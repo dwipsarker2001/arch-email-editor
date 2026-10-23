@@ -1,0 +1,340 @@
+/* Arch Email Editor - Framework Agnostic Stylesheet */
+:root {
+  --arch-bg-main: #f8fafc;
+  --arch-bg-surface: #ffffff;
+  --arch-border: #e2e8f0;
+  --arch-text-primary: #0f172a;
+  --arch-text-secondary: #64748b;
+  --arch-primary: #2563eb;
+  --arch-primary-hover: #1d4ed8;
+  --arch-danger: #ef4444;
+  --arch-radius: 8px;
+  --arch-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.arch-editor {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+  background-color: var(--arch-bg-main);
+  font-family: var(--arch-font);
+  color: var(--arch-text-primary);
+  border: 1px solid var(--arch-border);
+  border-radius: var(--arch-radius);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.arch-editor * {
+  box-sizing: border-box;
+}
+
+/* Header Toolbar */
+.arch-editor__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background-color: var(--arch-bg-surface);
+  border-bottom: 1px solid var(--arch-border);
+  gap: 12px;
+}
+
+.arch-editor__title {
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--arch-text-primary);
+}
+
+.arch-editor__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.arch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid var(--arch-border);
+  background-color: var(--arch-bg-surface);
+  color: var(--arch-text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.arch-btn:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.arch-btn--primary {
+  background-color: var(--arch-primary);
+  color: #ffffff;
+  border-color: var(--arch-primary);
+}
+
+.arch-btn--primary:hover {
+  background-color: var(--arch-primary-hover);
+  border-color: var(--arch-primary-hover);
+}
+
+.arch-btn--danger {
+  color: var(--arch-danger);
+}
+
+.arch-btn--danger:hover {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+}
+
+/* Main Body Layout: Palette + Canvas + Inspector */
+.arch-editor__body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Left Palette */
+.arch-editor__palette {
+  width: 220px;
+  background-color: var(--arch-bg-surface);
+  border-right: 1px solid var(--arch-border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.arch-editor__section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--arch-text-secondary);
+  margin-bottom: 4px;
+}
+
+.arch-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--arch-border);
+  border-radius: 6px;
+  background-color: var(--arch-bg-surface);
+  cursor: grab;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--arch-text-primary);
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.arch-palette-item:hover {
+  border-color: var(--arch-primary);
+  background-color: #eff6ff;
+  color: var(--arch-primary);
+  transform: translateY(-1px);
+}
+
+.arch-palette-item:active {
+  cursor: grabbing;
+}
+
+/* Center Canvas */
+.arch-editor__canvas {
+  flex: 1;
+  background-color: #f1f5f9;
+  overflow-y: auto;
+  padding: 32px 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.arch-canvas-container {
+  width: 100%;
+  max-width: 600px;
+  min-height: 480px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease;
+}
+
+.arch-canvas-container.drag-over {
+  border: 2px dashed var(--arch-primary);
+}
+
+/* Canvas Blocks */
+.arch-canvas-block {
+  position: relative;
+  cursor: pointer;
+  transition: outline 0.15s ease;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+
+.arch-canvas-block:hover {
+  outline: 2px dashed #93c5fd;
+}
+
+.arch-canvas-block.is-selected {
+  outline: 2px solid var(--arch-primary) !important;
+}
+
+.arch-block-toolbar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: none;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(4px);
+  padding: 2px 4px;
+  border-radius: 4px;
+  z-index: 10;
+}
+
+.arch-canvas-block:hover .arch-block-toolbar,
+.arch-canvas-block.is-selected .arch-block-toolbar {
+  display: flex;
+}
+
+.arch-toolbar-btn {
+  background: none;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 11px;
+  border-radius: 2px;
+}
+
+.arch-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.arch-canvas-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--arch-text-secondary);
+  font-size: 14px;
+}
+
+/* Right Inspector */
+.arch-editor__inspector {
+  width: 280px;
+  background-color: var(--arch-bg-surface);
+  border-left: 1px solid var(--arch-border);
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.arch-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.arch-form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--arch-text-secondary);
+}
+
+.arch-input,
+.arch-select,
+.arch-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid var(--arch-border);
+  border-radius: 6px;
+  color: var(--arch-text-primary);
+  background-color: var(--arch-bg-surface);
+  outline: none;
+  font-family: inherit;
+}
+
+.arch-input:focus,
+.arch-select:focus,
+.arch-textarea:focus {
+  border-color: var(--arch-primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.arch-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Modal Popup for HTML/JSON Export */
+.arch-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+
+.arch-modal {
+  width: 100%;
+  max-width: 680px;
+  max-height: 85%;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.arch-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--arch-border);
+  font-weight: 600;
+}
+
+.arch-modal__body {
+  padding: 16px 18px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.arch-modal__code {
+  width: 100%;
+  height: 280px;
+  padding: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  border: 1px solid var(--arch-border);
+  border-radius: 6px;
+  background-color: #0f172a;
+  color: #e2e8f0;
+  resize: none;
+  outline: none;
+}
