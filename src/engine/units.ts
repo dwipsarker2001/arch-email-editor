@@ -709,7 +709,16 @@ export function getUnitAncestry(unit: HTMLElement, selectedLeaf?: HTMLElement | 
         label = rowMatch ? `Row ${rowMatch[1]}` : 'Row';
       } else if (role === 'column') {
         const colMatch = cursor.className.match(/\bcolumn-(\d+)\b/i);
-        label = colMatch ? `Column ${colMatch[1]}` : 'Column';
+        const colSide =
+          cursor.className.match(/\bcol-(left|right|center)\b/i) ||
+          cursor.getAttribute('align')?.match(/\b(left|right|center)\b/i);
+        if (colMatch) {
+          label = `Column ${colMatch[1]}`;
+        } else if (colSide) {
+          label = `Column (${colSide[1].charAt(0).toUpperCase() + colSide[1].slice(1)})`;
+        } else {
+          label = 'Column';
+        }
       } else if (tag === 'a') {
         label = 'Link (a)';
       } else if (tag === 'img') {
@@ -750,6 +759,16 @@ export function getUnitAncestry(unit: HTMLElement, selectedLeaf?: HTMLElement | 
         element: anchor
       });
     }
+  }
+
+  // Disambiguate identical column labels in nested hierarchies (e.g. nested tables)
+  const colItems = items.filter((it) => it.role === 'column');
+  if (colItems.length >= 2) {
+    colItems.forEach((col, idx) => {
+      if (col.label === 'Column') {
+        col.label = idx === 0 ? 'Column (Outer)' : `Column (Inner)`;
+      }
+    });
   }
 
   return items;

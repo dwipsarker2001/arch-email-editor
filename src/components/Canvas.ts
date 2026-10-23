@@ -80,6 +80,7 @@ export class Canvas {
   private overlayLayer: HTMLElement;
   private floatingToolbar: HTMLElement | null = null;
   private dimensionsBadge: HTMLElement | null = null;
+  private resizeObserver: ResizeObserver | null = null;
   private dropIndicatorEl: HTMLElement | null = null;
   private dragGhostEl: HTMLElement | null = null;
   private events: CanvasEvents;
@@ -185,6 +186,14 @@ export class Canvas {
       this.iframe.style.maxWidth = '100%';
       this.iframe.style.margin = '0 auto';
     }
+    this.syncHUDPosition();
+  }
+
+  /**
+   * Re-evaluates and aligns the parent overlay HUD (toolbar, dimensions pill, resize handles)
+   * relative to the currently active or hovered unit.
+   */
+  public syncHUDPosition(): void {
     const target = this.activeMoveableUnit || this.hoveredUnit;
     if (target && this.floatingToolbar) {
       this.positionFloatingToolbar(target, this.floatingToolbar);
@@ -195,6 +204,33 @@ export class Canvas {
    * Binds click, pointer-drag, and palette HTML5 drop events on the outer canvas container & overlay shield.
    */
   private bindOuterEvents(): void {
+    const onScrollOrResize = () => this.syncHUDPosition();
+    this.containerElement.addEventListener('scroll', onScrollOrResize, { passive: true });
+    window.addEventListener('scroll', onScrollOrResize, { passive: true });
+    window.addEventListener('resize', onScrollOrResize, { passive: true });
+
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => this.syncHUDPosition());
+      this.resizeObserver.observe(this.containerElement);
+      this.resizeObserver.observe(this.iframe);
+    }
+
+    // Global Escape Key Drill-Up:
+    // Allows pressing Escape from anywhere (e.g. while inspecting fields or clicking outer canvas)
+    // to exit inline text editing or climb to parent container frame (Figma behavior).
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (this.isEditingText) {
+          this.exitTextEditMode();
+          return;
+        }
+        if (this.activeMoveableUnit) {
+          this.selectParentUnit(this.activeMoveableUnit);
+          return;
+        }
+      }
+    });
+
     this.element.addEventListener('click', (e) => {
       if (e.target === this.element || e.target === this.containerElement) {
         this.clearSelection();
@@ -410,7 +446,7 @@ export class Canvas {
     this.activeImageResize = null;
     this.suppressNextClick = true;
     this.overlayLayer.style.pointerEvents = 'none';
-    this.selectUnit(state.img, state.img);
+    this.selectUnit(state.img, state.unit);
     this.adjustHeight();
     this.onStructureChanged();
   }
@@ -703,14 +739,17 @@ export class Canvas {
     let draggedDelta = 0;
 
     if (hasGeometry) {
+      const sizeOf = (s: DOMRect) => (axis === 'x' ? s.width : s.height);
       const startOf = (s: DOMRect) => (axis === 'x' ? s.left : s.top);
       const endOf = (s: DOMRect) => (axis === 'x' ? s.right : s.bottom);
+      const dragSize = sizeOf(slots[dragIdx]);
+
       if (destIdx < dragIdx) {
-        bypassedDelta = Math.round(endOf(slots[dragIdx]) - endOf(slots[dragIdx - 1]));
+        bypassedDelta = Math.round(dragSize);
         draggedDelta = Math.round(startOf(slots[destIdx]) - startOf(slots[dragIdx]));
       } else {
-        bypassedDelta = Math.round(startOf(slots[dragIdx]) - startOf(slots[dragIdx + 1]));
-        draggedDelta = Math.round(endOf(slots[destIdx]) - endOf(slots[dragIdx]));
+        bypassedDelta = Math.round(-dragSize);
+        draggedDelta = Math.round((endOf(slots[destIdx]) - dragSize) - startOf(slots[dragIdx]));
       }
     } else {
       // Fallback for zero-layout environments (e.g. jsdom without mocked rects)
@@ -1865,8 +1904,20 @@ export class Canvas {
     const offsetX = iframeRect.left - containerRect.left;
     const offsetY = iframeRect.top - containerRect.top;
 
-    const top = Math.max(4, offsetY + unitRect.top - 28);
-    const left = Math.max(4, offsetX + unitRect.left);
+    const toolbarWidth = toolbar.offsetWidth || 260;
+    const toolbarHeight = toolbar.offsetHeight || 28;
+
+    // Viewport-aware horizontal positioning:
+    // Clamp `left` within container bounds so right-aligned elements (social icons, right columns) never push toolbar off-screen
+    const maxLeft = Math.max(4, containerRect.width - toolbarWidth - 8);
+    const left = Math.min(Math.max(4, offsetX + unitRect.left), maxLeft);
+
+    // Viewport-aware vertical positioning:
+    // If element is close to the top edge (< toolbarHeight + 6), flip toolbar below element so it never clips or overlaps
+    const fitsAbove = offsetY + unitRect.top >= toolbarHeight + 6;
+    const top = fitsAbove
+      ? Math.max(4, offsetY + unitRect.top - toolbarHeight - 2)
+      : Math.min(containerRect.height - toolbarHeight - 4, offsetY + unitRect.bottom + 6);
 
     toolbar.style.top = `${top}px`;
     toolbar.style.left = `${left}px`;
@@ -1880,8 +1931,16 @@ export class Canvas {
         : unitRect;
 
     if (this.dimensionsBadge) {
-      const dimTop = offsetY + targetRect.bottom + 4;
-      const dimLeft = offsetX + targetRect.left + targetRect.width / 2;
+      const dimWidth = this.dimensionsBadge.offsetWidth || 48;
+      // If toolbar was flipped below the element, position dimensions badge below toolbar or above element
+      const dimTop = fitsAbove
+        ? offsetY + targetRect.bottom + 4
+        : top + toolbarHeight + 4;
+      const rawDimLeft = offsetX + targetRect.left + targetRect.width / 2;
+      const dimLeft = Math.min(
+        Math.max(dimWidth / 2 + 4, rawDimLeft),
+        containerRect.width - dimWidth / 2 - 4
+      );
       this.dimensionsBadge.style.top = `${dimTop}px`;
       this.dimensionsBadge.style.left = `${dimLeft}px`;
     }
@@ -2228,6 +2287,8 @@ export class Canvas {
   }
 
   public destroy(): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.removeFloatingToolbar();
     this.removeDragGhost();
     this.clearDropIndicators();

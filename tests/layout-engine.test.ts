@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ArchEmailEditor } from '../src/editor';
-import { moveUnitToTarget } from '../src/engine/glue';
+import { moveUnitToTarget, removeUnit } from '../src/engine/glue';
 
 const PUMPKIN_EXCERPT = `<!DOCTYPE html>
 <html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" lang="en">
@@ -1465,6 +1465,136 @@ describe('Figma vertical displacement', () => {
     // MSO comments between the swapped tables remain valid
     const rawHTML = ifrDoc.body.innerHTML;
     expect(rawHTML).toContain('<!--[if mso | IE]></td><td><![endif]-->');
+
+    editor.destroy();
+  });
+
+  it('clamps floating toolbar and dimensions pill within container boundaries on right/top edges', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+
+    const html = `<table><tr><td id="top-right-cell" style="width:50px;height:24px;">Button</td></tr></table>`;
+    editor.importHTML(html);
+
+    const canvas = (editor as any).canvas;
+    const containerEl = canvas.containerElement as HTMLElement;
+    const iframeEl = canvas.iframe as HTMLElement;
+    const ifrDoc = (iframeEl as HTMLIFrameElement).contentDocument!;
+    const cell = ifrDoc.querySelector('#top-right-cell') as HTMLElement;
+
+    // Mock container geometry: 600px wide, 500px high
+    containerEl.getBoundingClientRect = () =>
+      ({ left: 100, top: 100, width: 600, height: 500, right: 700, bottom: 600 } as DOMRect);
+    iframeEl.getBoundingClientRect = () =>
+      ({ left: 100, top: 100, width: 600, height: 500, right: 700, bottom: 600 } as DOMRect);
+
+    // Mock cell positioned near top-right edge (x=550, y=10)
+    cell.getBoundingClientRect = () =>
+      ({ left: 550, top: 10, width: 40, height: 24, right: 590, bottom: 34 } as DOMRect);
+
+    canvas.selectUnit(cell, cell);
+    const toolbar = canvas.floatingToolbar as HTMLElement;
+    expect(toolbar).toBeTruthy();
+
+    const left = parseFloat(toolbar.style.left);
+    const top = parseFloat(toolbar.style.top);
+
+    // 1. Right-edge clamping: with toolbar width ~260px, left must NOT exceed containerWidth - toolbarWidth - 8 (~332px)
+    expect(left).toBeLessThanOrEqual(340);
+    expect(left).toBeGreaterThanOrEqual(4);
+
+    // 2. Top-edge flip: since y=10 is < toolbarHeight + 6, toolbar flips BELOW cell (y > 34) instead of clipping
+    expect(top).toBeGreaterThanOrEqual(34);
+
+    // 3. Dimensions pill is clamped within container boundaries
+    if (canvas.dimensionsBadge) {
+      const dimLeft = parseFloat(canvas.dimensionsBadge.style.left);
+      expect(dimLeft).toBeLessThan(600);
+      expect(dimLeft).toBeGreaterThan(0);
+    }
+
+    editor.destroy();
+  });
+
+  it('handles global Escape key to exit text editing and climb container hierarchy from anywhere', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+
+    const html = `<table class="row"><tr><td class="column col-1"><p id="txt">Editable Text</p></td><td class="column col-2"><p>Col 2</p></td></tr></table>`;
+    editor.importHTML(html);
+
+    const canvas = (editor as any).canvas;
+    const ifrDoc = (canvas.iframe as HTMLIFrameElement).contentDocument!;
+    const p = ifrDoc.querySelector('#txt') as HTMLElement;
+    const col = ifrDoc.querySelector('.col-1') as HTMLElement;
+    const row = ifrDoc.querySelector('.row') as HTMLElement;
+
+    // Drill down to p and enter inline text edit mode
+    canvas.selectUnit(p, p);
+    canvas.enterTextEditMode(p, p);
+    expect(canvas.isEditingText).toBe(true);
+
+    // Press Escape on window (e.g. while focus was anywhere in the window)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(canvas.isEditingText).toBe(false);
+
+    // Press Escape again: climbs from child (p) to Column
+    canvas.selectUnit(p, p);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(canvas.activeMoveableUnit).toBe(col);
+
+    // Press Escape again: climbs from Column to Row
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(canvas.activeMoveableUnit).toBe(row);
+
+    editor.destroy();
+  });
+
+  it('performs non-adjacent MSO ghost-table swaps cleanly and cleans up duplicate comments on deletion', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+
+    const html = `<div class="strip">
+      <!--[if mso]><table><tr><td><![endif]-->
+      <div class="item-0">Item 0</div>
+      <!--[if mso]></td><td><![endif]-->
+      <div class="item-1">Item 1</div>
+      <!--[if mso]></td><td><![endif]-->
+      <div class="item-2">Item 2</div>
+      <!--[if mso]></td></tr></table><![endif]-->
+    </div>`;
+    editor.importHTML(html);
+
+    const ifrDoc = (container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement).contentDocument!;
+    const item0 = ifrDoc.querySelector('.item-0') as HTMLElement;
+    const item2 = ifrDoc.querySelector('.item-2') as HTMLElement;
+
+    // Non-adjacent move: move item 0 after item 2 (0 jumps over 1 and 2)
+    (editor as any).canvas.selectUnit(item0, item0);
+    const moved = (editor as any).canvas.moveSelectedElement ? true : false;
+    expect(moved).toBe(true);
+
+    // Move item0 past item2 using glue.moveUnitToTarget
+    moveUnitToTarget(item0, item2, 'after');
+
+    const itemsAfter = Array.from(ifrDoc.querySelectorAll('.strip > div')).map((el) =>
+      el.className.replace(/\s*arch-selected-element\s*/, '').trim()
+    );
+    expect(itemsAfter).toEqual(['item-1', 'item-2', 'item-0']);
+
+    // MSO separator comments must still exist and separate the 3 items cleanly
+    const stripHtml = ifrDoc.querySelector('.strip')!.innerHTML;
+    const sepCount = (stripHtml.match(/<!--\[if mso\]><\/td><td><!\[endif\]-->/g) || []).length;
+    expect(sepCount).toBe(2);
+
+    // Delete item-2: duplicate adjacent MSO separator comment must be removed
+    removeUnit(item2);
+    const stripHtmlAfterDelete = ifrDoc.querySelector('.strip')!.innerHTML;
+    const sepCountAfterDelete = (stripHtmlAfterDelete.match(/<!--\[if mso\]><\/td><td><!\[endif\]-->/g) || []).length;
+    expect(sepCountAfterDelete).toBe(1);
 
     editor.destroy();
   });

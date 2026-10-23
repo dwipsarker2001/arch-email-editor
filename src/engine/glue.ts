@@ -521,17 +521,30 @@ export function moveUnitToTarget(
 
   // Same parent container: reorder directly
   if (sourceParent === targetParent) {
-    const envSource = collectUnitEnvelope(sourceUnit);
-    const envTarget = collectUnitEnvelope(targetUnit);
-
     const peers = getMoveableSiblings(sourceUnit);
     const sIdx = peers.indexOf(sourceUnit);
     const tIdx = peers.indexOf(targetUnit);
 
-    // Adjacent sibling swap (covers 2-column swaps, adjacent 3-column swaps, adjacent row swaps, and adjacent block swaps
-    // regardless of whether the cursor was in the first 50% or second 50% of `targetUnit`!)
-    if (sIdx !== -1 && tIdx !== -1 && Math.abs(sIdx - tIdx) === 1) {
-      swapEnvelopesInPlace(envSource, envTarget);
+    // For same-parent siblings, sequentially swap adjacent envelopes so all intervening gutter cells (<td width="20">)
+    // and MSO separator comments are 100% preserved!
+    if (sIdx !== -1 && tIdx !== -1) {
+      const step = sIdx < tIdx ? 1 : -1;
+      const targetIdx = tIdx;
+      const clampedTarget = Math.max(0, Math.min(peers.length - 1, targetIdx));
+
+      let curIdx = sIdx;
+      while (curIdx !== clampedTarget) {
+        const nextIdx = curIdx + step;
+        const curUnit = peers[curIdx];
+        const nextUnit = peers[nextIdx];
+        const curEnv = collectUnitEnvelope(curUnit);
+        const nextEnv = collectUnitEnvelope(nextUnit);
+        swapEnvelopesInPlace(curEnv, nextEnv);
+        peers[curIdx] = nextUnit;
+        peers[nextIdx] = curUnit;
+        curIdx = nextIdx;
+      }
+
       if (isColumnElement(sourceUnit) && isColumnElement(targetUnit)) {
         syncColumnSwapStyles(sourceUnit, targetUnit);
       } else if (isRowElement(sourceUnit)) {
@@ -539,29 +552,6 @@ export function moveUnitToTarget(
       }
       return true;
     }
-
-    // For non-adjacent siblings in the same container (e.g. moving Column 1 to Column 3 or Column 3 to Column 1 in a 3-column row),
-    // place `sourceUnit` at `targetUnit`'s position (`after` when moving rightward/downward, `before` when moving leftward/upward)!
-    const effectivePosition =
-      sIdx !== -1 && tIdx !== -1 ? (sIdx < tIdx ? 'after' : 'before') : position;
-
-    const sourceNodes = getEnvelopeNodes(envSource);
-    const targetNodes = getEnvelopeNodes(envTarget);
-    const refNode =
-      effectivePosition === 'before'
-        ? targetNodes[0]
-        : targetNodes[targetNodes.length - 1].nextSibling;
-
-    for (const n of sourceNodes) {
-      targetParent.insertBefore(n, refNode);
-    }
-
-    if (isColumnElement(sourceUnit) && isColumnElement(targetUnit)) {
-      syncColumnSwapStyles(sourceUnit, targetUnit);
-    } else if (isRowElement(sourceUnit)) {
-      normalizeCardGroupBorders(sourceUnit.ownerDocument?.body || targetParent);
-    }
-    return true;
   }
 
   // Cross-container move (e.g. moving a Block from Column 1 to Column 2 or Row 3 to Row 4)
@@ -725,6 +715,21 @@ export function removeUnit(unit: HTMLElement): void {
     } else if (prevEl && isGutterCell(prevEl)) {
       prevEl.remove();
     }
+  }
+
+  // If unit is preceded or followed by an MSO column separator comment (`</td>...<td`), remove one separator to avoid orphan empty cells
+  let prevNode = unit.previousSibling;
+  while (prevNode && prevNode.nodeType === 3 && !(prevNode.nodeValue || '').trim()) {
+    prevNode = prevNode.previousSibling;
+  }
+  let nextNode = unit.nextSibling;
+  while (nextNode && nextNode.nodeType === 3 && !(nextNode.nodeValue || '').trim()) {
+    nextNode = nextNode.nextSibling;
+  }
+  if (prevNode && isMsoColumnSeparatorComment(prevNode)) {
+    prevNode.parentNode?.removeChild(prevNode);
+  } else if (nextNode && isMsoColumnSeparatorComment(nextNode)) {
+    nextNode.parentNode?.removeChild(nextNode);
   }
 
   const env = collectUnitEnvelope(unit);
