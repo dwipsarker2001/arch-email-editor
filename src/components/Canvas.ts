@@ -106,6 +106,11 @@ export class Canvas {
     active: boolean;
   } | null = null;
   private resizeHandles: HTMLElement[] = [];
+  private pendingMove: { x: number; y: number } | null = null;
+  private moveRaf = 0;
+  private containerRectCache: DOMRect | null = null;
+  private displaceKey = '';
+  private dropMemoDragged: HTMLElement | null = null;
   private activeImageResize: {
     img: HTMLElement;
     unit: HTMLElement;
@@ -199,13 +204,20 @@ export class Canvas {
     });
 
     // Parent window pointermove/mouseup listeners for 60fps custom Figma Pointer Drag & Image Resize
+    // Coalesce mousemove to at most one drag update per animation frame (no redundant work at 120Hz+ mice)
     window.addEventListener('mousemove', (e) => {
       if (this.activeImageResize) {
         this.handleImageResizeMove(e.clientX);
         return;
       }
       if (!this.pointerDragCandidate) return;
-      this.handlePointerDragMove(e.clientX, e.clientY);
+      this.pendingMove = { x: e.clientX, y: e.clientY };
+      if (this.moveRaf) return;
+      this.moveRaf = requestAnimationFrame(() => {
+        this.moveRaf = 0;
+        const p = this.pendingMove;
+        if (p && this.pointerDragCandidate) this.handlePointerDragMove(p.x, p.y);
+      });
     });
 
     window.addEventListener('mouseup', () => {
@@ -296,6 +308,8 @@ export class Canvas {
   private finishPointerDrag(): void {
     const cand = this.pointerDragCandidate;
     this.pointerDragCandidate = null;
+    this.pendingMove = null;
+    this.containerRectCache = null;
 
     if (!cand || !cand.active) {
       return;
@@ -331,11 +345,11 @@ export class Canvas {
 
   private updateDragGhostPosition(clientX: number, clientY: number): void {
     if (!this.dragGhostEl) return;
-    const containerRect = this.containerElement.getBoundingClientRect();
-    const x = clientX - containerRect.left + 14;
-    const y = clientY - containerRect.top + 14;
-    this.dragGhostEl.style.left = `${x}px`;
-    this.dragGhostEl.style.top = `${y}px`;
+    // GPU-composited move (no layout): cached container origin + translate3d
+    if (!this.containerRectCache) this.containerRectCache = this.containerElement.getBoundingClientRect();
+    const x = clientX - this.containerRectCache.left + 14;
+    const y = clientY - this.containerRectCache.top + 14;
+    this.dragGhostEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
   }
 
   private removeDragGhost(): void {
@@ -451,9 +465,6 @@ export class Canvas {
       return;
     }
 
-    this.clearDropIndicators(false, true);
-    this.hoveredDropTarget = targetUnit;
-
     const targetDx = parseFloat(targetUnit.dataset.archDisplaceX || '0') || 0;
     const rawRect = targetUnit.getBoundingClientRect();
     const rect =
@@ -484,7 +495,22 @@ export class Canvas {
       }
     }
 
-    this.hoveredDropPosition = isBefore ? 'before' : 'after';
+    const nextPosition = isBefore ? 'before' : 'after';
+
+    // Perf: pointer moved but the drop slot is unchanged -> skip all DOM/layout work for this frame.
+    if (
+      this.hoveredDropTarget === targetUnit &&
+      this.hoveredDropPosition === nextPosition &&
+      this.dropMemoDragged === effectiveDragged &&
+      this.dropIndicatorEl
+    ) {
+      return;
+    }
+    this.dropMemoDragged = effectiveDragged;
+
+    this.clearDropIndicators(false, true);
+    this.hoveredDropTarget = targetUnit;
+    this.hoveredDropPosition = nextPosition;
 
     if (isHorizontal && effectiveDragged && effectiveDragged.parentElement === targetUnit.parentElement) {
       this.applyColumnDisplacementPreview(effectiveDragged, targetUnit, this.hoveredDropPosition);
@@ -540,6 +566,10 @@ export class Canvas {
       return Math.round(600 / cols.length);
     };
 
+    const key = `${dragIdx}:${destIdx}`;
+    if (this.displaceKey === key) return;
+    this.displaceKey = key;
+
     const dragWidth = getColAdvance(draggedCol);
 
     cols.forEach((col, i) => {
@@ -582,6 +612,7 @@ export class Canvas {
    * - When `keepTransition = false` (e.g. on drop commit), removes transition classes and inline transforms immediately.
    */
   private clearColumnDisplacementPreview(keepTransition = false): void {
+    this.displaceKey = '';
     const ifrDoc = this.iframe.contentDocument;
     if (!ifrDoc) return;
     ifrDoc
@@ -796,7 +827,7 @@ export class Canvas {
         transition: opacity 0.12s ease !important;
       }
       .arch-col-displace-ready {
-        transition: transform 220ms cubic-bezier(0.2, 0, 0, 1) !important;
+        transition: transform 200ms cubic-bezier(0.2, 0, 0, 1) !important;
         will-change: transform !important;
         position: relative !important;
       }

@@ -539,6 +539,9 @@
 
 .arch-figma-drag-ghost {
   position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
   z-index: 50;
   display: inline-flex;
   align-items: center;
