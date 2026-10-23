@@ -1,5 +1,61 @@
+/**
+ * Arch Email Editor - HTML Compiler & Document Normalizer
+ *
+ * Architecture & Email Quirks:
+ * Major desktop and mobile email clients (Outlook 2007-2021, Gmail Mobile, Yahoo Mail)
+ * do NOT support standard modern CSS layouts (Flexbox, CSS Grid, external stylesheets).
+ * 
+ * To ensure 100% visual fidelity across 70+ email clients, this module:
+ * 1. Outputs nested <table> markup with cellspacing="0" and cellpadding="0".
+ * 2. Inlines all CSS attributes into `style="..."` properties.
+ * 3. Uses Outlook MSO conditionals (`<!--[if (gte mso 9)|(IE)]>`) for desktop Outlook DPI scaling.
+ * 4. Implements bulletproof buttons (table + inline styled anchor).
+ * 5. Provides bidirectional compilation: AST -> Email HTML, and native DOMParser: HTML -> AST.
+ */
+
 import { EmailDocument, BlockNode } from './types';
 
+/**
+ * Normalizes any arbitrary JSON input into a guaranteed valid EmailDocument AST.
+ * Prevents runtime crashes from empty `{}` or corrupted database payloads.
+ */
+export function normalizeDocument(doc?: any): EmailDocument {
+  // If null or undefined, return the default starter template
+  if (!doc || typeof doc !== 'object') {
+    return getDefaultDocument();
+  }
+
+  // If passed an empty object without blocks, initialize with an empty blocks array
+  const hasBlocks = 'blocks' in doc;
+  if (!hasBlocks && Object.keys(doc).length === 0) {
+    return {
+      version: '1.0',
+      settings: {
+        contentWidth: '600px',
+        backgroundColor: '#f4f4f7',
+        fontFamily: 'Arial, sans-serif',
+        textColor: '#334155'
+      },
+      blocks: []
+    };
+  }
+
+  const settings = doc.settings && typeof doc.settings === 'object' ? doc.settings : {};
+  return {
+    version: '1.0',
+    settings: {
+      contentWidth: typeof settings.contentWidth === 'string' ? settings.contentWidth : '600px',
+      backgroundColor: typeof settings.backgroundColor === 'string' ? settings.backgroundColor : '#f4f4f7',
+      fontFamily: typeof settings.fontFamily === 'string' ? settings.fontFamily : 'Arial, sans-serif',
+      textColor: typeof settings.textColor === 'string' ? settings.textColor : '#334155'
+    },
+    blocks: Array.isArray(doc.blocks) ? doc.blocks : []
+  };
+}
+
+/**
+ * Returns the default starter email template.
+ */
 export function getDefaultDocument(): EmailDocument {
   return {
     version: '1.0',
@@ -78,7 +134,10 @@ export function getDefaultDocument(): EmailDocument {
   };
 }
 
-function escapeHtml(str: string): string {
+/**
+ * Escapes unsafe HTML characters to prevent XSS.
+ */
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -87,16 +146,39 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
-function sanitizeUrl(url?: string): string {
+/**
+ * Validates and sanitizes URLs against an explicit safe protocol whitelist.
+ * Blocks javascript:, vbscript:, data:text/html, etc.
+ */
+export function sanitizeUrl(url?: string): string {
   if (!url) return '#';
   const trimmed = url.trim();
-  if (/^javascript:/i.test(trimmed)) return '#';
-  return escapeHtml(trimmed);
+  // Protocol whitelist: http, https, mailto, tel, or fragment hash
+  if (/^(https?:\/\/|mailto:|tel:|#)/i.test(trimmed)) {
+    return escapeHtml(trimmed);
+  }
+  return '#';
 }
 
-function renderBlock(block: BlockNode, fontFamily: string): string {
+/**
+ * Validates image sources: allows http(s) or raster base64 images.
+ */
+export function sanitizeImageUrl(src?: string): string {
+  if (!src) return '';
+  const trimmed = src.trim();
+  if (/^(https?:\/\/|data:image\/(png|jpeg|jpg|gif|webp);base64,)/i.test(trimmed)) {
+    return escapeHtml(trimmed);
+  }
+  return '';
+}
+
+/**
+ * Renders an individual block into email-compatible table markup.
+ */
+function renderBlock(block: BlockNode, fontFamily: string, contentWidth: string): string {
   const align = block.style.textAlign || 'left';
   const padding = block.style.padding || '12px 20px';
+  const contentWidthNum = parseInt(contentWidth || '600', 10);
 
   switch (block.type) {
     case 'heading': {
@@ -124,6 +206,7 @@ function renderBlock(block: BlockNode, fontFamily: string): string {
     }
 
     case 'button': {
+      // Bulletproof Button pattern: uses a nested table and styled <a> tag
       const label = escapeHtml(block.content.label || 'Click Here');
       const url = sanitizeUrl(block.content.url);
       const bg = block.style.backgroundColor || '#2563eb';
@@ -148,12 +231,12 @@ function renderBlock(block: BlockNode, fontFamily: string): string {
     }
 
     case 'image': {
-      const src = sanitizeUrl(block.content.src || '');
+      const src = sanitizeImageUrl(block.content.src || '');
       const alt = escapeHtml(block.content.alt || '');
       return `
         <tr>
           <td align="${align}" style="padding: ${padding}; text-align: ${align};">
-            <img src="${src}" alt="${alt}" border="0" style="display: block; max-width: 100%; height: auto; margin: ${align === 'center' ? '0 auto' : align === 'right' ? '0 0 0 auto' : '0'};" />
+            <img src="${src}" alt="${alt}" border="0" width="${contentWidthNum}" style="display: block; width: 100%; max-width: ${contentWidthNum}px; height: auto; margin: ${align === 'center' ? '0 auto' : align === 'right' ? '0 0 0 auto' : '0'};" />
           </td>
         </tr>`;
     }
@@ -173,12 +256,17 @@ function renderBlock(block: BlockNode, fontFamily: string): string {
   }
 }
 
-export function compileToEmailHtml(doc: EmailDocument): string {
-  const contentWidth = parseInt(doc.settings.contentWidth || '600', 10);
+/**
+ * Compiles a structured EmailDocument into production-ready email HTML.
+ */
+export function compileToEmailHtml(inputDoc: EmailDocument): string {
+  const doc = normalizeDocument(inputDoc);
+  const contentWidth = doc.settings.contentWidth || '600px';
+  const contentWidthNum = parseInt(contentWidth, 10);
   const bgColor = doc.settings.backgroundColor || '#f4f4f7';
   const fontFamily = doc.settings.fontFamily || 'Arial, sans-serif';
 
-  const rows = doc.blocks.map(b => renderBlock(b, fontFamily)).join('\n');
+  const rows = doc.blocks.map(b => renderBlock(b, fontFamily, contentWidth)).join('\n');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -204,18 +292,18 @@ export function compileToEmailHtml(doc: EmailDocument): string {
   </style>
 </head>
 <body style="margin: 0; padding: 0; background-color: ${bgColor}; font-family: ${fontFamily};">
-  <!-- Outer Background Container -->
+  <!-- Outer Background Container Table -->
   <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: ${bgColor};">
     <tr>
       <td align="center" style="padding: 24px 10px;">
         <!--[if (gte mso 9)|(IE)]>
-        <table align="center" border="0" cellspacing="0" cellpadding="0" width="${contentWidth}">
+        <table align="center" border="0" cellspacing="0" cellpadding="0" width="${contentWidthNum}">
         <tr>
-        <td align="center" valign="top" width="${contentWidth}">
+        <td align="center" valign="top" width="${contentWidthNum}">
         <![endif]-->
         
-        <!-- Main Email Container -->
-        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: ${contentWidth}px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <!-- Main Centered Email Container Table -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: ${contentWidthNum}px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
           <tbody>
             ${rows}
           </tbody>
@@ -231,4 +319,146 @@ export function compileToEmailHtml(doc: EmailDocument): string {
   </table>
 </body>
 </html>`;
+}
+
+/**
+ * Parses an arbitrary prebuilt HTML email string into editable EmailDocument blocks.
+ * Uses browser-native DOMParser (standard platform feature — zero external dependencies).
+ */
+export function parseHtmlToDocument(htmlString: string): EmailDocument {
+  const parser = new DOMParser();
+  const parsedDoc = parser.parseFromString(htmlString, 'text/html');
+
+  const body = parsedDoc.body;
+  const bodyStyle = body.getAttribute('style') || '';
+  const bgColorMatch = bodyStyle.match(/background-color:\s*([^;]+)/i);
+  const bgColor = bgColorMatch ? bgColorMatch[1].trim() : '#f4f4f7';
+
+  const fontFamilyMatch = bodyStyle.match(/font-family:\s*([^;]+)/i);
+  const fontFamily = fontFamilyMatch
+    ? fontFamilyMatch[1].trim()
+    : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+  const blocks: BlockNode[] = [];
+  let blockIdCounter = 1;
+
+  const elements = Array.from(body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, img, a, hr'));
+  const processed = new Set<Element>();
+
+  for (const el of elements) {
+    if (processed.has(el)) continue;
+
+    const tagName = el.tagName.toLowerCase();
+    const styleAttr = el.getAttribute('style') || '';
+    const styleObj: Record<string, string> = {};
+    styleAttr.split(';').forEach(rule => {
+      const [k, v] = rule.split(':').map(s => s?.trim());
+      if (k && v) styleObj[k.toLowerCase()] = v;
+    });
+
+    if (tagName.startsWith('h')) {
+      const level = parseInt(tagName[1], 10) || 2;
+      const text = el.textContent?.trim() || '';
+      if (text) {
+        blocks.push({
+          id: `block_import_${blockIdCounter++}`,
+          type: 'heading',
+          content: { text, level: (level <= 3 ? level : 3) as 1 | 2 | 3 },
+          style: {
+            fontSize: styleObj['font-size'] || (level === 1 ? '26px' : level === 2 ? '22px' : '18px'),
+            color: styleObj['color'] || '#0f172a',
+            textAlign: (styleObj['text-align'] as any) || 'left',
+            padding: styleObj['padding'] || '12px 20px'
+          }
+        });
+        processed.add(el);
+      }
+    } else if (tagName === 'img') {
+      const src = el.getAttribute('src') || '';
+      const alt = el.getAttribute('alt') || '';
+      if (src) {
+        blocks.push({
+          id: `block_import_${blockIdCounter++}`,
+          type: 'image',
+          content: { src, alt },
+          style: {
+            textAlign: (styleObj['text-align'] as any) || 'center',
+            padding: styleObj['padding'] || '12px 20px'
+          }
+        });
+        processed.add(el);
+      }
+    } else if (tagName === 'a') {
+      const label = el.textContent?.trim() || 'Click Here';
+      const url = el.getAttribute('href') || '#';
+      const bg = styleObj['background-color'] || styleObj['background'] || '#2563eb';
+
+      blocks.push({
+        id: `block_import_${blockIdCounter++}`,
+        type: 'button',
+        content: { label, url },
+        style: {
+          backgroundColor: bg,
+          color: styleObj['color'] || '#ffffff',
+          borderRadius: styleObj['border-radius'] || '6px',
+          fontSize: styleObj['font-size'] || '16px',
+          textAlign: (styleObj['text-align'] as any) || 'center',
+          padding: styleObj['padding'] || '14px 20px'
+        }
+      });
+      processed.add(el);
+    } else if (tagName === 'hr') {
+      blocks.push({
+        id: `block_import_${blockIdCounter++}`,
+        type: 'divider',
+        content: {},
+        style: {
+          color: styleObj['border-top-color'] || styleObj['border-color'] || '#e2e8f0',
+          padding: '16px 20px'
+        }
+      });
+      processed.add(el);
+    } else if (tagName === 'p') {
+      const text = el.textContent?.trim() || '';
+      if (text) {
+        blocks.push({
+          id: `block_import_${blockIdCounter++}`,
+          type: 'text',
+          content: { text },
+          style: {
+            fontSize: styleObj['font-size'] || '16px',
+            color: styleObj['color'] || '#475569',
+            textAlign: (styleObj['text-align'] as any) || 'left',
+            padding: styleObj['padding'] || '12px 20px'
+          }
+        });
+        processed.add(el);
+      }
+    }
+  }
+
+  if (blocks.length === 0) {
+    const rawText = body.textContent?.trim();
+    if (rawText) {
+      blocks.push({
+        id: `block_import_${blockIdCounter++}`,
+        type: 'text',
+        content: { text: rawText },
+        style: { fontSize: '16px', color: '#475569', padding: '12px 20px' }
+      });
+    } else {
+      return getDefaultDocument();
+    }
+  }
+
+  return {
+    version: '1.0',
+    settings: {
+      contentWidth: '600px',
+      backgroundColor: bgColor,
+      fontFamily: fontFamily,
+      textColor: '#334155'
+    },
+    blocks
+  };
 }

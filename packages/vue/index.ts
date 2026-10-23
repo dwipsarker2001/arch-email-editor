@@ -1,3 +1,15 @@
+/**
+ * Arch Email Editor - Vue 3 Adapter Component
+ *
+ * Pattern: Thin Adapter around the Vanilla ArchEmailEditor Core.
+ *
+ * This component:
+ * 1. Creates a container ref using `ref<HTMLDivElement>`.
+ * 2. Instantiates `ArchEmailEditor` in `onMounted()`.
+ * 3. Tears down and unbinds in `onBeforeUnmount()` to prevent memory leaks.
+ * 4. Exposes component methods (`getJSON()`, `getHTML()`, `getEditor()`) via `expose()`.
+ */
+
 import { defineComponent, ref, onMounted, onBeforeUnmount, h, PropType } from 'vue';
 import { ArchEmailEditor } from '../../src/editor';
 import { EmailDocument } from '../../src/types';
@@ -5,14 +17,17 @@ import { EmailDocument } from '../../src/types';
 export const VueEmailEditor = defineComponent({
   name: 'VueEmailEditor',
   props: {
+    /** Initial email template schema */
     initialData: {
       type: Object as PropType<EmailDocument>,
       default: undefined
     },
+    /** UI theme ('light' | 'dark') */
     theme: {
       type: String as PropType<'light' | 'dark'>,
       default: 'light'
     },
+    /** Read-only state */
     readOnly: {
       type: Boolean,
       default: false
@@ -25,6 +40,8 @@ export const VueEmailEditor = defineComponent({
 
     onMounted(() => {
       if (!containerRef.value) return;
+
+      // Mount the vanilla editor core into the Vue template ref
       editorInstance = ArchEmailEditor.create(containerRef.value, {
         initialData: props.initialData,
         theme: props.theme,
@@ -35,12 +52,14 @@ export const VueEmailEditor = defineComponent({
     });
 
     onBeforeUnmount(() => {
+      // Destroy editor instance when Vue component unmounts
       if (editorInstance) {
         editorInstance.destroy();
         editorInstance = null;
       }
     });
 
+    // Expose methods for template refs: const editorRef = ref(); editorRef.value.getJSON()
     expose({
       getJSON: () => editorInstance?.getJSON() ?? null,
       getHTML: () => editorInstance?.getHTML() ?? '',

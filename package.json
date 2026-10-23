@@ -5,14 +5,22 @@
   "type": "module",
   "main": "./dist/arch-email-editor.umd.js",
   "module": "./dist/arch-email-editor.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./dist/src/index.d.ts",
       "import": "./dist/arch-email-editor.js",
       "require": "./dist/arch-email-editor.umd.js"
     },
-    "./style.css": "./dist/style.css"
+    "./style.css": "./dist/arch-email-editor.css",
+    "./react": {
+      "import": "./packages/react/index.ts",
+      "types": "./packages/react/index.ts"
+    },
+    "./vue": {
+      "import": "./packages/vue/index.ts",
+      "types": "./packages/vue/index.ts"
+    }
   },
   "files": [
     "dist",
@@ -20,7 +28,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc --emitDeclarationOnly && vite build",
+    "build": "vite build && tsc --emitDeclarationOnly",
     "test": "vitest run"
   },
   "keywords": [

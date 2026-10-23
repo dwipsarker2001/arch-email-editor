@@ -91,4 +91,19 @@ describe('ArchEmailEditor Core Engine', () => {
     editor.destroy();
     expect(container.children.length).toBe(0);
   });
+
+  it('imports prebuilt HTML and replaces canvas blocks', () => {
+    const editor = ArchEmailEditor.create(container);
+    const html = '<h1>Imported Header</h1><p>Imported paragraph text</p><a href="https://example.com">CTA Button</a>';
+
+    editor.importHTML(html);
+
+    const doc = editor.getJSON();
+    expect(doc.blocks.length).toBe(3);
+    expect(doc.blocks[0].content.text).toBe('Imported Header');
+    expect(doc.blocks[1].content.text).toBe('Imported paragraph text');
+    expect(doc.blocks[2].content.label).toBe('CTA Button');
+
+    editor.destroy();
+  });
 });

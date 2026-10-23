@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compileToEmailHtml, getDefaultDocument } from '../src/compiler';
+import { compileToEmailHtml, getDefaultDocument, parseHtmlToDocument } from '../src/compiler';
 import { EmailDocument } from '../src/types';
 
 describe('Email HTML Compiler', () => {
@@ -125,7 +125,8 @@ describe('Email HTML Compiler', () => {
     expect(html).toContain('src="https://images.unsplash.com/photo-1579546929518-9e396f3cc809"');
     expect(html).toContain('alt="Header Image"');
     expect(html).toContain('border="0"');
-    expect(html).toContain('max-width: 100%');
+    expect(html).toContain('width="600"');
+    expect(html).toContain('max-width: 600px');
   });
 
   it('compiles divider block', () => {
@@ -149,5 +150,41 @@ describe('Email HTML Compiler', () => {
 
     const html = compileToEmailHtml(doc);
     expect(html).toContain('border-top: 1px solid #e2e8f0');
+  });
+
+  it('parses prebuilt HTML email string into editable EmailDocument blocks', () => {
+    const sampleHtml = `
+      <!DOCTYPE html>
+      <html>
+        <body style="background-color: #f1f5f9;">
+          <table width="600" align="center">
+            <tr><td><h1 style="color: #1e293b; font-size: 26px;">Summer Newsletter</h1></td></tr>
+            <tr><td><img src="https://example.com/banner.jpg" alt="Summer Banner" /></td></tr>
+            <tr><td><p style="color: #475569; font-size: 15px;">Enjoy our special summer discount!</p></td></tr>
+            <tr><td><a href="https://example.com/shop" style="background-color: #10b981; color: #ffffff; padding: 10px 20px;">Claim Discount</a></td></tr>
+            <tr><td><hr style="border-top: 1px solid #cbd5e1;" /></td></tr>
+          </table>
+        </body>
+      </html>
+    `;
+
+    // Parse HTML string into structured email document
+    const doc = parseHtmlToDocument(sampleHtml);
+
+    expect(doc.version).toBe('1.0');
+    expect(doc.blocks.length).toBeGreaterThanOrEqual(4);
+
+    const heading = doc.blocks.find((b: any) => b.type === 'heading');
+    expect(heading).toBeDefined();
+    expect(heading!.content.text).toBe('Summer Newsletter');
+
+    const image = doc.blocks.find((b: any) => b.type === 'image');
+    expect(image).toBeDefined();
+    expect(image!.content.src).toBe('https://example.com/banner.jpg');
+
+    const button = doc.blocks.find((b: any) => b.type === 'button');
+    expect(button).toBeDefined();
+    expect(button!.content.url).toBe('https://example.com/shop');
+    expect(button!.content.label).toBe('Claim Discount');
   });
 });

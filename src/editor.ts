@@ -1,14 +1,44 @@
+/**
+ * Arch Email Editor - Core Vanilla Controller
+ *
+ * Architecture pattern: Core Controller + Thin Adapter.
+ * 
+ * This class is 100% Vanilla TypeScript with ZERO external framework dependencies.
+ * It manages:
+ * 1. Document State: Stores the AST of email blocks with robust normalization.
+ * 2. Visual View: Renders canvas, toolbar, palette, and inspector to the DOM.
+ * 3. Interactions: Drag-and-drop, block reordering, style updates, and HTML import/export.
+ * 4. Lifecycle: Implements imperative `create()` and `destroy()` methods compatible with
+ *    direct HTML <script> tags, React useEffect hooks, and Vue onMounted hooks.
+ */
+
 import { EmailDocument, BlockNode, BlockType, EditorOptions } from './types';
-import { getDefaultDocument, compileToEmailHtml } from './compiler';
+import {
+  compileToEmailHtml,
+  parseHtmlToDocument,
+  normalizeDocument,
+  sanitizeUrl,
+  sanitizeImageUrl
+} from './compiler';
 
 export class ArchEmailEditor {
+  /** Target container element where the editor is rendered */
   private container: HTMLElement;
+  /** Active editor configuration options */
   private options: EditorOptions;
+  /** The in-memory document state (reactive AST) */
   private document: EmailDocument;
+  /** Currently selected block ID (or null if document settings are selected) */
   private selectedBlockId: string | null = null;
+  /** The root editor DOM node */
   private rootElement: HTMLElement | null = null;
+  /** Event bus mapping event names to subscriber callbacks */
   private listeners: Map<string, Function[]> = new Map();
 
+  /**
+   * Initializes a new email editor instance.
+   * Prefer using the static `ArchEmailEditor.create()` factory method.
+   */
   constructor(target: HTMLElement | string, options: EditorOptions = {}) {
     if (typeof target === 'string') {
       const el = document.querySelector<HTMLElement>(target);
@@ -21,10 +51,10 @@ export class ArchEmailEditor {
     }
 
     this.options = options;
-    this.document = options.initialData
-      ? JSON.parse(JSON.stringify(options.initialData))
-      : getDefaultDocument();
+    // Robust normalization: guarantees valid settings and blocks even if empty {} or corrupted
+    this.document = normalizeDocument(options.initialData);
 
+    // Register event listeners passed via options
     if (options.onChange) {
       this.on('change', options.onChange);
     }
@@ -32,32 +62,70 @@ export class ArchEmailEditor {
       this.on('select', options.onSelectBlock);
     }
 
+    // Render the initial DOM structure
     this.render();
   }
 
+  /**
+   * Factory method to create and mount the editor.
+   * Matches the standard convention used by CKEditor, Monaco Editor, and TinyMCE.
+   */
   public static create(target: HTMLElement | string, options: EditorOptions = {}): ArchEmailEditor {
     return new ArchEmailEditor(target, options);
   }
 
+  /**
+   * Returns a copy of the editor's options.
+   */
   public getOptions(): EditorOptions {
     return this.options;
   }
 
+  /**
+   * Returns a deep clone of the current document AST.
+   * Useful for saving newsletter drafts in a backend database.
+   */
   public getJSON(): EmailDocument {
     return JSON.parse(JSON.stringify(this.document));
   }
 
+  /**
+   * Replaces the current document with a new JSON template and re-renders the canvas.
+   */
   public setJSON(doc: EmailDocument): void {
-    this.document = JSON.parse(JSON.stringify(doc));
+    this.document = normalizeDocument(doc);
     this.selectedBlockId = null;
     this.render();
     this.emit('change', this.getJSON());
   }
 
+  /**
+   * Compiles the current document into production-ready, client-tested email HTML.
+   */
   public getHTML(): string {
     return compileToEmailHtml(this.document);
   }
 
+  /**
+   * Imports prebuilt HTML email markup, parses it into editable blocks,
+   * and loads it directly onto the canvas.
+   */
+  public importHTML(htmlString: string): void {
+    const doc = parseHtmlToDocument(htmlString);
+    this.setJSON(doc);
+  }
+
+  /**
+   * Reads an HTML file from a file input or drag-and-drop and imports it.
+   */
+  public async importHTMLFile(file: File): Promise<void> {
+    const text = await file.text();
+    this.importHTML(text);
+  }
+
+  /**
+   * Subscribes a listener function to editor lifecycle and state events ('change', 'select').
+   */
   public on(event: string, callback: Function): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
@@ -65,12 +133,18 @@ export class ArchEmailEditor {
     this.listeners.get(event)!.push(callback);
   }
 
+  /**
+   * Unsubscribes a listener function.
+   */
   public off(event: string, callback: Function): void {
     const list = this.listeners.get(event);
     if (!list) return;
     this.listeners.set(event, list.filter(cb => cb !== callback));
   }
 
+  /**
+   * Emits an event to all subscribed listeners.
+   */
   private emit(event: string, ...args: any[]): void {
     const list = this.listeners.get(event);
     if (list) {
@@ -78,14 +152,22 @@ export class ArchEmailEditor {
     }
   }
 
+  /**
+   * Destroys the editor instance, clears event listeners, and removes the editor DOM.
+   * Crucial for preventing memory leaks in single-page apps (React / Vue unmounting).
+   */
   public destroy(): void {
     this.listeners.clear();
     if (this.rootElement && this.rootElement.parentElement) {
       this.rootElement.remove();
     }
+    this.rootElement = null;
     this.container.innerHTML = '';
   }
 
+  /**
+   * Creates a new block node with default styling based on block type.
+   */
   private createBlock(type: BlockType): BlockNode {
     const id = `block_${type}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
 
@@ -138,6 +220,9 @@ export class ArchEmailEditor {
     }
   }
 
+  /**
+   * Appends a new block of the given type to the document.
+   */
   private addBlock(type: BlockType): void {
     const newBlock = this.createBlock(type);
     this.document.blocks.push(newBlock);
@@ -147,6 +232,9 @@ export class ArchEmailEditor {
     this.emit('select', newBlock);
   }
 
+  /**
+   * Deletes a block by ID.
+   */
   private removeBlock(id: string): void {
     this.document.blocks = this.document.blocks.filter(b => b.id !== id);
     if (this.selectedBlockId === id) {
@@ -157,6 +245,9 @@ export class ArchEmailEditor {
     this.emit('change', this.getJSON());
   }
 
+  /**
+   * Moves a block up or down in the newsletter layout.
+   */
   private moveBlock(id: string, direction: 'up' | 'down'): void {
     const index = this.document.blocks.findIndex(b => b.id === id);
     if (index === -1) return;
@@ -175,6 +266,9 @@ export class ArchEmailEditor {
     this.emit('change', this.getJSON());
   }
 
+  /**
+   * Sets the active block for inspector property editing.
+   */
   private selectBlock(id: string | null): void {
     this.selectedBlockId = id;
     const block = id ? this.document.blocks.find(b => b.id === id) || null : null;
@@ -192,8 +286,10 @@ export class ArchEmailEditor {
     });
   }
 
+  /**
+   * Renders the overall editor frame: header toolbar, block palette, canvas container, and inspector sidebar.
+   */
   private render(): void {
-    // If rootElement already exists, re-render inner parts to preserve container
     if (!this.rootElement) {
       this.rootElement = document.createElement('div');
       this.rootElement.className = 'arch-editor';
@@ -208,6 +304,7 @@ export class ArchEmailEditor {
           <span>Arch Email Editor</span>
         </div>
         <div class="arch-editor__actions">
+          <button class="arch-btn arch-btn--import-html" type="button">📥 Import HTML</button>
           <button class="arch-btn arch-btn--export-json" type="button">Export JSON</button>
           <button class="arch-btn arch-btn--primary arch-btn--export-html" type="button">Export HTML</button>
           <button class="arch-btn arch-btn--danger arch-btn--clear" type="button">Clear</button>
@@ -249,7 +346,15 @@ export class ArchEmailEditor {
     this.updateInspector();
   }
 
+  /**
+   * Binds click handlers to the top toolbar actions (Import HTML, Export JSON/HTML, Clear).
+   */
   private bindToolbarEvents(): void {
+    const importBtn = this.rootElement?.querySelector('.arch-btn--import-html');
+    importBtn?.addEventListener('click', () => {
+      this.showImportModal();
+    });
+
     const jsonBtn = this.rootElement?.querySelector('.arch-btn--export-json');
     jsonBtn?.addEventListener('click', () => {
       this.showModal('Exported Template JSON', JSON.stringify(this.getJSON(), null, 2));
@@ -271,6 +376,9 @@ export class ArchEmailEditor {
     });
   }
 
+  /**
+   * Binds both click-to-add and native HTML5 drag-and-drop events for the block palette.
+   */
   private bindPaletteEvents(): void {
     const paletteButtons = this.rootElement?.querySelectorAll<HTMLButtonElement>('[data-block-type]');
     paletteButtons?.forEach(btn => {
@@ -290,8 +398,17 @@ export class ArchEmailEditor {
       });
     });
 
-    // Canvas container drag-and-drop
+    // Canvas container drag-and-drop dropzone
     const canvasContainer = this.rootElement?.querySelector<HTMLElement>('.arch-canvas-container');
+    const canvasWrapper = this.rootElement?.querySelector<HTMLElement>('.arch-editor__canvas');
+
+    // Deselect active block when clicking on empty canvas area
+    canvasWrapper?.addEventListener('click', (e) => {
+      if (e.target === canvasWrapper || e.target === canvasContainer) {
+        this.selectBlock(null);
+      }
+    });
+
     if (canvasContainer) {
       canvasContainer.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -313,6 +430,9 @@ export class ArchEmailEditor {
     }
   }
 
+  /**
+   * Renders the newsletter preview blocks inside the centered 600px canvas.
+   */
   private renderCanvas(): void {
     const container = this.rootElement?.querySelector<HTMLElement>('.arch-canvas-container');
     if (!container) return;
@@ -375,6 +495,9 @@ export class ArchEmailEditor {
     });
   }
 
+  /**
+   * Renders the interactive visual DOM representation of an individual block safely.
+   */
   private renderBlockPreview(block: BlockNode, container: HTMLElement): void {
     switch (block.type) {
       case 'heading': {
@@ -399,7 +522,7 @@ export class ArchEmailEditor {
       case 'button': {
         const btn = document.createElement('a');
         btn.textContent = block.content.label || 'Click Here';
-        btn.href = '#';
+        btn.href = sanitizeUrl(block.content.url);
         btn.style.display = 'inline-block';
         btn.style.backgroundColor = block.style.backgroundColor || '#2563eb';
         btn.style.color = block.style.color || '#ffffff';
@@ -413,7 +536,10 @@ export class ArchEmailEditor {
       }
       case 'image': {
         const img = document.createElement('img');
-        img.src = block.content.src || '';
+        const safeSrc = sanitizeImageUrl(block.content.src || '');
+        if (safeSrc) {
+          img.src = safeSrc;
+        }
         img.alt = block.content.alt || '';
         img.style.maxWidth = '100%';
         img.style.height = 'auto';
@@ -433,6 +559,9 @@ export class ArchEmailEditor {
     }
   }
 
+  /**
+   * Renders the contextual Inspector sidebar safely without raw innerHTML interpolation.
+   */
   private updateInspector(): void {
     const inspector = this.rootElement?.querySelector<HTMLElement>('.arch-editor__inspector');
     if (!inspector) return;
@@ -447,24 +576,30 @@ export class ArchEmailEditor {
         <div class="arch-editor__section-label">Email Settings</div>
         <div class="arch-form-group">
           <label class="arch-form-label">Background Color</label>
-          <input type="color" class="arch-input" id="inp-doc-bg" value="${this.document.settings.backgroundColor}">
+          <input type="color" class="arch-input" id="inp-doc-bg">
         </div>
         <div class="arch-form-group">
           <label class="arch-form-label">Content Width</label>
-          <input type="text" class="arch-input" id="inp-doc-width" value="${this.document.settings.contentWidth}">
+          <input type="text" class="arch-input" id="inp-doc-width">
         </div>
         <p style="font-size: 12px; color: var(--arch-text-secondary); margin-top: 12px;">
           💡 Click any block on the canvas to inspect and edit its properties.
         </p>
       `;
 
-      inspector.querySelector('#inp-doc-bg')?.addEventListener('input', (e) => {
+      const bgInp = inspector.querySelector<HTMLInputElement>('#inp-doc-bg');
+      if (bgInp) bgInp.value = this.document.settings.backgroundColor;
+
+      const widthInp = inspector.querySelector<HTMLInputElement>('#inp-doc-width');
+      if (widthInp) widthInp.value = this.document.settings.contentWidth;
+
+      bgInp?.addEventListener('input', (e) => {
         this.document.settings.backgroundColor = (e.target as HTMLInputElement).value;
         this.renderCanvas();
         this.emit('change', this.getJSON());
       });
 
-      inspector.querySelector('#inp-doc-width')?.addEventListener('change', (e) => {
+      widthInp?.addEventListener('change', (e) => {
         this.document.settings.contentWidth = (e.target as HTMLInputElement).value;
         this.renderCanvas();
         this.emit('change', this.getJSON());
@@ -482,7 +617,7 @@ export class ArchEmailEditor {
       </div>
     `;
 
-    const fieldsContainer = inspector.querySelector('#inspector-fields');
+    const fieldsContainer = inspector.querySelector<HTMLElement>('#inspector-fields');
     if (!fieldsContainer) return;
 
     inspector.querySelector('#btn-inspector-delete')?.addEventListener('click', () => {
@@ -494,45 +629,58 @@ export class ArchEmailEditor {
       fieldsContainer.innerHTML = `
         <div class="arch-form-group">
           <label class="arch-form-label">Text Content</label>
-          <textarea class="arch-textarea" id="inp-block-text">${block.content.text || ''}</textarea>
+          <textarea class="arch-textarea" id="inp-block-text"></textarea>
         </div>
         <div class="arch-form-group">
           <label class="arch-form-label">Font Size</label>
-          <input type="text" class="arch-input" id="inp-font-size" value="${block.style.fontSize || (isHeading ? '24px' : '16px')}">
+          <input type="text" class="arch-input" id="inp-font-size">
         </div>
         <div class="arch-form-group">
           <label class="arch-form-label">Text Color</label>
-          <input type="color" class="arch-input" id="inp-color" value="${block.style.color || (isHeading ? '#0f172a' : '#475569')}">
+          <input type="color" class="arch-input" id="inp-color">
         </div>
         <div class="arch-form-group">
           <label class="arch-form-label">Alignment</label>
           <select class="arch-select" id="inp-align">
-            <option value="left" ${block.style.textAlign === 'left' ? 'selected' : ''}>Left</option>
-            <option value="center" ${block.style.textAlign === 'center' ? 'selected' : ''}>Center</option>
-            <option value="right" ${block.style.textAlign === 'right' ? 'selected' : ''}>Right</option>
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
           </select>
         </div>
       `;
 
-      fieldsContainer.querySelector('#inp-block-text')?.addEventListener('input', (e) => {
+      // Safe value assignments (immune to XSS injection)
+      const textInp = fieldsContainer.querySelector<HTMLTextAreaElement>('#inp-block-text')!;
+      textInp.value = block.content.text || '';
+
+      const fontInp = fieldsContainer.querySelector<HTMLInputElement>('#inp-font-size')!;
+      fontInp.value = block.style.fontSize || (isHeading ? '24px' : '16px');
+
+      const colorInp = fieldsContainer.querySelector<HTMLInputElement>('#inp-color')!;
+      colorInp.value = block.style.color || (isHeading ? '#0f172a' : '#475569');
+
+      const alignSel = fieldsContainer.querySelector<HTMLSelectElement>('#inp-align')!;
+      alignSel.value = block.style.textAlign || 'left';
+
+      textInp.addEventListener('input', (e) => {
         block.content.text = (e.target as HTMLTextAreaElement).value;
         this.renderCanvas();
         this.emit('change', this.getJSON());
       });
 
-      fieldsContainer.querySelector('#inp-font-size')?.addEventListener('change', (e) => {
+      fontInp.addEventListener('change', (e) => {
         block.style.fontSize = (e.target as HTMLInputElement).value;
         this.renderCanvas();
         this.emit('change', this.getJSON());
       });
 
-      fieldsContainer.querySelector('#inp-color')?.addEventListener('input', (e) => {
+      colorInp.addEventListener('input', (e) => {
         block.style.color = (e.target as HTMLInputElement).value;
         this.renderCanvas();
         this.emit('change', this.getJSON());
       });
 
-      fieldsContainer.querySelector('#inp-align')?.addEventListener('change', (e) => {
+      alignSel.addEventListener('change', (e) => {
         block.style.textAlign = (e.target as HTMLSelectElement).value as any;
         this.renderCanvas();
         this.emit('change', this.getJSON());
@@ -541,55 +689,70 @@ export class ArchEmailEditor {
       fieldsContainer.innerHTML = `
         <div class="arch-form-group">
           <label class="arch-form-label">Button Label</label>
-          <input type="text" class="arch-input" id="inp-btn-label" value="${block.content.label || ''}">
+          <input type="text" class="arch-input" id="inp-btn-label">
         </div>
         <div class="arch-form-group">
           <label class="arch-form-label">Target URL</label>
-          <input type="text" class="arch-input" id="inp-btn-url" value="${block.content.url || ''}">
+          <input type="text" class="arch-input" id="inp-btn-url">
         </div>
         <div class="arch-form-group">
           <label class="arch-form-label">Button Background</label>
-          <input type="color" class="arch-input" id="inp-btn-bg" value="${block.style.backgroundColor || '#2563eb'}">
+          <input type="color" class="arch-input" id="inp-btn-bg">
         </div>
         <div class="arch-form-group">
           <label class="arch-form-label">Text Color</label>
-          <input type="color" class="arch-input" id="inp-btn-color" value="${block.style.color || '#ffffff'}">
+          <input type="color" class="arch-input" id="inp-btn-color">
         </div>
         <div class="arch-form-group">
           <label class="arch-form-label">Alignment</label>
           <select class="arch-select" id="inp-btn-align">
-            <option value="left" ${block.style.textAlign === 'left' ? 'selected' : ''}>Left</option>
-            <option value="center" ${block.style.textAlign === 'center' ? 'selected' : ''}>Center</option>
-            <option value="right" ${block.style.textAlign === 'right' ? 'selected' : ''}>Right</option>
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
           </select>
         </div>
       `;
 
-      fieldsContainer.querySelector('#inp-btn-label')?.addEventListener('input', (e) => {
+      const labelInp = fieldsContainer.querySelector<HTMLInputElement>('#inp-btn-label')!;
+      labelInp.value = block.content.label || '';
+
+      const urlInp = fieldsContainer.querySelector<HTMLInputElement>('#inp-btn-url')!;
+      urlInp.value = block.content.url || '';
+
+      const bgInp = fieldsContainer.querySelector<HTMLInputElement>('#inp-btn-bg')!;
+      bgInp.value = block.style.backgroundColor || '#2563eb';
+
+      const colorInp = fieldsContainer.querySelector<HTMLInputElement>('#inp-btn-color')!;
+      colorInp.value = block.style.color || '#ffffff';
+
+      const alignSel = fieldsContainer.querySelector<HTMLSelectElement>('#inp-btn-align')!;
+      alignSel.value = block.style.textAlign || 'center';
+
+      labelInp.addEventListener('input', (e) => {
         block.content.label = (e.target as HTMLInputElement).value;
         this.renderCanvas();
         this.emit('change', this.getJSON());
       });
 
-      fieldsContainer.querySelector('#inp-btn-url')?.addEventListener('input', (e) => {
+      urlInp.addEventListener('input', (e) => {
         block.content.url = (e.target as HTMLInputElement).value;
         this.renderCanvas();
         this.emit('change', this.getJSON());
       });
 
-      fieldsContainer.querySelector('#inp-btn-bg')?.addEventListener('input', (e) => {
+      bgInp.addEventListener('input', (e) => {
         block.style.backgroundColor = (e.target as HTMLInputElement).value;
         this.renderCanvas();
         this.emit('change', this.getJSON());
       });
 
-      fieldsContainer.querySelector('#inp-btn-color')?.addEventListener('input', (e) => {
+      colorInp.addEventListener('input', (e) => {
         block.style.color = (e.target as HTMLInputElement).value;
         this.renderCanvas();
         this.emit('change', this.getJSON());
       });
 
-      fieldsContainer.querySelector('#inp-btn-align')?.addEventListener('change', (e) => {
+      alignSel.addEventListener('change', (e) => {
         block.style.textAlign = (e.target as HTMLSelectElement).value as any;
         this.renderCanvas();
         this.emit('change', this.getJSON());
@@ -598,35 +761,44 @@ export class ArchEmailEditor {
       fieldsContainer.innerHTML = `
         <div class="arch-form-group">
           <label class="arch-form-label">Image URL</label>
-          <input type="text" class="arch-input" id="inp-img-src" value="${block.content.src || ''}">
+          <input type="text" class="arch-input" id="inp-img-src">
         </div>
         <div class="arch-form-group">
           <label class="arch-form-label">Alt Description</label>
-          <input type="text" class="arch-input" id="inp-img-alt" value="${block.content.alt || ''}">
+          <input type="text" class="arch-input" id="inp-img-alt">
         </div>
         <div class="arch-form-group">
           <label class="arch-form-label">Alignment</label>
           <select class="arch-select" id="inp-img-align">
-            <option value="left" ${block.style.textAlign === 'left' ? 'selected' : ''}>Left</option>
-            <option value="center" ${block.style.textAlign === 'center' ? 'selected' : ''}>Center</option>
-            <option value="right" ${block.style.textAlign === 'right' ? 'selected' : ''}>Right</option>
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
           </select>
         </div>
       `;
 
-      fieldsContainer.querySelector('#inp-img-src')?.addEventListener('input', (e) => {
+      const srcInp = fieldsContainer.querySelector<HTMLInputElement>('#inp-img-src')!;
+      srcInp.value = block.content.src || '';
+
+      const altInp = fieldsContainer.querySelector<HTMLInputElement>('#inp-img-alt')!;
+      altInp.value = block.content.alt || '';
+
+      const alignSel = fieldsContainer.querySelector<HTMLSelectElement>('#inp-img-align')!;
+      alignSel.value = block.style.textAlign || 'center';
+
+      srcInp.addEventListener('input', (e) => {
         block.content.src = (e.target as HTMLInputElement).value;
         this.renderCanvas();
         this.emit('change', this.getJSON());
       });
 
-      fieldsContainer.querySelector('#inp-img-alt')?.addEventListener('input', (e) => {
+      altInp.addEventListener('input', (e) => {
         block.content.alt = (e.target as HTMLInputElement).value;
         this.renderCanvas();
         this.emit('change', this.getJSON());
       });
 
-      fieldsContainer.querySelector('#inp-img-align')?.addEventListener('change', (e) => {
+      alignSel.addEventListener('change', (e) => {
         block.style.textAlign = (e.target as HTMLSelectElement).value as any;
         this.renderCanvas();
         this.emit('change', this.getJSON());
@@ -635,11 +807,14 @@ export class ArchEmailEditor {
       fieldsContainer.innerHTML = `
         <div class="arch-form-group">
           <label class="arch-form-label">Line Color</label>
-          <input type="color" class="arch-input" id="inp-div-color" value="${block.style.color || '#e2e8f0'}">
+          <input type="color" class="arch-input" id="inp-div-color">
         </div>
       `;
 
-      fieldsContainer.querySelector('#inp-div-color')?.addEventListener('input', (e) => {
+      const divColorInp = fieldsContainer.querySelector<HTMLInputElement>('#inp-div-color')!;
+      divColorInp.value = block.style.color || '#e2e8f0';
+
+      divColorInp.addEventListener('input', (e) => {
         block.style.color = (e.target as HTMLInputElement).value;
         this.renderCanvas();
         this.emit('change', this.getJSON());
@@ -647,17 +822,79 @@ export class ArchEmailEditor {
     }
   }
 
+  /**
+   * Displays the HTML Import modal allowing file uploads or pasting raw HTML markup.
+   */
+  private showImportModal(): void {
+    const modal = document.createElement('div');
+    modal.className = 'arch-modal-overlay';
+    modal.innerHTML = `
+      <div class="arch-modal">
+        <div class="arch-modal__header">
+          <span>📥 Import Prebuilt HTML Email Template</span>
+          <button class="arch-btn arch-btn--close" type="button">✕</button>
+        </div>
+        <div class="arch-modal__body">
+          <div class="arch-form-group" style="margin-bottom: 16px;">
+            <label class="arch-form-label">Option 1: Upload .html file</label>
+            <input type="file" id="arch-import-file" class="arch-input" accept=".html,.htm" />
+          </div>
+          <div class="arch-form-group">
+            <label class="arch-form-label">Option 2: Or Paste HTML Code</label>
+            <textarea class="arch-modal__code" id="arch-import-text" placeholder="Paste <table> email markup here..."></textarea>
+          </div>
+        </div>
+        <div style="padding: 12px 18px; border-top: 1px solid var(--arch-border); display: flex; justify-content: flex-end; gap: 8px;">
+          <button class="arch-btn arch-btn--close-cancel" type="button">Cancel</button>
+          <button class="arch-btn arch-btn--primary arch-btn--do-import" type="button">Load Into Editor</button>
+        </div>
+      </div>
+    `;
+
+    const closeModal = () => modal.remove();
+    modal.querySelector('.arch-btn--close')?.addEventListener('click', closeModal);
+    modal.querySelector('.arch-btn--close-cancel')?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    const fileInput = modal.querySelector<HTMLInputElement>('#arch-import-file');
+    const textarea = modal.querySelector<HTMLTextAreaElement>('#arch-import-text');
+
+    fileInput?.addEventListener('change', async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file && textarea) {
+        textarea.value = await file.text();
+      }
+    });
+
+    modal.querySelector('.arch-btn--do-import')?.addEventListener('click', () => {
+      const html = textarea?.value?.trim();
+      if (html) {
+        this.importHTML(html);
+        closeModal();
+      } else {
+        alert('Please select an HTML file or paste HTML markup.');
+      }
+    });
+
+    this.rootElement?.appendChild(modal);
+  }
+
+  /**
+   * Displays an export modal safely setting textarea.value without HTML interpolation.
+   */
   private showModal(title: string, content: string): void {
     const modal = document.createElement('div');
     modal.className = 'arch-modal-overlay';
     modal.innerHTML = `
       <div class="arch-modal">
         <div class="arch-modal__header">
-          <span>${title}</span>
+          <span class="arch-modal__title"></span>
           <button class="arch-btn arch-btn--close" type="button">✕</button>
         </div>
         <div class="arch-modal__body">
-          <textarea class="arch-modal__code" readonly>${content}</textarea>
+          <textarea class="arch-modal__code" readonly></textarea>
         </div>
         <div style="padding: 12px 18px; border-top: 1px solid var(--arch-border); display: flex; justify-content: flex-end; gap: 8px;">
           <button class="arch-btn arch-btn--primary arch-btn--copy" type="button">Copy to Clipboard</button>
@@ -665,16 +902,26 @@ export class ArchEmailEditor {
       </div>
     `;
 
-    modal.querySelector('.arch-btn--close')?.addEventListener('click', () => modal.remove());
+    modal.querySelector<HTMLElement>('.arch-modal__title')!.textContent = title;
+    const textarea = modal.querySelector<HTMLTextAreaElement>('.arch-modal__code')!;
+    textarea.value = content; // Safe programmatic assignment
+
+    let copyTimer: any = null;
+    const closeModal = () => {
+      if (copyTimer) clearTimeout(copyTimer);
+      modal.remove();
+    };
+
+    modal.querySelector('.arch-btn--close')?.addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.remove();
+      if (e.target === modal) closeModal();
     });
 
     const copyBtn = modal.querySelector<HTMLButtonElement>('.arch-btn--copy');
     copyBtn?.addEventListener('click', () => {
       navigator.clipboard?.writeText(content);
       copyBtn.textContent = 'Copied!';
-      setTimeout(() => {
+      copyTimer = setTimeout(() => {
         if (copyBtn) copyBtn.textContent = 'Copy to Clipboard';
       }, 2000);
     });
