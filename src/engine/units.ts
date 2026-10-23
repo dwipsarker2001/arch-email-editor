@@ -854,9 +854,10 @@ export function getContainerChain(target: HTMLElement): HTMLElement[] {
   }
 
   // 4. Push inner semantic sub-elements (`<td>`, `<p>/<h1..h6>`, `<a href="...">`, `<img>`) inside `deepestContainer`
-  //    so users can drill down step-by-step from parent to child for ALL content types (`td -> p`, `td -> a -> img`, etc.)!
+  //    ONLY when `target` is actually on/inside that child element (`target.closest(...)`).
+  //    Never use downward `querySelector` fallbacks so double-clicking empty left/right padding space on a parent
+  //    container never accidentally selects an unclicked child!
   const deepestContainer = chain[chain.length - 1];
-  const scopeEl = deepestContainer.contains(target) ? target : deepestContainer;
 
   // If `deepestContainer` is a generic `<table>` or `<tr>` (not a Beefree `*_block` table), include the enclosing `<td>` cell
   const dTag = deepestContainer.tagName.toLowerCase();
@@ -867,14 +868,7 @@ export function getContainerChain(target: HTMLElement): HTMLElement[] {
     }
   }
 
-  let textBlock = target.closest<HTMLElement>('p, h1, h2, h3, h4, h5, h6, li, blockquote');
-  if (!textBlock || !deepestContainer.contains(textBlock)) {
-    const candidates = scopeEl.querySelectorAll<HTMLElement>('p, h1, h2, h3, h4, h5, h6, li, blockquote');
-    if (candidates.length === 1) {
-      textBlock = candidates[0];
-    }
-  }
-
+  const textBlock = target.closest<HTMLElement>('p, h1, h2, h3, h4, h5, h6, li, blockquote');
   if (
     textBlock &&
     deepestContainer.contains(textBlock) &&
@@ -888,34 +882,12 @@ export function getContainerChain(target: HTMLElement): HTMLElement[] {
     }
   }
 
-  // Resolve target `<a>`: either `target.closest('a')` if user clicked on/inside `<a>`,
-  // OR if user clicked/double-clicked on the `<td>`/`<h1>`/`table.*_block` padding around an `<a>`,
-  // find the child `<a>` inside `target` or `deepestContainer`!
-  let targetAnchor = target.closest<HTMLElement>('a');
-  if (!targetAnchor || !deepestContainer.contains(targetAnchor)) {
-    targetAnchor =
-      scopeEl.querySelector<HTMLElement>('a') ||
-      deepestContainer.querySelector<HTMLElement>('a');
-  }
-
+  const targetAnchor = target.closest<HTMLElement>('a');
   if (targetAnchor && deepestContainer.contains(targetAnchor) && !chain.includes(targetAnchor)) {
     chain.push(targetAnchor);
   }
 
-  // Resolve target `<img>`: allows drilling down from `td` / `table.image_block` / `<a>` directly to the `<img>` leaf
-  let targetImg = target.closest<HTMLElement>('img');
-  if (!targetImg || !deepestContainer.contains(targetImg)) {
-    const imgs = scopeEl.querySelectorAll<HTMLElement>('img');
-    if (imgs.length === 1) {
-      targetImg = imgs[0];
-    } else {
-      const allImgs = deepestContainer.querySelectorAll<HTMLElement>('img');
-      if (allImgs.length === 1) {
-        targetImg = allImgs[0];
-      }
-    }
-  }
-
+  const targetImg = target.closest<HTMLElement>('img');
   if (targetImg && deepestContainer.contains(targetImg) && !chain.includes(targetImg)) {
     chain.push(targetImg);
   }

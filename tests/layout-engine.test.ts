@@ -824,8 +824,8 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     const tdCol1 = ifrDoc.querySelector('.td-col-1') as HTMLElement;
     const link1 = ifrDoc.querySelector('a.link-1') as HTMLElement;
 
-    // 1. Even when clicking/double-clicking on the outer `<td class="pad">` (around `<a>`),
-    //    drilling down goes: Row 13 -> Column 1 -> Heading Block -> Link (`<a class="link-1">`)!
+    // 1. Double-clicking on the empty left/right padding space of `<td class="pad">` (`tdCol1`)
+    //    drills down: Row 13 -> Column 1 -> Heading Block (`td`) and STOPS at the parent (never selects child `link1`)!
     tdCol1.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(row13);
 
@@ -835,7 +835,12 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     tdCol1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(col1.querySelector('table.heading_block'));
 
+    // Double-clicking AGAIN on the parent's empty space (`tdCol1`) keeps the parent selected and does NOT select `link1`
     tdCol1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(col1.querySelector('table.heading_block'));
+
+    // Only when actually double-clicking ON the child `link1` (`<a class="link-1">`) does `link1` get selected!
+    link1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(link1);
 
     // 2. When `<a class="link-1">` is selected, the Inspector displays Link/Button (`<a>`) controls
@@ -1000,7 +1005,13 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('.text_block'));
     expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
 
-    // 4. 2nd Double-click drills down from `td`/Block to select `<p>` itself (still NOT edit mode!)
+    // Double-clicking in the empty left/right space of parent `td.pad` keeps the parent selected (does NOT select `<p>`)
+    const tdPad = ifrDoc.querySelector('td.pad') as HTMLElement;
+    tdPad.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('.text_block'));
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
+
+    // 4. Actually double-clicking ON `<p>` drills down from `td`/Block to select `<p>` itself (still NOT edit mode!)
     p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
     expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();

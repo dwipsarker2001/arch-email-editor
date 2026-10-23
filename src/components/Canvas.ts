@@ -1076,13 +1076,18 @@ export class Canvas {
       return;
     }
 
-    // Case 2: Already at the innermost Leaf (`currentIdx === chain.length - 1`) -> Enter Inline Text Edit Mode!
+    // Case 2: Already at the innermost Leaf (`currentIdx === chain.length - 1`) ->
+    // Only enter Inline Text Edit Mode if the user actually double-clicked ON the text/button leaf itself
+    // (never when double-clicking empty left/right padding space of a parent `<td>` or `div.alignment`)!
     if (currentIdx === chain.length - 1) {
       const leafBlock = chain[currentIdx];
-      const leafSelectable = leafBlock.contains(selectable) ? selectable : leafBlock;
-      const textHost = findEditableTextHost(leafSelectable, leafBlock);
-      if (textHost) {
-        this.enterTextEditMode(leafSelectable, leafBlock);
+      const directHost =
+        target.getAttribute('contenteditable') === 'true'
+          ? target
+          : target.closest<HTMLElement>('[contenteditable="true"]') ||
+            (leafBlock.tagName.toLowerCase() === 'a' ? findEditableTextHost(target, leafBlock) : null);
+      if (directHost && leafBlock.contains(directHost)) {
+        this.enterTextEditMode(directHost, leafBlock);
       }
       return;
     }
