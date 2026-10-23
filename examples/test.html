@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    
+    <iframe id="preview-iframe"></iframe>
+    <!-- Include ArchEmailEditor UMD Bundle -->
+    <script src="../dist/arch-email-editor.umd.js"></script>
+    <script>
+    // Initialize editor instance directly from window.ArchEmailEditor
+    const Editor = window.ArchEmailEditor.create ? window.ArchEmailEditor : window.ArchEmailEditor.ArchEmailEditor;
+    const editor = Editor.create('#editor-container', {
+      onChange: (doc) => {
+        console.log('Document updated in real-time:', doc);
+      }
+    });
+
+    document.getElementById('btn-get-json').addEventListener('click', () => {
+      const json = editor.getJSON();
+      console.log('Exported JSON template:', json);
+      alert('Template JSON logged to browser console! (' + json.blocks.length + ' blocks)');
+    });
+
+    document.getElementById('btn-show-html').addEventListener('click', () => {
+      const html = editor.getHTML();
+      const previewBox = document.getElementById('preview-box');
+      const iframe = document.getElementById('preview-iframe');
+      previewBox.style.display = 'block';
+      iframe.srcdoc = html;
+      previewBox.scrollIntoView({ behavior: 'smooth' });
+    });
+  </script>
+</body>
+</html>

@@ -105,6 +105,7 @@
   </div>
 
   <div class="external-bar">
+    <button id="btn-sample-template" type="button" style="background-color: #059669;">📰 Load 2-Column Template Sample</button>
     <button id="btn-show-html" type="button">👁️ Render Live Email Preview</button>
     <button id="btn-get-json" type="button" style="background-color: #475569;">📋 Log JSON to Console</button>
     <span style="color: #94a3b8; font-size: 13px;">External API integration: <code>editor.getHTML()</code> & <code>editor.getJSON()</code></span>
@@ -128,6 +129,64 @@
       onChange: (doc) => {
         console.log('Document updated in real-time:', doc);
       }
+    });
+
+    document.getElementById('btn-sample-template').addEventListener('click', () => {
+      const sample = `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    @media only screen and (max-width: 600px) {
+      .responsive-col { width: 100% !important; display: block !important; }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: Arial, sans-serif;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 24px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+          <!-- Header Banner -->
+          <tr>
+            <td style="background-color: #1e293b; padding: 28px 24px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">🚀 Tech Pulse Weekly</h1>
+              <p style="color: #94a3b8; margin: 8px 0 0 0; font-size: 14px;">Curated developer news and engineering insights</p>
+            </td>
+          </tr>
+          <!-- 2-Column Content Grid -->
+          <tr>
+            <td style="padding: 24px 20px;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td class="responsive-col" width="270" valign="top" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 18px;">
+                    <h3 style="margin: 0 0 8px 0; color: #0f172a; font-size: 18px;">Frontend Architecture</h3>
+                    <p style="margin: 0 0 16px 0; color: #64748b; font-size: 14px; line-height: 1.5;">Learn how modern teams build fast, accessible web applications with zero runtime overhead.</p>
+                    <a href="https://example.com/frontend" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600;">Read Article →</a>
+                  </td>
+                  <td width="20" class="responsive-col" style="height: 16px;"></td>
+                  <td class="responsive-col" width="270" valign="top" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 18px;">
+                    <h3 style="margin: 0 0 8px 0; color: #0f172a; font-size: 18px;">Cloud Native Systems</h3>
+                    <p style="margin: 0 0 16px 0; color: #64748b; font-size: 14px; line-height: 1.5;">Scaling microservices safely with isolated state containers and automated recovery pipelines.</p>
+                    <a href="https://example.com/cloud" style="display: inline-block; background-color: #059669; color: #ffffff; text-decoration: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600;">Explore Cloud →</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
+              © 2026 Arch Newsletter. All rights reserved. <br/>
+              <a href="https://example.com/unsubscribe" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+      editor.importHTML(sample);
     });
 
     document.getElementById('btn-get-json').addEventListener('click', () => {

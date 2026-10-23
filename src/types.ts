@@ -2,14 +2,14 @@
  * Arch Email Editor - Types and Schema Definitions
  * 
  * Core architectural principle: Framework-agnostic document state.
- * The editor manipulates this JSON AST, which is subsequently compiled
- * into client-safe table HTML via `compileToEmailHtml()`.
+ * Supports both structured block ASTs and full prebuilt HTML email templates
+ * (preserving media queries, nested tables, and head styles without breaking).
  */
 
 /**
  * Supported email block types.
  */
-export type BlockType = 'heading' | 'text' | 'button' | 'image' | 'divider';
+export type BlockType = 'heading' | 'text' | 'button' | 'image' | 'divider' | 'html';
 
 /**
  * Visual styling attributes for a block.
@@ -43,6 +43,8 @@ export interface BlockContent {
   src?: string;
   /** Image alternative text for accessibility and screen readers */
   alt?: string;
+  /** Raw or prebuilt HTML snippet for custom sections */
+  html?: string;
 }
 
 /**
@@ -76,11 +78,32 @@ export interface DocumentSettings {
 /**
  * The complete serializable Email Document.
  * Can be exported to JSON to persist in databases, or compiled to email HTML.
+ * When `rawHtml` is present, it preserves 100% of the imported prebuilt template.
  */
 export interface EmailDocument {
   version: '1.0';
   settings: DocumentSettings;
   blocks: BlockNode[];
+  /** Preserved full HTML document (keeps <head>, <style>, media queries, and nested tables intact) */
+  rawHtml?: string;
+}
+
+/**
+ * Information about a currently selected DOM node on the visual canvas.
+ */
+export interface SelectedElementInfo {
+  tagName: string;
+  type: 'heading' | 'text' | 'button' | 'image' | 'section' | 'other';
+  text?: string;
+  src?: string;
+  alt?: string;
+  url?: string;
+  color?: string;
+  backgroundColor?: string;
+  fontSize?: string;
+  textAlign?: string;
+  padding?: string;
+  element: HTMLElement;
 }
 
 /**
@@ -97,6 +120,6 @@ export interface EditorOptions {
   readOnly?: boolean;
   /** Callback fired whenever blocks, content, or settings change */
   onChange?: (doc: EmailDocument) => void;
-  /** Callback fired when a block is selected or deselected */
+  /** Callback fired when an element or block is selected */
   onSelectBlock?: (block: BlockNode | null) => void;
 }

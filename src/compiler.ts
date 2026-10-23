@@ -10,7 +10,8 @@
  * 2. Inlines all CSS attributes into `style="..."` properties.
  * 3. Uses Outlook MSO conditionals (`<!--[if (gte mso 9)|(IE)]>`) for desktop Outlook DPI scaling.
  * 4. Implements bulletproof buttons (table + inline styled anchor).
- * 5. Provides bidirectional compilation: AST -> Email HTML, and native DOMParser: HTML -> AST.
+ * 5. Lossless parsing: Preserves full `rawHtml` (including <head>, <style>, media queries,
+ *    and multi-column nested tables) so imported templates never break.
  */
 
 import { EmailDocument, BlockNode } from './types';
@@ -20,15 +21,13 @@ import { EmailDocument, BlockNode } from './types';
  * Prevents runtime crashes from empty `{}` or corrupted database payloads.
  */
 export function normalizeDocument(doc?: any): EmailDocument {
-  // If null or undefined, return the default starter template
   if (!doc || typeof doc !== 'object') {
     return getDefaultDocument();
   }
 
-  // If passed an empty object without blocks, initialize with an empty blocks array
   const hasBlocks = 'blocks' in doc;
   if (!hasBlocks && Object.keys(doc).length === 0) {
-    return {
+    const emptyDoc: EmailDocument = {
       version: '1.0',
       settings: {
         contentWidth: '600px',
@@ -38,10 +37,12 @@ export function normalizeDocument(doc?: any): EmailDocument {
       },
       blocks: []
     };
+    emptyDoc.rawHtml = compileBlocksToHtml(emptyDoc);
+    return emptyDoc;
   }
 
   const settings = doc.settings && typeof doc.settings === 'object' ? doc.settings : {};
-  return {
+  const normalized: EmailDocument = {
     version: '1.0',
     settings: {
       contentWidth: typeof settings.contentWidth === 'string' ? settings.contentWidth : '600px',
@@ -51,13 +52,21 @@ export function normalizeDocument(doc?: any): EmailDocument {
     },
     blocks: Array.isArray(doc.blocks) ? doc.blocks : []
   };
+
+  if (typeof doc.rawHtml === 'string' && doc.rawHtml.trim()) {
+    normalized.rawHtml = doc.rawHtml;
+  } else if (normalized.blocks.length > 0) {
+    normalized.rawHtml = compileBlocksToHtml(normalized);
+  }
+
+  return normalized;
 }
 
 /**
  * Returns the default starter email template.
  */
 export function getDefaultDocument(): EmailDocument {
-  return {
+  const doc: EmailDocument = {
     version: '1.0',
     settings: {
       contentWidth: '600px',
@@ -96,7 +105,7 @@ export function getDefaultDocument(): EmailDocument {
         id: 'block_text_1',
         type: 'text',
         content: {
-          text: 'This is your framework-agnostic email editor. You can easily add blocks, customize typography, configure buttons, and export bulletproof email HTML ready for sending!'
+          text: 'This is your framework-agnostic email editor. You can easily drag and reorder blocks, customize typography, configure buttons, and export bulletproof email HTML ready for sending!'
         },
         style: {
           fontSize: '16px',
@@ -132,6 +141,9 @@ export function getDefaultDocument(): EmailDocument {
       }
     ]
   };
+
+  doc.rawHtml = compileBlocksToHtml(doc);
+  return doc;
 }
 
 /**
@@ -185,10 +197,13 @@ function renderBlock(block: BlockNode, fontFamily: string, contentWidth: string)
       const text = escapeHtml(block.content.text || '');
       const color = block.style.color || '#0f172a';
       const fontSize = block.style.fontSize || '24px';
+      const tag = block.content.level === 1 ? 'h1' : block.content.level === 3 ? 'h3' : 'h2';
       return `
         <tr>
-          <td align="${align}" style="padding: ${padding}; font-family: ${fontFamily}; font-size: ${fontSize}; font-weight: bold; line-height: 1.3; color: ${color}; text-align: ${align};">
-            ${text}
+          <td align="${align}" style="padding: ${padding}; text-align: ${align};">
+            <${tag} style="margin: 0; font-family: ${fontFamily}; font-size: ${fontSize}; font-weight: bold; line-height: 1.3; color: ${color}; text-align: ${align};">
+              ${text}
+            </${tag}>
           </td>
         </tr>`;
     }
@@ -199,14 +214,15 @@ function renderBlock(block: BlockNode, fontFamily: string, contentWidth: string)
       const fontSize = block.style.fontSize || '16px';
       return `
         <tr>
-          <td align="${align}" style="padding: ${padding}; font-family: ${fontFamily}; font-size: ${fontSize}; line-height: 1.6; color: ${color}; text-align: ${align};">
-            ${text}
+          <td align="${align}" style="padding: ${padding}; text-align: ${align};">
+            <p style="margin: 0; font-family: ${fontFamily}; font-size: ${fontSize}; line-height: 1.6; color: ${color}; text-align: ${align};">
+              ${text}
+            </p>
           </td>
         </tr>`;
     }
 
     case 'button': {
-      // Bulletproof Button pattern: uses a nested table and styled <a> tag
       const label = escapeHtml(block.content.label || 'Click Here');
       const url = sanitizeUrl(block.content.url);
       const bg = block.style.backgroundColor || '#2563eb';
@@ -251,16 +267,25 @@ function renderBlock(block: BlockNode, fontFamily: string, contentWidth: string)
         </tr>`;
     }
 
+    case 'html': {
+      const customHtml = block.content.html || '';
+      return `
+        <tr>
+          <td align="${align}" style="padding: ${padding}; font-family: ${fontFamily};">
+            ${customHtml}
+          </td>
+        </tr>`;
+    }
+
     default:
       return '';
   }
 }
 
 /**
- * Compiles a structured EmailDocument into production-ready email HTML.
+ * Compiles an EmailDocument's blocks into table-based email HTML.
  */
-export function compileToEmailHtml(inputDoc: EmailDocument): string {
-  const doc = normalizeDocument(inputDoc);
+export function compileBlocksToHtml(doc: EmailDocument): string {
   const contentWidth = doc.settings.contentWidth || '600px';
   const contentWidthNum = parseInt(contentWidth, 10);
   const bgColor = doc.settings.backgroundColor || '#f4f4f7';
@@ -322,28 +347,62 @@ export function compileToEmailHtml(inputDoc: EmailDocument): string {
 }
 
 /**
- * Parses an arbitrary prebuilt HTML email string into editable EmailDocument blocks.
- * Uses browser-native DOMParser (standard platform feature — zero external dependencies).
+ * Compiles a structured EmailDocument into production-ready email HTML.
+ * If the document has a preserved `rawHtml` (from an imported template), it returns that
+ * ensuring 100% of head styles, media queries, and nested tables are preserved.
+ */
+export function compileToEmailHtml(inputDoc: EmailDocument): string {
+  const doc = normalizeDocument(inputDoc);
+  if (doc.rawHtml && doc.rawHtml.trim()) {
+    return doc.rawHtml;
+  }
+  return compileBlocksToHtml(doc);
+}
+
+/**
+ * Parses an arbitrary prebuilt HTML email template into an EmailDocument.
+ * Preserves the full `rawHtml` so templates with media queries, custom CSS,
+ * and multi-column tables are NEVER broken.
  */
 export function parseHtmlToDocument(htmlString: string): EmailDocument {
   const parser = new DOMParser();
   const parsedDoc = parser.parseFromString(htmlString, 'text/html');
-
   const body = parsedDoc.body;
+
+  // 1. Extract Background Color
   const bodyStyle = body.getAttribute('style') || '';
   const bgColorMatch = bodyStyle.match(/background-color:\s*([^;]+)/i);
-  const bgColor = bgColorMatch ? bgColorMatch[1].trim() : '#f4f4f7';
+  let bgColor: string | null = bgColorMatch ? bgColorMatch[1].trim() : body.getAttribute('bgcolor');
+  if (!bgColor) {
+    const outerTable = body.querySelector('table[bgcolor], table[style*="background"]');
+    if (outerTable) {
+      const match = outerTable.getAttribute('style')?.match(/background(?:-color)?:\s*([^;]+)/i);
+      bgColor = outerTable.getAttribute('bgcolor') || (match ? match[1].trim() : null);
+    }
+  }
+  bgColor = bgColor || '#f4f4f7';
 
+  // 2. Extract Font Family
   const fontFamilyMatch = bodyStyle.match(/font-family:\s*([^;]+)/i);
   const fontFamily = fontFamilyMatch
     ? fontFamilyMatch[1].trim()
     : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
+  // 3. Extract Content Width
+  const innerTable = body.querySelector('table[width="600"], table[width="640"], table[style*="max-width"]') as HTMLElement | null;
+  let contentWidth = '600px';
+  if (innerTable) {
+    const widthAttr = innerTable.getAttribute('width');
+    const maxWidthMatch = innerTable.getAttribute('style')?.match(/max-width:\s*(\d+px)/i);
+    if (maxWidthMatch) contentWidth = maxWidthMatch[1];
+    else if (widthAttr && !widthAttr.includes('%')) contentWidth = `${widthAttr}px`;
+  }
+
   const blocks: BlockNode[] = [];
   let blockIdCounter = 1;
-
-  const elements = Array.from(body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, img, a, hr'));
   const processed = new Set<Element>();
+
+  const elements = Array.from(body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, img, a, hr, td, div'));
 
   for (const el of elements) {
     if (processed.has(el)) continue;
@@ -434,31 +493,38 @@ export function parseHtmlToDocument(htmlString: string): EmailDocument {
         });
         processed.add(el);
       }
+    } else if (tagName === 'td' || tagName === 'div') {
+      const hasNestedBlocks = el.querySelector('h1, h2, h3, h4, h5, h6, p, img, a, hr');
+      if (!hasNestedBlocks) {
+        const text = el.textContent?.trim() || '';
+        if (text && text.length > 1) {
+          blocks.push({
+            id: `block_import_${blockIdCounter++}`,
+            type: 'text',
+            content: { text },
+            style: {
+              fontSize: styleObj['font-size'] || '15px',
+              color: styleObj['color'] || '#475569',
+              textAlign: (styleObj['text-align'] as any) || 'left',
+              padding: styleObj['padding'] || '12px 20px'
+            }
+          });
+          processed.add(el);
+        }
+      }
     }
   }
 
-  if (blocks.length === 0) {
-    const rawText = body.textContent?.trim();
-    if (rawText) {
-      blocks.push({
-        id: `block_import_${blockIdCounter++}`,
-        type: 'text',
-        content: { text: rawText },
-        style: { fontSize: '16px', color: '#475569', padding: '12px 20px' }
-      });
-    } else {
-      return getDefaultDocument();
-    }
-  }
-
+  // Preserve the entire raw HTML so imported templates are NEVER broken
   return {
     version: '1.0',
     settings: {
-      contentWidth: '600px',
+      contentWidth: contentWidth,
       backgroundColor: bgColor,
       fontFamily: fontFamily,
       textColor: '#334155'
     },
-    blocks
+    blocks,
+    rawHtml: htmlString
   };
 }

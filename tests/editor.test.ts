@@ -106,4 +106,129 @@ describe('ArchEmailEditor Core Engine', () => {
 
     editor.destroy();
   });
+
+  it('reorders blocks when dragged and dropped on canvas', () => {
+    const editor = ArchEmailEditor.create(container);
+    const initialDoc = editor.getJSON();
+    const firstBlockId = initialDoc.blocks[0].id;
+    const secondBlockId = initialDoc.blocks[1].id;
+
+    // Simulate drag and drop reordering
+    (editor as any).reorderBlock(firstBlockId, 2); // move first block to index 2
+
+    const updatedDoc = editor.getJSON();
+    expect(updatedDoc.blocks[0].id).toBe(secondBlockId);
+    expect(updatedDoc.blocks[1].id).toBe(firstBlockId);
+
+    editor.destroy();
+  });
+
+  it('imports complex multi-column HTML email template losslessly without breaking styles or tables', () => {
+    const editor = ArchEmailEditor.create(container);
+
+    const complexTemplate = `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    @media only screen and (max-width: 600px) {
+      .responsive-column { width: 100% !important; display: block !important; }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #e2e8f0;">
+  <table width="600" align="center" style="border-collapse: collapse;">
+    <tr>
+      <td class="responsive-column" width="300" style="padding: 16px; background-color: #ffffff;">
+        <h2 style="color: #1e3a8a;">Left Column Product</h2>
+        <p>Product description copy.</p>
+        <a href="https://example.com/p1" style="background-color: #2563eb; color: #ffffff; padding: 10px 20px;">Buy Left</a>
+      </td>
+      <td class="responsive-column" width="300" style="padding: 16px; background-color: #f8fafc;">
+        <h2 style="color: #047857;">Right Column Product</h2>
+        <p>Special offer details.</p>
+        <a href="https://example.com/p2" style="background-color: #059669; color: #ffffff; padding: 10px 20px;">Buy Right</a>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    editor.importHTML(complexTemplate);
+
+    const exportedHtml = editor.getHTML();
+
+    // 1. Preserves head styles and media queries
+    expect(exportedHtml).toContain('@media only screen and (max-width: 600px)');
+    expect(exportedHtml).toContain('.responsive-column');
+
+    // 2. Preserves table layout and both columns
+    expect(exportedHtml).toContain('width="300"');
+    expect(exportedHtml).toContain('Left Column Product');
+    expect(exportedHtml).toContain('Right Column Product');
+    expect(exportedHtml).toContain('https://example.com/p1');
+    expect(exportedHtml).toContain('https://example.com/p2');
+
+    // 3. Verifies canvas iframe loaded the live document
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    expect(iframe).toBeTruthy();
+    const ifrDoc = iframe.contentDocument!;
+    expect(ifrDoc.querySelector('h2')?.textContent).toBe('Left Column Product');
+
+    editor.destroy();
+  });
+
+  it('enables in-place text editing and updates document', () => {
+    const editor = ArchEmailEditor.create(container);
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+
+    const heading = ifrDoc.querySelector('h1')!;
+    expect(heading).toBeTruthy();
+    expect(heading.getAttribute('contenteditable')).toBe('true');
+
+    // User types new text in-place directly in email canvas
+    heading.textContent = 'Brand New In-Place Headline';
+    ifrDoc.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const updatedHtml = editor.getHTML();
+    expect(updatedHtml).toContain('Brand New In-Place Headline');
+
+    editor.destroy();
+  });
+
+  it('selects elements on click and allows inspector editing', () => {
+    const editor = ArchEmailEditor.create(container);
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+
+    // Click button element in canvas iframe
+    const button = ifrDoc.querySelector('a')!;
+    expect(button).toBeTruthy();
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    // Check inspector panel updated with button properties
+    const labelInp = container.querySelector('#inp-btn-label') as HTMLInputElement;
+    expect(labelInp).toBeTruthy();
+    expect(labelInp.value).toBe(button.textContent?.trim());
+
+    // Edit button label in Inspector
+    labelInp.value = 'Updated via Inspector';
+    labelInp.dispatchEvent(new Event('input'));
+
+    expect(button.textContent).toBe('Updated via Inspector');
+    expect(editor.getHTML()).toContain('Updated via Inspector');
+
+    editor.destroy();
+  });
+
+  it('exports clean HTML free of internal editor attributes or helper styles', () => {
+    const editor = ArchEmailEditor.create(container);
+    const html = editor.getHTML();
+
+    expect(html).not.toContain('contenteditable');
+    expect(html).not.toContain('arch-canvas-editor-style');
+    expect(html).not.toContain('arch-selected-element');
+
+    editor.destroy();
+  });
 });
