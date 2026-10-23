@@ -949,19 +949,40 @@ export class Canvas {
         outline: none !important;
         -webkit-tap-highlight-color: transparent !important;
       }
-      [contenteditable="true"]:not(.arch-editing-text),
-      [contenteditable="true"]:not(.arch-editing-text) * {
+      [contenteditable="true"]:not(.arch-editing-text) {
         cursor: default !important;
         user-select: none !important;
         -webkit-user-select: none !important;
         caret-color: transparent !important;
       }
-      .arch-editing-text, .arch-editing-text * {
+      [contenteditable="true"]:not(.arch-editing-text) *:not(.arch-editing-text):not(.arch-editing-text *) {
+        cursor: inherit;
+        caret-color: transparent !important;
+      }
+      .arch-editing-text,
+      .arch-editing-text *,
+      [contenteditable="true"].arch-editing-text,
+      [contenteditable="true"].arch-editing-text *,
+      [contenteditable="true"] .arch-editing-text,
+      [contenteditable="true"] .arch-editing-text * {
         outline: none !important;
         cursor: text !important;
         user-select: text !important;
         -webkit-user-select: text !important;
-        caret-color: #0d99ff !important;
+        caret-color: #000000 !important;
+      }
+      a.arch-editing-text,
+      span.arch-editing-text,
+      .arch-editing-text[style*="display: inline-block"],
+      .arch-editing-text[style*="display:inline-block"] {
+        display: inline-flex !important;
+        align-items: center !important;
+        line-height: normal !important;
+      }
+      .arch-editing-text::selection,
+      .arch-editing-text *::selection {
+        background-color: #0d99ff !important;
+        color: #ffffff !important;
       }
       .arch-selected-element {
         outline: 2px solid #0d99ff !important;
@@ -1076,8 +1097,13 @@ export class Canvas {
           return;
         }
 
-        // If user is in Text Edit Mode inside the selected element, allow normal mouse drag-selection of text!
-        if (this.isEditingText && this.activeMoveableUnit && this.activeMoveableUnit.contains(target)) {
+        // If user is in Text Edit Mode inside the selected element or active editing host, allow normal mouse drag-selection of text!
+        if (
+          this.isEditingText &&
+          ((this.activeMoveableUnit && this.activeMoveableUnit.contains(target)) ||
+            (this.selectedElement && this.selectedElement.contains(target)) ||
+            Boolean(target.closest('.arch-editing-text')))
+        ) {
           return;
         }
 
@@ -1288,7 +1314,11 @@ export class Canvas {
    * Enters Inline Text Edit Mode (`Level 4`) on a Button, Heading, or Paragraph so the user
    * can freely click and drag-select text characters without triggering frame drag.
    */
-  public enterTextEditMode(target: HTMLElement, unit?: HTMLElement): void {
+  public enterTextEditMode(
+    target: HTMLElement,
+    unit?: HTMLElement,
+    clickCoords?: { clientX: number; clientY: number }
+  ): void {
     const activeUnit = unit || this.activeMoveableUnit || this.findMoveableUnit(target);
     const host = findEditableTextHost(target, activeUnit);
     if (!host) return;
@@ -1299,7 +1329,69 @@ export class Canvas {
 
     this.isEditingText = true;
     host.classList.add('arch-editing-text');
+    if (host.getAttribute('contenteditable') !== 'true') {
+      host.setAttribute('contenteditable', 'true');
+      host.setAttribute('spellcheck', 'false');
+    }
+
+    // Adaptive contrast: if the text or background is very dark and text is light, adapt caret to match text
+    try {
+      const cs = host.ownerDocument.defaultView?.getComputedStyle(host);
+      if (cs) {
+        const textColor = cs.color;
+        const rgb = textColor.match(/\d+/g);
+        if (rgb && rgb.length >= 3) {
+          const r = parseInt(rgb[0], 10);
+          const g = parseInt(rgb[1], 10);
+          const b = parseInt(rgb[2], 10);
+          const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+          if (brightness > 200) {
+            host.style.setProperty('caret-color', '#ffffff', 'important');
+          } else {
+            host.style.setProperty('caret-color', '#000000', 'important');
+          }
+        }
+      }
+    } catch (_) {}
+
     host.focus();
+
+    // Explicitly place the blinking text cursor (caret) right where the user clicked,
+    // or at the end of the text if entered via toolbar button.
+    const doc = host.ownerDocument;
+    const win = doc.defaultView || window;
+    const sel = win.getSelection();
+
+    if (sel) {
+      let range: Range | null = null;
+
+      if (clickCoords) {
+        if (typeof doc.caretRangeFromPoint === 'function') {
+          range = doc.caretRangeFromPoint(clickCoords.clientX, clickCoords.clientY);
+        } else if (typeof (doc as any).caretPositionFromPoint === 'function') {
+          const pos = (doc as any).caretPositionFromPoint(clickCoords.clientX, clickCoords.clientY);
+          if (pos && pos.offsetNode) {
+            range = doc.createRange();
+            range.setStart(pos.offsetNode, pos.offset);
+            range.collapse(true);
+          }
+        }
+      }
+
+      if (range && host.contains(range.startContainer)) {
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } else {
+        try {
+          const fallbackRange = doc.createRange();
+          fallbackRange.selectNodeContents(host);
+          fallbackRange.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(fallbackRange);
+        } catch (_) {}
+      }
+    }
+
     this.renderFloatingToolbar(activeUnit, host);
   }
 
@@ -1311,9 +1403,16 @@ export class Canvas {
     this.isEditingText = false;
     const ifrDoc = this.iframe.contentDocument;
     if (ifrDoc) {
-      ifrDoc.querySelectorAll('.arch-editing-text').forEach((el) => el.classList.remove('arch-editing-text'));
+      ifrDoc.querySelectorAll('.arch-editing-text').forEach((el) => {
+        el.classList.remove('arch-editing-text');
+        (el as HTMLElement).style?.removeProperty('caret-color');
+      });
       if (ifrDoc.activeElement instanceof HTMLElement) {
         ifrDoc.activeElement.blur();
+      }
+      const sel = ifrDoc.defaultView?.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
       }
     }
     if (this.activeMoveableUnit) {
@@ -1342,7 +1441,12 @@ export class Canvas {
     }
 
     // If user is currently editing text inside the selected unit, let them place the caret freely!
-    if (this.isEditingText && this.activeMoveableUnit && this.activeMoveableUnit.contains(target)) {
+    if (
+      this.isEditingText &&
+      ((this.activeMoveableUnit && this.activeMoveableUnit.contains(target)) ||
+        (this.selectedElement && this.selectedElement.contains(target)) ||
+        Boolean(target.closest('.arch-editing-text')))
+    ) {
       const host = findEditableTextHost(target, this.activeMoveableUnit);
       if (host && !host.contains(target)) {
         host.focus();
@@ -1427,13 +1531,19 @@ export class Canvas {
     // (never when double-clicking empty left/right padding space of a parent `<td>` or `div.alignment`)!
     if (currentIdx === chain.length - 1) {
       const leafBlock = chain[currentIdx];
-      const directHost =
-        target.getAttribute('contenteditable') === 'true'
+      const isTargetOnLeaf = Boolean(
+        target.getAttribute('contenteditable') === 'true' ||
+          target.closest<HTMLElement>('[contenteditable="true"]') ||
+          target.closest('p, h1, h2, h3, h4, h5, h6, a, button') === leafBlock ||
+          leafBlock.tagName.toLowerCase() === 'a'
+      );
+      const directHost = isTargetOnLeaf
+        ? target.getAttribute('contenteditable') === 'true'
           ? target
-          : target.closest<HTMLElement>('[contenteditable="true"]') ||
-            (leafBlock.tagName.toLowerCase() === 'a' ? findEditableTextHost(target, leafBlock) : null);
+          : target.closest<HTMLElement>('[contenteditable="true"]') || findEditableTextHost(target, leafBlock)
+        : null;
       if (directHost && leafBlock.contains(directHost)) {
-        this.enterTextEditMode(directHost, leafBlock);
+        this.enterTextEditMode(directHost, leafBlock, { clientX: e.clientX, clientY: e.clientY });
       }
       return;
     }

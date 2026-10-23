@@ -1303,4 +1303,67 @@ describe('Figma vertical displacement', () => {
 
     editor.destroy();
   });
+
+  it('shows a visible blinking black cursor matching text height and places caret on double click', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+
+    const html = `<div class="menu-links" contenteditable="true" spellcheck="false">
+<a href="#" target="_blank" title="HALLOWEEN" style="display:inline-block;padding:10px;font-size:12px;color:#000000;">HALLOWEEN</a>
+</div>`;
+
+    editor.importHTML(html);
+    const ifrDoc = (container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement).contentDocument!;
+    const a1 = ifrDoc.querySelector('a[title="HALLOWEEN"]') as HTMLElement;
+    const canvas = (editor as any).canvas;
+
+    // Verify injected editor style rules:
+    // 1) Active edit text rules MUST override parent contenteditable="true" transparent rules
+    const styleEl = ifrDoc.getElementById('arch-canvas-editor-style') as HTMLStyleElement;
+    expect(styleEl).toBeTruthy();
+    expect(styleEl.textContent).toContain('caret-color: #000000 !important;');
+    expect(styleEl.textContent).toContain('a.arch-editing-text');
+    expect(styleEl.textContent).toContain('display: inline-flex !important;');
+    expect(styleEl.textContent).toContain('line-height: normal !important;');
+
+    // Mock caret placement API in test DOM environment
+    ifrDoc.caretRangeFromPoint = (_x: number, _y: number) => {
+      const range = ifrDoc.createRange();
+      range.selectNodeContents(a1.firstChild || a1);
+      range.collapse(true);
+      return range;
+    };
+
+    // 1. Single click selects the outer container (div.menu-links)
+    a1.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('.menu-links'));
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
+
+    // 2. Double-click drills down to select the link (a1)
+    a1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(a1);
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
+
+    // 3. Double-clicking on selected a1 enters inline text edit mode with blinking black cursor
+    a1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2, clientX: 50, clientY: 20 }));
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBe(a1);
+    expect(a1.classList.contains('arch-editing-text')).toBe(true);
+
+    // Caret color is explicitly black
+    expect(a1.style.getPropertyValue('caret-color')).toBe('#000000');
+
+    // Selection range was positioned inside a1
+    const sel = ifrDoc.defaultView?.getSelection();
+    expect(sel?.rangeCount).toBeGreaterThan(0);
+    const activeRange = sel?.getRangeAt(0);
+    expect(a1.contains(activeRange!.startContainer)).toBe(true);
+
+    // 3. Exiting text edit mode removes .arch-editing-text and clears caret-color property
+    canvas.exitTextEditMode();
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
+    expect(a1.style.getPropertyValue('caret-color')).toBe('');
+
+    editor.destroy();
+  });
 });
