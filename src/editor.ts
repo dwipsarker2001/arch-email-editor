@@ -382,16 +382,23 @@ export class ArchEmailEditor {
       }
     });
 
-    // 3. Initialize Palette
+    // 3. Initialize Palette (Figma Layers Tree + Assets)
     this.palette = new Palette({
       onAddBlock: (type) => this.addBlock(type),
-      onAddRowLayout: (layout) => this.addRowLayout(layout)
+      onAddRowLayout: (layout) => this.addRowLayout(layout),
+      onSelectLayer: (el) => this.canvas?.selectUnitFromTree(el),
+      onHoverLayer: (el) => this.canvas?.highlightUnitFromTree(el),
+      onMoveLayer: (el, dir) => this.canvas?.moveSelectedElement(dir, el),
+      onRemoveLayer: (el) => this.canvas?.removeSelectedElement(el)
     });
 
     // 4. Initialize Canvas
     this.canvas = new Canvas({
       onSelectBlock: (id) => this.selectBlock(id),
       onSelectElement: (info) => this.selectElement(info),
+      onLayersChange: (layers, selectedUnit) => {
+        this.palette?.updateLayers(layers, selectedUnit);
+      },
       onContentChange: (cleanHtml) => {
         this.document.rawHtml = cleanHtml;
         this.recordHistory();

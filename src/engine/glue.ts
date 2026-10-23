@@ -16,8 +16,22 @@
  *           can always be moved and dragged!
  */
 
-import { isEditorHelperNode, isGutterCell, isColumnElement, isRowElement, resolveUnit } from './units';
-import { migrateScopedMediaRules } from './cssScope';
+import {
+  findEnclosingColumn,
+  getColumnSlotContainer,
+  isColumnElement,
+  isEditorHelperNode,
+  isGutterCell,
+  isRowElement,
+  isStructuralSlotWrapper,
+  resolveUnit
+} from './units';
+import {
+  migrateScopedMediaRules,
+  normalizeCardGroupBorders,
+  preserveBlockLegibilityOnMove,
+  syncColumnSwapStyles
+} from './cssScope';
 
 export interface UnitEnvelope {
   leadingNodes: Node[];
@@ -134,6 +148,29 @@ export function collectUnitEnvelope(unit: HTMLElement): UnitEnvelope {
     trailingNodes.push(...tempTrailing);
   }
 
+  // Group responsive twin siblings (`.mobile_hide` immediately paired with `.desktop_hide` of the same tag)
+  // so moving, duplicating, or deleting a heading in Taskrabbit `row-9`/`row-11` moves its mobile twin in lockstep!
+  if (unit.classList?.contains('mobile_hide') || unit.classList?.contains('arch-hide-mobile')) {
+    const twinTrail: Node[] = [];
+    let cur = (trailingNodes.length > 0 ? trailingNodes[trailingNodes.length - 1] : unit).nextSibling;
+    while (cur) {
+      if (cur.nodeType === 3 && !(cur.nodeValue || '').trim()) {
+        twinTrail.push(cur);
+        cur = cur.nextSibling;
+        continue;
+      }
+      if (
+        cur.nodeType === 1 &&
+        (cur as HTMLElement).tagName === unit.tagName &&
+        isHiddenBlockElement(cur as HTMLElement)
+      ) {
+        twinTrail.push(cur);
+        trailingNodes.push(...twinTrail);
+      }
+      break;
+    }
+  }
+
   return { leadingNodes, unit, trailingNodes };
 }
 
@@ -179,6 +216,16 @@ export function resolveEffectiveMoveUnit(unit: HTMLElement): HTMLElement {
   const directPeers = getMoveableSiblings(unit);
   if (directPeers.length > 1) {
     return unit;
+  }
+
+  // If `unit` is an inner leaf (`<a>`, `<img>`, `<p>`, `<h1>`) inside a Block (`table.*_block`),
+  // check if that enclosing Block has sibling Blocks in its Column first!
+  const blockUnit = resolveUnit(unit);
+  if (blockUnit && blockUnit !== unit) {
+    const blockPeers = getMoveableSiblings(blockUnit);
+    if (blockPeers.length > 1) {
+      return blockUnit;
+    }
   }
 
   let cursor: HTMLElement | null = unit.parentElement;
@@ -239,7 +286,8 @@ export function swapEnvelopesInPlace(envA: UnitEnvelope, envB: UnitEnvelope): vo
 
 /**
  * Moves `unit` (or its escalated single-child Column/Row) up/left (`'up'`) or down/right (`'down'`).
- * Preserves MSO conditional envelopes, template-tag envelopes, and inter-column gutter cells.
+ * Preserves MSO conditional envelopes, template-tag envelopes, inter-column gutter cells,
+ * column `.first`/`.last` positional classes, and bordered-card top/bottom caps.
  */
 export function moveUnit(unit: HTMLElement, direction: 'up' | 'down'): boolean {
   const effective = resolveEffectiveMoveUnit(unit);
@@ -255,6 +303,13 @@ export function moveUnit(unit: HTMLElement, direction: 'up' | 'down'): boolean {
   const envPeer = collectUnitEnvelope(targetPeer);
 
   swapEnvelopesInPlace(envUnit, envPeer);
+
+  if (isColumnElement(effective) && isColumnElement(targetPeer)) {
+    syncColumnSwapStyles(effective, targetPeer);
+  } else if (isRowElement(effective)) {
+    normalizeCardGroupBorders(effective.ownerDocument?.body || effective.parentElement);
+  }
+
   return true;
 }
 
@@ -263,7 +318,7 @@ export function moveUnit(unit: HTMLElement, direction: 'up' | 'down'): boolean {
  * structural drop target unit:
  * - If `draggedUnit` (or its effective unit) is a Row, resolves to the enclosing Row of `rawTarget`.
  * - If `draggedUnit` is a Column, resolves to the enclosing Column of `rawTarget`.
- * - Otherwise resolves to the hovered Block unit (allowing cross-row and cross-column block drops!).
+ * - Otherwise resolves to the hovered Block unit or Column Slot (allowing cross-row and cross-column block drops!).
  */
 export function resolveCompatibleDropTarget(
   draggedUnit: HTMLElement,
@@ -282,28 +337,62 @@ export function resolveCompatibleDropTarget(
     return null;
   }
 
-  // 2. If explicitly dragging a Column (`td.column`), target a sibling/peer Column
+  // 2. If explicitly dragging a Column (`td.column` or multi-cell `<td>`), target a sibling/peer Column
   if (isColumnElement(draggedUnit)) {
-    const targetCol = rawTarget.closest<HTMLElement>('td.column, th.column, div.column') || resolveUnit(rawTarget);
-    if (targetCol && targetCol !== draggedUnit && !draggedUnit.contains(targetCol)) {
+    const targetCol = findEnclosingColumn(rawTarget) || resolveUnit(rawTarget);
+    if (targetCol && targetCol !== draggedUnit && !draggedUnit.contains(targetCol) && isColumnElement(targetCol)) {
       return targetCol;
+    }
+    // If cursor is on the row padding between columns in the same row, pick the sibling column
+    const enclosingRow = draggedUnit.closest('table.row, section');
+    if (enclosingRow && enclosingRow.contains(rawTarget)) {
+      const siblingCols = getMoveableSiblings(draggedUnit).filter((c) => c !== draggedUnit);
+      if (siblingCols.length === 1) return siblingCols[0];
     }
     return null;
   }
 
-  // 3. Dragging a Block (`table.*_block`, `tr`, `div`, `p`, etc.)
+  // 3. Dragging a Block (`table.*_block`, `tr`, `div`, `p`, `a`, etc.)
+  // If `draggedUnit` (or its effective move unit) is a Column of a multi-column row, and the user hovers
+  // over a sibling Column in the SAME row, resolve to that sibling Column so dragging swaps/reorders the Columns!
+  const effectiveForDrag = resolveEffectiveMoveUnit(draggedUnit);
+  if (isColumnElement(effectiveForDrag)) {
+    const hoveredCol = findEnclosingColumn(rawTarget);
+    if (hoveredCol && hoveredCol !== effectiveForDrag && hoveredCol.parentElement === effectiveForDrag.parentElement) {
+      return hoveredCol;
+    }
+  }
+
   const targetBlock = resolveUnit(rawTarget);
 
-  // If the user hovered over empty padding of a Row (`table.row`) or Column (`td.column`),
-  // find the last block inside that Row/Column or if dragging between single-block rows, match the Row!
+  // If the user hovered over empty padding of a Column (`td.column`) or `<div class="border">`,
+  // resolve to the last visible block inside `getColumnSlotContainer(col)`, or the Column itself if empty!
+  if (isColumnElement(targetBlock) || isStructuralSlotWrapper(targetBlock)) {
+    const slot = getColumnSlotContainer(targetBlock);
+    const children = Array.from(slot.children).filter(
+      (c) => !isEditorHelperNode(c) && !isHiddenBlockElement(c as HTMLElement)
+    ) as HTMLElement[];
+    if (children.length > 0) {
+      const candidate = children[children.length - 1];
+      if (candidate !== draggedUnit && !draggedUnit.contains(candidate)) {
+        return candidate;
+      }
+    }
+    return targetBlock;
+  }
+
+  // If the user hovered over empty padding of a Row (`table.row`),
+  // find the last visible block inside that Row's slot container!
   if (isRowElement(targetBlock)) {
     const effectiveDragged = resolveEffectiveMoveUnit(draggedUnit);
     if (isRowElement(effectiveDragged) && effectiveDragged !== targetBlock) {
       return targetBlock;
     }
-    const innerBlocks = targetBlock.querySelectorAll<HTMLElement>(
-      'table.image_block, table.button_block, table.paragraph_block, table.text_block, table.divider_block, table.heading_block, table.social_block, table.spacer_block, table.html_block'
-    );
+    const innerBlocks = Array.from(
+      targetBlock.querySelectorAll<HTMLElement>(
+        'table.image_block, table.button_block, table.paragraph_block, table.text_block, table.divider_block, table.heading_block, table.social_block, table.spacer_block, table.html_block, table.list_block'
+      )
+    ).filter((b) => !isHiddenBlockElement(b));
     if (innerBlocks.length > 0) {
       return innerBlocks[innerBlocks.length - 1];
     }
@@ -335,6 +424,57 @@ export function moveUnitToTarget(
     }
   }
 
+  // If sourceUnit is the sole block (or inner leaf `<a>`) inside a Column of a multi-column row and targetUnit is in a sibling Column
+  // of the SAME row (or targetUnit is that sibling Column), escalate both to Column so they swap/reorder cleanly as Columns!
+  if (!isRowElement(sourceUnit) && !isColumnElement(sourceUnit)) {
+    const effectiveSource = resolveEffectiveMoveUnit(sourceUnit);
+    if (isColumnElement(effectiveSource)) {
+      const targetCol = isColumnElement(targetUnit) ? targetUnit : findEnclosingColumn(targetUnit);
+      if (targetCol && targetCol !== effectiveSource && targetCol.parentElement === effectiveSource.parentElement) {
+        sourceUnit = effectiveSource;
+        targetUnit = targetCol;
+      }
+    }
+  }
+
+  // If sourceUnit is a Column and targetUnit is a Block/Leaf inside a sibling Column, escalate targetUnit to that Column!
+  if (isColumnElement(sourceUnit) && !isColumnElement(targetUnit)) {
+    const targetCol = findEnclosingColumn(targetUnit);
+    if (targetCol && targetCol !== sourceUnit) {
+      targetUnit = targetCol;
+    }
+  }
+
+  // If sourceUnit is an inner leaf (`<a>`, `<img>`, `<p>`, `<h1>`) inside a Block and targetUnit is another Block,
+  // escalate sourceUnit to its enclosing Block so we never detach an `<a>` from its `<td>` wrapper!
+  const sourceBlock = resolveUnit(sourceUnit);
+  if (sourceBlock && sourceBlock !== sourceUnit && sourceUnit.parentElement !== targetUnit.parentElement) {
+    sourceUnit = sourceBlock;
+  }
+
+  // If sourceUnit is a Block and targetUnit resolved to a Column or Structural Slot Wrapper (`div.border`),
+  // redirect targetUnit to the last/first child inside `getColumnSlotContainer(targetUnit)` (or append into slot if empty!)
+  if (!isRowElement(sourceUnit) && !isColumnElement(sourceUnit) && (isColumnElement(targetUnit) || isStructuralSlotWrapper(targetUnit))) {
+    const slot = getColumnSlotContainer(targetUnit);
+    const slotChildren = Array.from(slot.children).filter(
+      (c) => !isEditorHelperNode(c) && !isHiddenBlockElement(c as HTMLElement)
+    ) as HTMLElement[];
+    if (slotChildren.length > 0) {
+      targetUnit = position === 'before' ? slotChildren[0] : slotChildren[slotChildren.length - 1];
+    } else {
+      const oldRow = sourceUnit.closest<HTMLElement>('table.row');
+      migrateScopedMediaRules(sourceUnit, slot);
+      preserveBlockLegibilityOnMove(sourceUnit, slot);
+      const envSource = collectUnitEnvelope(sourceUnit);
+      for (const n of getEnvelopeNodes(envSource)) {
+        slot.appendChild(n);
+      }
+      cleanupEmptiedSourceRow(oldRow);
+      normalizeCardGroupBorders(slot.ownerDocument?.body || null);
+      return true;
+    }
+  }
+
   if (sourceUnit === targetUnit) return false;
   if (sourceUnit.contains(targetUnit) || targetUnit.contains(sourceUnit)) return false;
 
@@ -350,29 +490,60 @@ export function moveUnitToTarget(
     const peers = getMoveableSiblings(sourceUnit);
     const sIdx = peers.indexOf(sourceUnit);
     const tIdx = peers.indexOf(targetUnit);
-    if (Math.abs(sIdx - tIdx) === 1 && isColumnElement(sourceUnit)) {
+
+    // Adjacent sibling swap (covers 2-column swaps, adjacent 3-column swaps, adjacent row swaps, and adjacent block swaps
+    // regardless of whether the cursor was in the first 50% or second 50% of `targetUnit`!)
+    if (sIdx !== -1 && tIdx !== -1 && Math.abs(sIdx - tIdx) === 1) {
       swapEnvelopesInPlace(envSource, envTarget);
+      if (isColumnElement(sourceUnit) && isColumnElement(targetUnit)) {
+        syncColumnSwapStyles(sourceUnit, targetUnit);
+      } else if (isRowElement(sourceUnit)) {
+        normalizeCardGroupBorders(sourceUnit.ownerDocument?.body || targetParent);
+      }
       return true;
     }
+
+    // For non-adjacent siblings in the same container (e.g. moving Column 1 to Column 3 or Column 3 to Column 1 in a 3-column row),
+    // place `sourceUnit` at `targetUnit`'s position (`after` when moving rightward/downward, `before` when moving leftward/upward)!
+    const effectivePosition =
+      sIdx !== -1 && tIdx !== -1 ? (sIdx < tIdx ? 'after' : 'before') : position;
 
     const sourceNodes = getEnvelopeNodes(envSource);
     const targetNodes = getEnvelopeNodes(envTarget);
     const refNode =
-      position === 'before'
+      effectivePosition === 'before'
         ? targetNodes[0]
         : targetNodes[targetNodes.length - 1].nextSibling;
 
     for (const n of sourceNodes) {
       targetParent.insertBefore(n, refNode);
     }
+
+    if (isColumnElement(sourceUnit) && isColumnElement(targetUnit)) {
+      syncColumnSwapStyles(sourceUnit, targetUnit);
+    } else if (isRowElement(sourceUnit)) {
+      normalizeCardGroupBorders(sourceUnit.ownerDocument?.body || targetParent);
+    }
     return true;
   }
 
   // Cross-container move (e.g. moving a Block from Column 1 to Column 2 or Row 3 to Row 4)
-  // 1. Migrate any ancestor-scoped @media CSS rules before moving (Fixes R20)
-  migrateScopedMediaRules(sourceUnit, targetParent);
+  const oldEnclosingRow = !isRowElement(sourceUnit) ? sourceUnit.closest<HTMLElement>('table.row') : null;
+  const envSource = collectUnitEnvelope(sourceUnit);
 
-  // 2. Ensure HTML content-model compatibility between sourceUnit and targetParent
+  // 1. Migrate any ancestor-scoped @media CSS rules before moving (Fixes R20)
+  //    Also migrate rules for any paired responsive twin inside `envSource.trailingNodes`!
+  migrateScopedMediaRules(sourceUnit, targetParent);
+  for (const n of envSource.trailingNodes) {
+    if (n.nodeType === 1) {
+      migrateScopedMediaRules(n as HTMLElement, targetParent);
+    }
+  }
+
+  // 2. Preserve text legibility when moving between dark and light sections
+  preserveBlockLegibilityOnMove(sourceUnit, targetParent);
+
+  // 3. Ensure HTML content-model compatibility between sourceUnit and targetParent
   const adaptedUnit = adaptUnitForContainer(sourceUnit, targetParent);
   const envTarget = collectUnitEnvelope(targetUnit);
   const targetNodes = getEnvelopeNodes(envTarget);
@@ -382,26 +553,58 @@ export function moveUnitToTarget(
       : targetNodes[targetNodes.length - 1].nextSibling;
 
   if (adaptedUnit === sourceUnit) {
-    const envSource = collectUnitEnvelope(sourceUnit);
     for (const n of getEnvelopeNodes(envSource)) {
       targetParent.insertBefore(n, refNode);
     }
   } else {
-    const envSource = collectUnitEnvelope(sourceUnit);
     targetParent.insertBefore(adaptedUnit, refNode);
     removeEnvelope(envSource);
   }
+
+  // 4. If moving a Block across rows left the old `table.row` completely empty of blocks, collapse it cleanly
+  //    and normalize any card-group top/bottom borders!
+  if (oldEnclosingRow && oldEnclosingRow !== targetParent.closest('table.row')) {
+    cleanupEmptiedSourceRow(oldEnclosingRow);
+  }
+  normalizeCardGroupBorders(targetParent.ownerDocument?.body || targetParent);
 
   return true;
 }
 
 /**
+ * If a `table.row` had its last block moved out into another row, removes the emptied `table.row` shell
+ * so no dead empty padding/border gap remains behind.
+ */
+function cleanupEmptiedSourceRow(rowEl: HTMLElement | null): void {
+  if (!rowEl || !rowEl.parentElement) return;
+  const remainingBlocks = rowEl.querySelectorAll(
+    'table.image_block, table.button_block, table.paragraph_block, table.text_block, table.divider_block, table.heading_block, table.social_block, table.spacer_block, table.html_block, table.list_block, img, p, h1, h2, h3, h4, h5, h6, ul, ol, hr, a'
+  );
+  if (remainingBlocks.length === 0 && (rowEl.textContent || '').trim().length === 0) {
+    const env = collectUnitEnvelope(rowEl);
+    removeEnvelope(env);
+  }
+}
+
+/**
  * Adapts `unit` when moving between containers with different HTML content models
- * (e.g., `<tr>` from a `<tbody>` into a `<td>`/`<div>` column, or a block into a `<tbody>`).
+ * (e.g., `<tr>` from a `<tbody>` into a `<td>`/`<div>` column, or a block into a `<tbody>`),
+ * and ensures responsive `max-width: 100%` on images so narrow columns never overflow.
  */
 function adaptUnitForContainer(unit: HTMLElement, targetContainer: HTMLElement): HTMLElement {
   const doc = unit.ownerDocument;
   if (!doc) return unit;
+
+  // Ensure any image inside `unit` scales fluidly inside narrower columns
+  const imgs = unit.tagName.toLowerCase() === 'img' ? [unit] : Array.from(unit.querySelectorAll<HTMLElement>('img'));
+  for (const img of imgs) {
+    if (!img.style.maxWidth) {
+      img.style.maxWidth = '100%';
+    }
+    if (!img.style.height) {
+      img.style.height = 'auto';
+    }
+  }
 
   const uTag = unit.tagName.toLowerCase();
   const cTag = targetContainer.tagName.toLowerCase();

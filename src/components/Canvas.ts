@@ -1,21 +1,21 @@
 /**
- * Arch Email Editor - Visual Canvas & Parent Overlay Component
+ * Arch Email Editor - Figma-Grade Visual Canvas & Pointer Engine
  *
  * Architecture & Email Rendering Fidelity:
  * Uses a same-origin HTMLIFrameElement (`iframe.contentDocument`) with a non-invasive
- * parent-document overlay layer (`overlayLayer`).
+ * parent-document Figma HUD overlay (`overlayLayer`).
  * - 100% email client visual fidelity: table columns, responsive `@media` rules, VML, fonts, and colors.
  * - Safe HTML sanitization + template-tag tokenization (`{% ... %}` / `{{ ... }}`) + DOCTYPE preservation.
- * - Always re-binds iframe event listeners after `ifrDoc.open()/write()/close()` (since `document.open()`
- *   wipes all listeners on the Document object in real browsers).
- * - Shows the Floating Action Toolbar (`⠿ Drag`, `↑ Parent`, `▲/◀`, `▼/▶`, `⧉`, `✕`) immediately on hover
- *   (when no element is locked) and locks it on click selection.
- * - Dual Drag-and-Drop support:
- *   1. Dragging `⠿ Drag` handle or Palette items uses the Parent Overlay Drag-Capture Shield (`elementFromPoint`).
- *   2. Dragging blocks, images, or buttons directly inside the iframe reorders units seamlessly.
+ * - Figma 60fps Custom Pointer-Event Drag Engine (`mousedown` -> `4px` threshold -> `mousemove` -> `mouseup`):
+ *   - Dragging any Block, Column, or Row (or its Figma Frame Pill `⠿`) shows a 60fps Floating Ghost Card
+ *     and a Figma Auto-Layout Insertion Line (`2px solid #0d99ff` with circular end-caps + target slot label).
+ *   - Completely bypasses browser `contenteditable` native drop corruption so tables are NEVER dropped inside `<p>`/`<h1>`.
+ * - Two-State Text Interaction:
+ *   - Single-click selects the Frame/Block (and allows immediate typing or dragging).
+ *   - Double-click (or clicking `✎`) locks into Text Selection Mode for highlighting characters inside text.
  */
 
-import { BlockType, EmailDocument, RowLayoutType, SelectedElementInfo, ViewportMode } from '../types';
+import { BlockType, EmailDocument, LayerNode, RowLayoutType, SelectedElementInfo, ViewportMode } from '../types';
 import { compileToEmailHtml } from '../compiler';
 import {
   extractFrameMeta,
@@ -26,17 +26,26 @@ import {
   tokenizeTemplateTags
 } from '../engine/sanitize';
 import {
+  buildLayerTree,
   classifyElementType,
   classifyUnitRole,
+  describeUnitForLayer,
   detectAxis,
+  findEditableTextHost,
+  findEnclosingColumn,
+  getColumnSlotContainer,
+  getContainerChain,
   getParentStructuralUnit,
   getUnitAncestry,
+  isColumnElement,
   isEditableTextHost,
+  isRowElement,
   resolveUnit
 } from '../engine/units';
 import {
   canMoveUnit,
   duplicateUnit,
+  getMoveableSiblings,
   moveUnit,
   moveUnitToTarget,
   removeUnit,
@@ -56,6 +65,7 @@ export interface CanvasEvents {
   onSelectBlock: (id: string | null) => void;
   onSelectElement: (info: SelectedElementInfo | null) => void;
   onContentChange: (html: string) => void;
+  onLayersChange?: (layers: LayerNode[], selectedUnit: HTMLElement | null) => void;
   onAddBlock?: (type: BlockType) => void;
   onReorderBlock?: (sourceId: string, targetIndex: number) => void;
   onMoveBlock?: (id: string, direction: 'up' | 'down') => void;
@@ -69,6 +79,9 @@ export class Canvas {
   private iframe: HTMLIFrameElement;
   private overlayLayer: HTMLElement;
   private floatingToolbar: HTMLElement | null = null;
+  private dimensionsBadge: HTMLElement | null = null;
+  private dropIndicatorEl: HTMLElement | null = null;
+  private dragGhostEl: HTMLElement | null = null;
   private events: CanvasEvents;
 
   private selectedElement: HTMLElement | null = null;
@@ -80,6 +93,27 @@ export class Canvas {
   private hoveredDropTarget: HTMLElement | null = null;
   private hoveredDropPosition: 'before' | 'after' = 'after';
   private viewportMode: ViewportMode = 'desktop';
+  private isEditingText: boolean = false;
+  private suppressNextClick: boolean = false;
+  private iframeEventsAbortController: AbortController | null = null;
+
+  // Custom 60fps Pointer Drag state
+  private pointerDragCandidate: {
+    unit: HTMLElement;
+    startTarget: HTMLElement;
+    startX: number;
+    startY: number;
+    active: boolean;
+  } | null = null;
+  private resizeHandles: HTMLElement[] = [];
+  private activeImageResize: {
+    img: HTMLElement;
+    unit: HTMLElement;
+    startX: number;
+    startWidth: number;
+    maxWidth: number;
+    dir: 1 | -1;
+  } | null = null;
 
   constructor(events: CanvasEvents) {
     this.events = events;
@@ -98,7 +132,7 @@ export class Canvas {
     this.iframe.className = 'arch-canvas-iframe';
     this.iframe.setAttribute('title', 'Email Canvas Preview');
 
-    // Non-invasive parent-document overlay layer (zero pollution inside iframe DOM)
+    // Non-invasive parent-document Figma HUD overlay layer (zero pollution inside iframe DOM)
     this.overlayLayer = document.createElement('div');
     this.overlayLayer.className = 'arch-canvas-overlay';
 
@@ -119,6 +153,12 @@ export class Canvas {
 
   public getViewportMode(): ViewportMode {
     return this.viewportMode;
+  }
+
+  public getLayerTree(): LayerNode[] {
+    const ifrDoc = this.iframe.contentDocument;
+    if (!ifrDoc) return [];
+    return buildLayerTree(ifrDoc);
   }
 
   /**
@@ -146,7 +186,7 @@ export class Canvas {
   }
 
   /**
-   * Binds click and drag events on the outer canvas container & parent overlay shield.
+   * Binds click, pointer-drag, and palette HTML5 drop events on the outer canvas container & overlay shield.
    */
   private bindOuterEvents(): void {
     this.element.addEventListener('click', (e) => {
@@ -154,10 +194,30 @@ export class Canvas {
         this.clearSelection();
         this.events.onSelectElement(null);
         this.events.onSelectBlock(null);
+        this.emitLayersUpdate();
       }
     });
 
-    // Parent Overlay Drag-Capture Shield handlers (handles drags from `⠿ Drag` handle and Palette across iframe)
+    // Parent window pointermove/mouseup listeners for 60fps custom Figma Pointer Drag & Image Resize
+    window.addEventListener('mousemove', (e) => {
+      if (this.activeImageResize) {
+        this.handleImageResizeMove(e.clientX);
+        return;
+      }
+      if (!this.pointerDragCandidate) return;
+      this.handlePointerDragMove(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (this.activeImageResize) {
+        this.finishImageResize();
+        return;
+      }
+      if (!this.pointerDragCandidate) return;
+      this.finishPointerDrag();
+    });
+
+    // Parent Overlay HTML5 Drag-Capture Shield handlers (for dragging new items from the Assets Palette)
     this.containerElement.addEventListener('dragover', (e) => {
       e.preventDefault();
       if (e.dataTransfer) {
@@ -184,6 +244,144 @@ export class Canvas {
   }
 
   /**
+   * Handles 60fps pointer movement during a Figma Pointer Drag.
+   */
+  private handlePointerDragMove(clientX: number, clientY: number): void {
+    const cand = this.pointerDragCandidate;
+    if (!cand) return;
+
+    const dx = clientX - cand.startX;
+    const dy = clientY - cand.startY;
+    if (!cand.active) {
+      if (Math.hypot(dx, dy) < 5) return;
+
+      // Direction-aware Auto-Column Drag Initiator:
+      // If `cand.unit` is a multi-column Row (or an inner Block/Link inside a multi-column Row),
+      // and the user drags HORIZONTALLY (`|dx| > |dy|`), automatically switch the drag unit to the
+      // enclosing Column (`td.column`) so 2-column and 3-column rows can be reordered horizontally in 1 motion!
+      if (Math.abs(dx) > Math.abs(dy) * 1.1) {
+        const enclosingCol = findEnclosingColumn(cand.startTarget);
+        if (enclosingCol && getMoveableSiblings(enclosingCol).length >= 2) {
+          if (isRowElement(cand.unit) || enclosingCol.contains(cand.unit)) {
+            cand.unit = enclosingCol;
+            this.selectUnit(cand.startTarget, enclosingCol);
+          }
+        }
+      }
+
+      // Threshold exceeded -> activate Figma Pointer Drag!
+      cand.active = true;
+      this.draggedUnit = cand.unit;
+      this.draggedUnit.classList.add('arch-dragging-source');
+
+      // Clear any accidental text selection inside iframe so browser never drags text nodes
+      const ifrDoc = this.iframe.contentDocument;
+      ifrDoc?.getSelection()?.removeAllRanges();
+      if (ifrDoc?.activeElement && ifrDoc.activeElement instanceof HTMLElement) {
+        ifrDoc.activeElement.blur();
+      }
+
+      // Activate parent overlay shield so pointer tracking is 100% smooth across iframe boundaries
+      this.overlayLayer.style.pointerEvents = 'auto';
+      this.createDragGhost(cand.unit, clientX, clientY);
+    }
+
+    this.updateDragGhostPosition(clientX, clientY);
+    this.updateDropTargetFromClientPoint(clientX, clientY);
+  }
+
+  /**
+   * Commits or cancels an active Figma Pointer Drag on mouseup.
+   */
+  private finishPointerDrag(): void {
+    const cand = this.pointerDragCandidate;
+    this.pointerDragCandidate = null;
+
+    if (!cand || !cand.active) {
+      return;
+    }
+
+    this.suppressNextClick = true;
+    cand.unit.classList.remove('arch-dragging-source');
+    this.overlayLayer.style.pointerEvents = 'none';
+    this.removeDragGhost();
+
+    this.executeDrop('arch-move-unit');
+    if (this.activeMoveableUnit && !this.floatingToolbar) {
+      this.renderFloatingToolbar(this.activeMoveableUnit, this.selectedElement || this.activeMoveableUnit);
+    }
+  }
+
+  /**
+   * Creates the floating Figma Ghost Preview Card during pointer drag.
+   */
+  private createDragGhost(unit: HTMLElement, clientX: number, clientY: number): void {
+    this.removeDragGhost();
+    const desc = describeUnitForLayer(unit);
+    const ghost = document.createElement('div');
+    ghost.className = 'arch-figma-drag-ghost';
+    ghost.innerHTML = `
+      <span class="arch-ghost-badge">${desc.label}</span>
+      <span class="arch-ghost-text">${desc.sublabel || 'Moving layer'}</span>
+    `;
+    this.overlayLayer.appendChild(ghost);
+    this.dragGhostEl = ghost;
+    this.updateDragGhostPosition(clientX, clientY);
+  }
+
+  private updateDragGhostPosition(clientX: number, clientY: number): void {
+    if (!this.dragGhostEl) return;
+    const containerRect = this.containerElement.getBoundingClientRect();
+    const x = clientX - containerRect.left + 14;
+    const y = clientY - containerRect.top + 14;
+    this.dragGhostEl.style.left = `${x}px`;
+    this.dragGhostEl.style.top = `${y}px`;
+  }
+
+  private removeDragGhost(): void {
+    if (this.dragGhostEl) {
+      this.dragGhostEl.remove();
+      this.dragGhostEl = null;
+    }
+  }
+
+  /**
+   * Resizes the active image live as the user drags a corner `.arch-resize-handle`.
+   */
+  private handleImageResizeMove(clientX: number): void {
+    const state = this.activeImageResize;
+    if (!state) return;
+
+    const deltaX = (clientX - state.startX) * state.dir;
+    const nextWidth = Math.round(Math.max(24, Math.min(state.maxWidth, state.startWidth + deltaX)));
+    ImageAdapter.setWidth(state.img, `${nextWidth}px`, state.unit);
+
+    if (this.floatingToolbar) {
+      this.positionFloatingToolbar(state.unit, this.floatingToolbar);
+    }
+    if (this.dimensionsBadge) {
+      const rect = state.img.getBoundingClientRect();
+      const h = rect.height > 0 ? Math.round(rect.height) : Math.round(nextWidth);
+      this.dimensionsBadge.textContent = `${nextWidth} × ${h}`;
+    }
+  }
+
+  /**
+   * Commits an interactive image resize operation and syncs the Inspector & history.
+   */
+  private finishImageResize(): void {
+    const state = this.activeImageResize;
+    if (!state) return;
+    this.activeImageResize = null;
+    this.suppressNextClick = true;
+    this.overlayLayer.style.pointerEvents = 'none';
+    const imgUnit = this.findMoveableUnit(state.img);
+    this.selectUnit(state.img, imgUnit);
+    this.adjustHeight();
+    this.onStructureChanged();
+  }
+
+  /**
    * Resolves the drop target inside the iframe from parent-window `(clientX, clientY)` coordinates.
    */
   private updateDropTargetFromClientPoint(clientX: number, clientY: number): void {
@@ -199,18 +397,24 @@ export class Canvas {
     const hitEl = ifrDoc.elementFromPoint(x, y) as HTMLElement | null;
     if (!hitEl) return;
 
-    this.updateDropTargetForElement(hitEl, y);
+    this.updateDropTargetForElement(hitEl, x, y);
   }
 
   /**
-   * Updates the visual drop indicator line on the compatible target unit inside the iframe.
+   * Updates the Figma Auto-Layout Insertion Line on the compatible target unit.
    */
-  private updateDropTargetForElement(rawTarget: HTMLElement, iframeRelativeY: number): void {
-    const targetUnit = this.draggedUnit
-      ? resolveCompatibleDropTarget(this.draggedUnit, rawTarget)
+  private updateDropTargetForElement(rawTarget: HTMLElement, iframeRelativeX: number, iframeRelativeY: number): void {
+    const effectiveDragged = this.draggedUnit ? resolveEffectiveMoveUnit(this.draggedUnit) : null;
+    const targetUnit = effectiveDragged
+      ? resolveCompatibleDropTarget(effectiveDragged, rawTarget)
       : this.findMoveableUnit(rawTarget);
 
-    if (!targetUnit || targetUnit === this.draggedUnit || targetUnit.tagName.toLowerCase() === 'body') {
+    if (
+      !targetUnit ||
+      targetUnit === this.draggedUnit ||
+      targetUnit === effectiveDragged ||
+      targetUnit.tagName.toLowerCase() === 'body'
+    ) {
       return;
     }
 
@@ -218,18 +422,78 @@ export class Canvas {
     this.hoveredDropTarget = targetUnit;
 
     const rect = targetUnit.getBoundingClientRect();
-    const isTop = iframeRelativeY < rect.top + rect.height / 2;
-    this.hoveredDropPosition = isTop ? 'before' : 'after';
+    const isHorizontal = isColumnElement(targetUnit) && effectiveDragged && isColumnElement(effectiveDragged);
+    let isBefore = isHorizontal
+      ? iframeRelativeX < rect.left + rect.width / 2
+      : iframeRelativeY < rect.top + rect.height / 2;
 
-    if (isTop) {
+    // If dragging onto a sibling in the same container (e.g. 2-column or 3-column horizontal reorder,
+    // or adjacent row swap), always show the Figma insertion line on the directional target edge!
+    if (effectiveDragged && effectiveDragged.parentElement === targetUnit.parentElement) {
+      const peers = getMoveableSiblings(effectiveDragged);
+      const sIdx = peers.indexOf(effectiveDragged);
+      const tIdx = peers.indexOf(targetUnit);
+      if (sIdx !== -1 && tIdx !== -1 && sIdx !== tIdx) {
+        isBefore = sIdx > tIdx;
+      }
+    }
+
+    this.hoveredDropPosition = isBefore ? 'before' : 'after';
+
+    if (isBefore) {
       targetUnit.classList.add('arch-drop-line-top');
     } else {
       targetUnit.classList.add('arch-drop-line-bottom');
     }
+
+    this.renderFigmaDropIndicator(targetUnit, rect, isBefore, !!isHorizontal);
   }
 
   /**
-   * Executes a drop operation (either moving `this.draggedUnit` or inserting a block/row from the Palette).
+   * Renders the crisp Figma `#0d99ff` Auto-Layout Insertion Line with circular end-caps and slot pill in `overlayLayer`.
+   */
+  private renderFigmaDropIndicator(
+    targetUnit: HTMLElement,
+    unitRect: DOMRect,
+    isBefore: boolean,
+    isHorizontal: boolean
+  ): void {
+    const iframeRect = this.iframe.getBoundingClientRect();
+    const containerRect = this.containerElement.getBoundingClientRect();
+    const offsetX = iframeRect.left - containerRect.left;
+    const offsetY = iframeRect.top - containerRect.top;
+
+    const ind = document.createElement('div');
+    ind.className = `arch-figma-drop-indicator ${isHorizontal ? 'arch-figma-drop-indicator--vertical' : ''}`;
+
+    const desc = describeUnitForLayer(targetUnit);
+    const parentCol = targetUnit.closest<HTMLElement>('td.column, th.column, div.column');
+    const parentRow = targetUnit.closest<HTMLElement>('table.row, section');
+    const rowLabel = parentRow ? describeUnitForLayer(parentRow).label : '';
+    const colLabel = parentCol ? describeUnitForLayer(parentCol).label : '';
+    const contextPath = [rowLabel, colLabel].filter(Boolean).join(' › ');
+    const pillText = `${isBefore ? 'Before' : 'After'} ${desc.label}${contextPath ? ` in ${contextPath}` : ''}`;
+
+    ind.innerHTML = `<span class="arch-figma-drop-pill">${pillText}</span>`;
+
+    if (isHorizontal) {
+      const x = offsetX + (isBefore ? unitRect.left : unitRect.right);
+      ind.style.left = `${x}px`;
+      ind.style.top = `${offsetY + unitRect.top}px`;
+      ind.style.height = `${Math.max(24, unitRect.height)}px`;
+    } else {
+      const y = offsetY + (isBefore ? unitRect.top : unitRect.bottom);
+      ind.style.left = `${offsetX + unitRect.left}px`;
+      ind.style.top = `${y}px`;
+      ind.style.width = `${Math.max(40, unitRect.width)}px`;
+    }
+
+    this.overlayLayer.appendChild(ind);
+    this.dropIndicatorEl = ind;
+  }
+
+  /**
+   * Executes a drop operation (either moving `this.draggedUnit` or inserting a block/row from the Assets Palette).
    */
   private executeDrop(data: string): void {
     const targetUnit = this.hoveredDropTarget;
@@ -241,9 +505,16 @@ export class Canvas {
     if (this.draggedUnit) {
       const source = this.draggedUnit;
       this.draggedUnit = null;
+      source.classList.remove('arch-dragging-source');
       if (targetUnit && source !== targetUnit) {
+        const snapshotBefore = this.getCleanHTML();
         const moved = moveUnitToTarget(source, targetUnit, position);
         if (moved) {
+          const ifrDoc = this.iframe.contentDocument;
+          if (ifrDoc && !validateEmailStructure(ifrDoc).valid) {
+            this.update({ version: '1.0', settings: {} as any, blocks: [], rawHtml: snapshotBefore }, null, true);
+            return;
+          }
           this.selectUnit(source, source);
           this.onStructureChanged();
         }
@@ -282,6 +553,7 @@ export class Canvas {
           </p>
         </div>
       `;
+      this.emitLayersUpdate();
       return;
     }
 
@@ -295,6 +567,7 @@ export class Canvas {
       doc.rawHtml && doc.rawHtml.trim() ? doc.rawHtml : compileToEmailHtml(doc);
 
     if (!forceRewrite && this.lastRenderedHtml === htmlToRender && this.iframe.contentDocument?.body) {
+      this.emitLayersUpdate();
       return;
     }
     this.lastRenderedHtml = htmlToRender;
@@ -320,20 +593,21 @@ export class Canvas {
     // 4. Defense-in-depth DOM sanitization pass
     sanitizeDomTree(ifrDoc);
 
-    // 5. Inject lightweight outline CSS into iframe head (stripped on export)
+    // 5. Inject lightweight Figma outline CSS into iframe head (stripped on export)
     this.injectEditorStyles(ifrDoc);
 
-    // 6. Enable single-host direct typing on text leaves & mark blocks draggable
+    // 6. Enable single-host direct typing on text leaves
     this.enableDirectEditing(ifrDoc);
 
     // 7. Always bind delegated iframe events after `ifrDoc.open()/write()/close()`
     this.bindIframeEvents(ifrDoc);
 
     this.adjustHeight();
+    this.emitLayersUpdate();
   }
 
   /**
-   * Injects lightweight visual outline styles into the iframe (stripped cleanly on export).
+   * Injects crisp Figma `#0d99ff` frame & selection outlines into the iframe (stripped cleanly on export).
    */
   private injectEditorStyles(doc: Document): void {
     if (doc.getElementById('arch-canvas-editor-style')) return;
@@ -341,23 +615,36 @@ export class Canvas {
     const styleEl = doc.createElement('style');
     styleEl.id = 'arch-canvas-editor-style';
     styleEl.textContent = `
-      [contenteditable="true"]:focus {
-        outline: 2px dashed #2563eb !important;
-        outline-offset: 2px;
+      [contenteditable="true"]:not(.arch-editing-text),
+      [contenteditable="true"]:not(.arch-editing-text) * {
+        cursor: default !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+        caret-color: transparent !important;
+      }
+      .arch-editing-text, .arch-editing-text * {
+        cursor: text !important;
+        user-select: text !important;
+        -webkit-user-select: text !important;
+        caret-color: auto !important;
       }
       .arch-selected-element {
-        outline: 2px solid #2563eb !important;
+        outline: 2px solid #0d99ff !important;
         outline-offset: -2px;
       }
       .arch-hover-element:not(.arch-selected-element) {
-        outline: 2px dashed #60a5fa !important;
-        outline-offset: -2px;
+        outline: 1.5px solid rgba(13, 153, 255, 0.75) !important;
+        outline-offset: -1.5px;
+      }
+      .arch-dragging-source {
+        opacity: 0.35 !important;
+        transition: opacity 0.12s ease !important;
       }
       .arch-drop-line-top {
-        box-shadow: inset 0 4px 0 0 #2563eb !important;
+        box-shadow: inset 0 3px 0 0 #0d99ff !important;
       }
       .arch-drop-line-bottom {
-        box-shadow: inset 0 -4px 0 0 #2563eb !important;
+        box-shadow: inset 0 -3px 0 0 #0d99ff !important;
       }
     `;
     (doc.head || doc.documentElement).appendChild(styleEl);
@@ -365,7 +652,8 @@ export class Canvas {
 
   /**
    * Marks true text leaf hosts as `contenteditable="true"` (Fixes R14, R17, R18)
-   * and marks structural block tables as `draggable="true"`.
+   * and sets `draggable="false"` on `<a>` and `<img>` elements so native browser link/image dragging
+   * never blocks selecting text inside a Button or interferes with the Figma Pointer Drag engine.
    */
   public enableDirectEditing(doc: Document): void {
     if (!doc.body) return;
@@ -385,57 +673,174 @@ export class Canvas {
       }
     });
 
-    // Make structural block wrappers directly draggable on the canvas
-    const blockUnits = doc.body.querySelectorAll<HTMLElement>(
-      'table.image_block, table.button_block, table.paragraph_block, table.text_block, table.divider_block, table.heading_block, table.social_block, table.spacer_block, table.html_block'
-    );
-    blockUnits.forEach((unit) => {
-      unit.setAttribute('draggable', 'true');
+    doc.body.querySelectorAll<HTMLElement>('a, img').forEach((el) => {
+      el.setAttribute('draggable', 'false');
     });
   }
 
   /**
-   * Binds delegated click, hover, input, keydown, scroll, and drag-and-drop listeners on `ifrDoc`.
+   * Binds delegated click, double-click, pointer-drag, hover, input, keydown, and scroll listeners on `ifrDoc`.
    */
   private bindIframeEvents(doc: Document): void {
-    doc.addEventListener('click', (e) => this.handleIframeClick(e));
+    if (this.iframeEventsAbortController) {
+      this.iframeEventsAbortController.abort();
+    }
+    this.iframeEventsAbortController = new AbortController();
+    const { signal } = this.iframeEventsAbortController;
 
-    doc.addEventListener('mouseover', (e) => {
-      if (this.draggedUnit) return;
+    // Block all native link navigation and form submission inside the editor canvas (even on middle-click or after drag-release)
+    const preventLinkNavigation = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
-      if (!target || target.tagName.toLowerCase() === 'body' || target.tagName.toLowerCase() === 'html') {
-        return;
+      if (target?.closest?.('a, area')) {
+        e.preventDefault();
       }
-      doc.querySelectorAll('.arch-hover-element').forEach((el) => el.classList.remove('arch-hover-element'));
-      const unit = this.findMoveableUnit(target);
-      if (unit && unit !== doc.body) {
-        unit.classList.add('arch-hover-element');
-        this.hoveredUnit = unit;
-        // If no element has been clicked/locked yet, show the Floating Toolbar on the hovered unit
-        // so the user immediately sees `⠿ Drag`, `▲`, `▼`, `⧉`, `✕` on any imported template!
-        if (!this.activeMoveableUnit) {
-          this.renderFloatingToolbar(unit, target);
+    };
+    doc.addEventListener('click', preventLinkNavigation, { capture: true, signal });
+    doc.addEventListener('auxclick', preventLinkNavigation, { capture: true, signal });
+    doc.addEventListener('submit', (e) => e.preventDefault(), { capture: true, signal });
+
+    doc.addEventListener('click', (e) => this.handleIframeClick(e), { signal });
+
+    doc.addEventListener('dblclick', (e) => this.handleIframeDoubleClick(e), { signal });
+
+    doc.addEventListener(
+      'focusin',
+      (e) => {
+        if (!this.isEditingText) {
+          const t = e.target as HTMLElement | null;
+          if (t && (t.getAttribute('contenteditable') === 'true' || t.isContentEditable)) {
+            t.blur();
+          }
         }
-      }
-    });
+      },
+      { signal }
+    );
 
-    doc.addEventListener('input', () => {
-      const cleanHtml = this.getCleanHTML();
-      this.lastRenderedHtml = cleanHtml;
-      this.events.onContentChange(cleanHtml);
-    });
-
-    doc.addEventListener('keydown', (e: KeyboardEvent) => {
-      const active = doc.activeElement as HTMLElement | null;
-      if (!active || active.getAttribute('contenteditable') !== 'true') return;
-
-      if (e.key === 'Backspace' || e.key === 'Delete') {
-        const text = active.textContent || '';
-        if (text.length === 0) {
-          e.preventDefault();
+    // Custom Figma Pointer Drag initiator inside the iframe
+    doc.addEventListener(
+      'mousedown',
+      (e: MouseEvent) => {
+        if (e.button !== 0) return;
+        const target = e.target as HTMLElement | null;
+        if (!target || target.tagName.toLowerCase() === 'body' || target.tagName.toLowerCase() === 'html') {
+          return;
         }
-      }
-    });
+
+        // If user is in Text Edit Mode inside the selected element, allow normal mouse drag-selection of text!
+        if (this.isEditingText && this.activeMoveableUnit && this.activeMoveableUnit.contains(target)) {
+          return;
+        }
+
+        // If user was editing text and clicked outside, exit edit mode
+        if (this.isEditingText) {
+          this.exitTextEditMode();
+        }
+
+        // Prevent browser from automatically focusing contenteditable and showing a blinking caret on single click
+        e.preventDefault();
+
+        const unit = this.resolveDragCandidateUnit(target);
+
+        if (unit && unit !== doc.body) {
+          const iframeRect = this.iframe.getBoundingClientRect();
+          this.pointerDragCandidate = {
+            unit,
+            startTarget: target,
+            startX: iframeRect.left + e.clientX,
+            startY: iframeRect.top + e.clientY,
+            active: false
+          };
+        }
+      },
+      { signal }
+    );
+
+    doc.addEventListener(
+      'mousemove',
+      (e: MouseEvent) => {
+        const iframeRect = this.iframe.getBoundingClientRect();
+        if (this.activeImageResize) {
+          this.handleImageResizeMove(iframeRect.left + e.clientX);
+          return;
+        }
+        if (!this.pointerDragCandidate) return;
+        this.handlePointerDragMove(iframeRect.left + e.clientX, iframeRect.top + e.clientY);
+      },
+      { signal }
+    );
+
+    doc.addEventListener(
+      'mouseup',
+      () => {
+        if (this.activeImageResize) {
+          this.finishImageResize();
+          return;
+        }
+        if (!this.pointerDragCandidate) return;
+        this.finishPointerDrag();
+      },
+      { signal }
+    );
+
+    doc.addEventListener(
+      'mouseover',
+      (e) => {
+        if (this.draggedUnit || this.pointerDragCandidate?.active) return;
+        const target = e.target as HTMLElement | null;
+        if (!target || target.tagName.toLowerCase() === 'body' || target.tagName.toLowerCase() === 'html') {
+          return;
+        }
+        doc.querySelectorAll('.arch-hover-element').forEach((el) => el.classList.remove('arch-hover-element'));
+        const unit = this.resolveHoverUnitForHierarchy(target);
+        if (unit && unit !== doc.body) {
+          unit.classList.add('arch-hover-element');
+          this.hoveredUnit = unit;
+          if (!this.activeMoveableUnit) {
+            this.renderFloatingToolbar(unit, target);
+          }
+        }
+      },
+      { signal }
+    );
+
+    doc.addEventListener(
+      'input',
+      () => {
+        const cleanHtml = this.getCleanHTML();
+        this.lastRenderedHtml = cleanHtml;
+        this.events.onContentChange(cleanHtml);
+        this.emitLayersUpdate();
+      },
+      { signal }
+    );
+
+    doc.addEventListener(
+      'keydown',
+      (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          if (this.isEditingText) {
+            this.exitTextEditMode();
+            return;
+          }
+          // Pressing Escape when a child container is selected climbs up to parent container (just like Shift+Enter / Esc in Figma!)
+          if (this.activeMoveableUnit) {
+            this.selectParentUnit(this.activeMoveableUnit);
+            return;
+          }
+        }
+
+        const active = doc.activeElement as HTMLElement | null;
+        if (!active || active.getAttribute('contenteditable') !== 'true') return;
+
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+          const text = active.textContent || '';
+          if (text.length === 0) {
+            e.preventDefault();
+          }
+        }
+      },
+      { signal }
+    );
 
     const onScroll = () => {
       const target = this.activeMoveableUnit || this.hoveredUnit;
@@ -443,10 +848,58 @@ export class Canvas {
         this.positionFloatingToolbar(target, this.floatingToolbar);
       }
     };
-    doc.addEventListener('scroll', onScroll, { passive: true });
-    this.iframe.contentWindow?.addEventListener('scroll', onScroll, { passive: true });
+    doc.addEventListener('scroll', onScroll, { passive: true, signal });
+    this.iframe.contentWindow?.addEventListener('scroll', onScroll, { passive: true, signal });
 
-    this.bindIframeDragDrop(doc);
+    this.bindIframeDragDrop(doc, signal);
+  }
+
+  /**
+   * Resolves the unit to preview on hover based on current Figma hierarchy depth:
+   * - If nothing is selected, previews the Top Container (`Row Frame`).
+   * - If a Container (`Row` or `Column`) is selected and cursor is inside it, previews the immediate child level!
+   */
+  private resolveHoverUnitForHierarchy(target: HTMLElement): HTMLElement {
+    const chain = getContainerChain(target);
+    if (chain.length === 0) return this.findMoveableUnit(target);
+
+    if (!this.activeMoveableUnit) {
+      return chain[0];
+    }
+
+    const activeIdx = chain.indexOf(this.activeMoveableUnit);
+    if (activeIdx !== -1) {
+      return activeIdx + 1 < chain.length ? chain[activeIdx + 1] : chain[activeIdx];
+    }
+
+    // If hovering a sibling inside the same Top Row, preview at the same role level (`column` or `block`)
+    const activeRole = classifyUnitRole(this.activeMoveableUnit);
+    const sameRole = chain.find((u) => classifyUnitRole(u) === activeRole);
+    return sameRole || chain[0];
+  }
+
+  /**
+   * Resolves which Frame/Unit should be dragged when the user presses `mousedown` on `target`:
+   * - If `activeMoveableUnit` contains `target`, drags `activeMoveableUnit` (e.g. `Row Frame`, `Column Frame`, or `Block Frame`).
+   * - If `activeMoveableUnit` is at the `Column` or `Block` level inside the same Row, and the user presses and drags
+   *   a sibling `Column` or `Block`, drags that sibling at the same level!
+   * - Otherwise drags the Top Container (`chain[0]`, the `Row Frame`).
+   */
+  private resolveDragCandidateUnit(target: HTMLElement): HTMLElement {
+    if (this.activeMoveableUnit && this.activeMoveableUnit.contains(target)) {
+      return this.activeMoveableUnit;
+    }
+
+    const chain = getContainerChain(target);
+    if (chain.length === 0) return this.findMoveableUnit(target);
+
+    if (this.activeMoveableUnit) {
+      const activeRole = classifyUnitRole(this.activeMoveableUnit);
+      const sameRole = chain.find((u) => classifyUnitRole(u) === activeRole);
+      if (sameRole) return sameRole;
+    }
+
+    return chain[0];
   }
 
   /**
@@ -457,10 +910,146 @@ export class Canvas {
   }
 
   /**
-   * Handles element click selection inside the iframe to drive the Inspector and Floating Toolbar.
+   * Highlights a unit on the canvas when hovered in the Left Sidebar Figma Layers Tree.
+   */
+  public highlightUnitFromTree(unit: HTMLElement | null): void {
+    const ifrDoc = this.iframe.contentDocument;
+    if (!ifrDoc) return;
+    ifrDoc.querySelectorAll('.arch-hover-element').forEach((el) => el.classList.remove('arch-hover-element'));
+    if (unit && ifrDoc.body.contains(unit)) {
+      unit.classList.add('arch-hover-element');
+    }
+  }
+
+  /**
+   * Selects a unit from the Left Sidebar Figma Layers Tree and scrolls it smoothly into view.
+   */
+  public selectUnitFromTree(unit: HTMLElement): void {
+    const ifrDoc = this.iframe.contentDocument;
+    if (!ifrDoc || !ifrDoc.body.contains(unit)) return;
+    this.exitTextEditMode();
+    this.selectUnit(unit, unit);
+    if (typeof unit.scrollIntoView === 'function') {
+      unit.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  /**
+   * Enters Inline Text Edit Mode (`Level 4`) on a Button, Heading, or Paragraph so the user
+   * can freely click and drag-select text characters without triggering frame drag.
+   */
+  public enterTextEditMode(target: HTMLElement, unit?: HTMLElement): void {
+    const activeUnit = unit || this.activeMoveableUnit || this.findMoveableUnit(target);
+    const host = findEditableTextHost(target, activeUnit);
+    if (!host) return;
+
+    if (this.activeMoveableUnit !== activeUnit) {
+      this.selectUnit(host, activeUnit);
+    }
+
+    this.isEditingText = true;
+    host.classList.add('arch-editing-text');
+    host.focus();
+    this.renderFloatingToolbar(activeUnit, host);
+  }
+
+  /**
+   * Exits Inline Text Edit Mode and returns to Frame Selection mode.
+   */
+  public exitTextEditMode(): void {
+    if (!this.isEditingText) return;
+    this.isEditingText = false;
+    const ifrDoc = this.iframe.contentDocument;
+    if (ifrDoc) {
+      ifrDoc.querySelectorAll('.arch-editing-text').forEach((el) => el.classList.remove('arch-editing-text'));
+      if (ifrDoc.activeElement instanceof HTMLElement) {
+        ifrDoc.activeElement.blur();
+      }
+    }
+    if (this.activeMoveableUnit) {
+      this.renderFloatingToolbar(this.activeMoveableUnit, this.selectedElement || this.activeMoveableUnit);
+    }
+  }
+
+  /**
+   * Handles single-click selection inside the iframe using Figma's Top-Down Hierarchical Frame model:
+   * - 1st click on a section selects the Top Container (`Row Frame`).
+   * - Clicking a sibling at the currently active hierarchy depth (`Column` or `Block`) switches to that sibling.
+   * - Holding `Cmd`/`Ctrl` while clicking jumps directly to the innermost `Block`.
    */
   private handleIframeClick(e: MouseEvent): void {
-    const target = e.target as HTMLElement;
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+
+    const anchor = target.closest('a, area');
+    if (anchor) {
+      e.preventDefault();
+    }
+
+    if (this.suppressNextClick) {
+      this.suppressNextClick = false;
+      return;
+    }
+
+    // If user is currently editing text inside the selected unit, let them place the caret freely!
+    if (this.isEditingText && this.activeMoveableUnit && this.activeMoveableUnit.contains(target)) {
+      const host = findEditableTextHost(target, this.activeMoveableUnit);
+      if (host && !host.contains(target)) {
+        host.focus();
+      }
+      return;
+    }
+
+    // Second click of a double-click is handled by `handleIframeDoubleClick` (`dblclick`)
+    if (e.detail >= 2) {
+      return;
+    }
+
+    const selectable = (target.closest('img, a, h1, h2, h3, h4, h5, h6, p, li, hr, td, div, section') ||
+      target) as HTMLElement;
+
+    // Programmatic synthetic test clicks (`detail === 0 && !isTrusted`) or `Cmd/Ctrl + Click` deep-selects the leaf block
+    if ((!e.isTrusted && e.detail === 0) || e.metaKey || e.ctrlKey) {
+      const deepUnit = this.findMoveableUnit(selectable);
+      this.exitTextEditMode();
+      this.selectUnit(selectable, deepUnit);
+      return;
+    }
+
+    const chain = getContainerChain(selectable);
+    if (chain.length === 0) return;
+
+    // 1. If clicking inside the currently selected container, keep it selected (NEVER enter edit mode on single click)
+    if (this.activeMoveableUnit && chain.includes(this.activeMoveableUnit)) {
+      this.selectUnit(selectable, this.activeMoveableUnit);
+      return;
+    }
+
+    // 2. If another unit at the same role level (`Column` or `Block`) inside the SAME Row was selected,
+    //    select the clicked sibling at that same role level!
+    if (this.activeMoveableUnit) {
+      const prevChain = getContainerChain(this.activeMoveableUnit);
+      if (prevChain.length > 0 && prevChain[0] === chain[0]) {
+        const activeRole = classifyUnitRole(this.activeMoveableUnit);
+        const sameRoleUnit = chain.find((u) => classifyUnitRole(u) === activeRole);
+        if (sameRoleUnit) {
+          this.exitTextEditMode();
+          this.selectUnit(selectable, sameRoleUnit);
+          return;
+        }
+      }
+    }
+
+    // 3. Otherwise select the Top Container (`chain[0]`, the Row Frame)!
+    this.exitTextEditMode();
+    this.selectUnit(selectable, chain[0]);
+  }
+
+  /**
+   * Handles Figma-style Double-Click Drill-Down (`Row Frame` -> `Column Frame` -> `Block Frame` -> `Inline Text Edit`).
+   */
+  public handleIframeDoubleClick(e: MouseEvent): void {
+    const target = e.target as HTMLElement | null;
     if (!target) return;
 
     const anchor = target.closest('a');
@@ -470,27 +1059,55 @@ export class Canvas {
 
     const selectable = (target.closest('img, a, h1, h2, h3, h4, h5, h6, p, li, hr, td, div, section') ||
       target) as HTMLElement;
-    const moveableUnit = this.findMoveableUnit(selectable);
+    const chain = getContainerChain(selectable);
+    if (chain.length === 0) return;
 
-    this.selectUnit(selectable, moveableUnit);
+    const currentIdx = this.activeMoveableUnit ? chain.indexOf(this.activeMoveableUnit) : -1;
+
+    // Case 1: Drill down to the next child container (`Row` -> `Column` -> `Block (td)` -> `Link (a)`)
+    if (currentIdx >= 0 && currentIdx < chain.length - 1) {
+      const nextUnit = chain[currentIdx + 1];
+      const nextSelectable = nextUnit.contains(selectable) ? selectable : nextUnit;
+      this.exitTextEditMode();
+      this.selectUnit(nextSelectable, nextUnit);
+      return;
+    }
+
+    // Case 2: Already at the innermost Block/Leaf (`currentIdx === chain.length - 1`) -> Enter Inline Text Edit Mode!
+    if (currentIdx === chain.length - 1) {
+      const leafBlock = chain[currentIdx];
+      const leafSelectable = leafBlock.contains(selectable) ? selectable : leafBlock;
+      const textHost = findEditableTextHost(leafSelectable, leafBlock);
+      if (textHost) {
+        this.enterTextEditMode(leafSelectable, leafBlock);
+      }
+      return;
+    }
+
+    // Case 3: Nothing in `chain` was selected yet -> select the first child level (`chain[1]` or `chain[0]`)
+    const initialUnit = chain.length > 1 ? chain[1] : chain[0];
+    const initialSelectable = initialUnit.contains(selectable) ? selectable : initialUnit;
+    this.exitTextEditMode();
+    this.selectUnit(initialSelectable, initialUnit);
   }
 
   /**
-   * Selects a specific inner element and its resolved structural unit, updating the overlay and Inspector.
+   * Selects a specific inner element and its resolved structural unit, updating the Figma HUD, Inspector, and Layers Tree.
    */
   public selectUnit(selectable: HTMLElement, unit?: HTMLElement): void {
     const resolvedUnit = unit || this.findMoveableUnit(selectable);
+    const effectiveSelectable = resolvedUnit.contains(selectable) ? selectable : resolvedUnit;
 
     this.clearSelection();
-    this.selectedElement = selectable;
+    this.selectedElement = effectiveSelectable;
     this.activeMoveableUnit = resolvedUnit;
     resolvedUnit.classList.add('arch-selected-element');
-    resolvedUnit.setAttribute('draggable', 'true');
 
-    this.renderFloatingToolbar(resolvedUnit, selectable);
+    this.renderFloatingToolbar(resolvedUnit, effectiveSelectable);
 
-    const info = this.extractElementInfo(selectable, resolvedUnit);
+    const info = this.extractElementInfo(effectiveSelectable, resolvedUnit);
     this.events.onSelectElement(info);
+    this.emitLayersUpdate();
   }
 
   /**
@@ -501,13 +1118,14 @@ export class Canvas {
     if (!current) return;
     const parentUnit = getParentStructuralUnit(current);
     if (parentUnit) {
+      this.exitTextEditMode();
       this.selectUnit(parentUnit, parentUnit);
     }
   }
 
   /**
    * Moves the currently selected (or hovered) unit up/left or down/right.
-   * Automatically preserves MSO conditional envelopes, gutter cells, and scoped `@media` rules.
+   * Automatically preserves MSO conditional envelopes, gutter cells, card borders, and scoped `@media` rules.
    */
   public moveSelectedElement(direction: 'up' | 'down', targetUnitOverride?: HTMLElement): void {
     const unit =
@@ -517,7 +1135,7 @@ export class Canvas {
       this.hoveredUnit;
     if (!unit) return;
 
-    if (!this.activeMoveableUnit) {
+    if (!this.activeMoveableUnit || targetUnitOverride) {
       this.selectUnit(unit, unit);
     }
 
@@ -569,7 +1187,7 @@ export class Canvas {
   }
 
   /**
-   * Renders the Floating Quick-Action Toolbar in the parent overlay layer (zero nodes inside iframe DOM).
+   * Renders the Figma Frame Pill & Dimensions Badge in the parent overlay layer (zero nodes inside iframe DOM).
    */
   private renderFloatingToolbar(unit: HTMLElement, innerTarget?: HTMLElement): void {
     this.removeFloatingToolbar();
@@ -579,26 +1197,35 @@ export class Canvas {
     const canDown = canMoveUnit(unit, 'down');
     const parentUnit = getParentStructuralUnit(unit);
     const axis = detectAxis(effectiveMoveTarget);
-    const role = classifyUnitRole(unit);
-    const elemType = classifyElementType(innerTarget || this.selectedElement || unit, unit);
-    const badgeLabel = role === 'row' ? 'Row' : role === 'column' ? 'Column' : elemType.toUpperCase();
+    const desc = describeUnitForLayer(unit);
+    const editableHost = findEditableTextHost(innerTarget || this.selectedElement || unit, unit);
+    const badgeLabel = this.isEditingText ? `✎ ${desc.label} (Editing Text)` : desc.label;
 
     const upIcon = axis === 'horizontal' ? '◀' : '▲';
     const downIcon = axis === 'horizontal' ? '▶' : '▼';
-    const upTitle = axis === 'horizontal' ? 'Move Column Left' : 'Move Up';
-    const downTitle = axis === 'horizontal' ? 'Move Column Right' : 'Move Down';
+    const upTitle = axis === 'horizontal' ? 'Swap Column Left' : 'Move Up';
+    const downTitle = axis === 'horizontal' ? 'Swap Column Right' : 'Move Down';
 
     const toolbar = document.createElement('div');
     toolbar.className = 'arch-floating-toolbar';
     toolbar.innerHTML = `
-      <span class="arch-float-drag" draggable="true" title="Drag to move anywhere">⠿ Drag</span>
-      <span class="arch-float-badge">${badgeLabel}</span>
-      <button type="button" class="arch-float-btn btn-float-parent" title="Select Parent Container (Column / Row)" ${!parentUnit ? 'disabled' : ''}>↑</button>
+      <span class="arch-float-drag" draggable="true" title="Drag Frame (${desc.label}) • Double-click on canvas to drill inside">⠿ ${badgeLabel}</span>
+      ${
+        editableHost && !this.isEditingText
+          ? `<button type="button" class="arch-float-btn btn-float-edit-text" title="Edit / Select Text Inside (or Double-Click)">✎</button>`
+          : ''
+      }
+      <button type="button" class="arch-float-btn btn-float-parent" title="Select Parent Frame (Esc)" ${!parentUnit ? 'disabled' : ''}>↑</button>
       <button type="button" class="arch-float-btn btn-float-up" title="${upTitle}" ${!canUp ? 'disabled' : ''}>${upIcon}</button>
       <button type="button" class="arch-float-btn btn-float-down" title="${downTitle}" ${!canDown ? 'disabled' : ''}>${downIcon}</button>
-      <button type="button" class="arch-float-btn btn-float-dup" title="Duplicate">⧉</button>
-      <button type="button" class="arch-float-btn arch-float-btn--danger btn-float-del" title="Delete">✕</button>
+      <button type="button" class="arch-float-btn btn-float-dup" title="Duplicate Frame">⧉</button>
+      <button type="button" class="arch-float-btn arch-float-btn--danger btn-float-del" title="Delete Frame">✕</button>
     `;
+
+    toolbar.querySelector('.btn-float-edit-text')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.enterTextEditMode(innerTarget || this.selectedElement || unit, unit);
+    });
 
     toolbar.querySelector('.btn-float-parent')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -625,9 +1252,21 @@ export class Canvas {
       this.removeSelectedElement(unit);
     });
 
-    // Handle drag initiation from the parent overlay `⠿ Drag` handle:
-    // Activates `pointer-events: auto` on `overlayLayer` so cross-iframe dragging never drops events!
+    // Support both Pointer-Event dragging and HTML5 dragstart on the `⠿` Frame Pill
     const dragHandle = toolbar.querySelector<HTMLElement>('.arch-float-drag');
+    dragHandle?.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.pointerDragCandidate = {
+        unit,
+        startTarget: unit,
+        startX: e.clientX,
+        startY: e.clientY,
+        active: false
+      };
+    });
+
     dragHandle?.addEventListener('dragstart', (e) => {
       if (e.dataTransfer) {
         e.dataTransfer.setData('text/plain', 'arch-move-unit');
@@ -647,11 +1286,73 @@ export class Canvas {
 
     this.overlayLayer.appendChild(toolbar);
     this.floatingToolbar = toolbar;
+
+    // If this unit is actively selected, also render the Figma Dimensions Badge (`W × H`)
+    // and 4 corner resize handles when an image is selected
+    if (this.activeMoveableUnit === unit) {
+      const targetEl = innerTarget || this.selectedElement || unit;
+      const isImageContext =
+        targetEl.tagName.toLowerCase() === 'img' ||
+        classifyElementType(targetEl, unit) === 'image' ||
+        classifyElementType(targetEl, targetEl) === 'image';
+      const targetImg = isImageContext ? ImageAdapter.findImage(targetEl, unit) : null;
+
+      const rect = (targetImg || unit).getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const dim = document.createElement('div');
+        dim.className = 'arch-dimensions-pill';
+        dim.textContent = `${Math.round(rect.width)} × ${Math.round(rect.height)}`;
+        this.overlayLayer.appendChild(dim);
+        this.dimensionsBadge = dim;
+      }
+
+      if (targetImg) {
+        const corners: Array<{ corner: 'nw' | 'ne' | 'sw' | 'se'; dir: 1 | -1 }> = [
+          { corner: 'nw', dir: -1 },
+          { corner: 'ne', dir: 1 },
+          { corner: 'sw', dir: -1 },
+          { corner: 'se', dir: 1 }
+        ];
+        for (const { corner, dir } of corners) {
+          const handle = document.createElement('div');
+          handle.className = `arch-resize-handle arch-resize-handle--${corner}`;
+          handle.dataset.corner = corner;
+          handle.title = 'Drag to resize image';
+          handle.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const imgRect = targetImg.getBoundingClientRect();
+            const parsedWidth =
+              parseInt(ImageAdapter.getWidth(targetImg, unit), 10) ||
+              parseInt(targetImg.getAttribute('width') || '', 10) ||
+              200;
+            const startWidth = imgRect.width > 0 ? imgRect.width : parsedWidth;
+            const colCell = targetImg.closest('td, th') as HTMLElement | null;
+            const colWidth = colCell?.getBoundingClientRect().width || 0;
+            const maxWidth = colWidth > 40 ? Math.round(colWidth) : 600;
+
+            this.activeImageResize = {
+              img: targetImg,
+              unit,
+              startX: e.clientX,
+              startWidth,
+              maxWidth: Math.max(maxWidth, Math.round(startWidth)),
+              dir
+            };
+            this.overlayLayer.style.pointerEvents = 'auto';
+          });
+          this.overlayLayer.appendChild(handle);
+          this.resizeHandles.push(handle);
+        }
+      }
+    }
+
     this.positionFloatingToolbar(unit, toolbar);
   }
 
   /**
-   * Positions the parent-overlay floating toolbar relative to `unit` inside the iframe.
+   * Positions the Figma Frame Pill, Dimensions Badge, and Image Resize Handles relative to `unit` inside the iframe.
    */
   private positionFloatingToolbar(unit: HTMLElement, toolbar: HTMLElement): void {
     const unitRect = unit.getBoundingClientRect();
@@ -661,11 +1362,40 @@ export class Canvas {
     const offsetX = iframeRect.left - containerRect.left;
     const offsetY = iframeRect.top - containerRect.top;
 
-    const top = Math.max(4, offsetY + unitRect.top - 32);
+    const top = Math.max(4, offsetY + unitRect.top - 28);
     const left = Math.max(4, offsetX + unitRect.left);
 
     toolbar.style.top = `${top}px`;
     toolbar.style.left = `${left}px`;
+
+    const targetEl = this.selectedElement || unit;
+    const targetImg =
+      this.resizeHandles.length > 0 ? ImageAdapter.findImage(targetEl, unit) : null;
+    const targetRect =
+      targetImg && targetImg.getBoundingClientRect().width > 0
+        ? targetImg.getBoundingClientRect()
+        : unitRect;
+
+    if (this.dimensionsBadge) {
+      const dimTop = offsetY + targetRect.bottom + 4;
+      const dimLeft = offsetX + targetRect.left + targetRect.width / 2;
+      this.dimensionsBadge.style.top = `${dimTop}px`;
+      this.dimensionsBadge.style.left = `${dimLeft}px`;
+    }
+
+    for (const handle of this.resizeHandles) {
+      const corner = handle.dataset.corner;
+      const hTop =
+        corner === 'nw' || corner === 'ne'
+          ? offsetY + targetRect.top - 5
+          : offsetY + targetRect.bottom - 5;
+      const hLeft =
+        corner === 'nw' || corner === 'sw'
+          ? offsetX + targetRect.left - 5
+          : offsetX + targetRect.right - 5;
+      handle.style.top = `${hTop}px`;
+      handle.style.left = `${hLeft}px`;
+    }
   }
 
   private removeFloatingToolbar(): void {
@@ -673,8 +1403,17 @@ export class Canvas {
       this.floatingToolbar.remove();
       this.floatingToolbar = null;
     }
-    this.overlayLayer.innerHTML = '';
-    this.overlayLayer.style.pointerEvents = 'none';
+    if (this.dimensionsBadge) {
+      this.dimensionsBadge.remove();
+      this.dimensionsBadge = null;
+    }
+    if (this.resizeHandles.length > 0) {
+      this.resizeHandles.forEach((h) => h.remove());
+      this.resizeHandles = [];
+    }
+    if (!this.pointerDragCandidate?.active && !this.activeImageResize) {
+      this.overlayLayer.style.pointerEvents = 'none';
+    }
   }
 
   /**
@@ -695,12 +1434,20 @@ export class Canvas {
     const cleanHtml = this.getCleanHTML();
     this.lastRenderedHtml = cleanHtml;
     this.events.onContentChange(cleanHtml);
+    this.emitLayersUpdate();
+  }
+
+  private emitLayersUpdate(): void {
+    if (!this.events.onLayersChange) return;
+    const layers = this.getLayerTree();
+    this.events.onLayersChange(layers, this.activeMoveableUnit);
   }
 
   /**
    * Clears selection outlines and floating toolbar.
    */
   public clearSelection(): void {
+    this.isEditingText = false;
     if (this.activeMoveableUnit) {
       this.activeMoveableUnit.classList.remove('arch-selected-element');
       this.activeMoveableUnit = null;
@@ -729,7 +1476,7 @@ export class Canvas {
     const type = classifyElementType(el, targetUnit);
     const unitRole = classifyUnitRole(targetUnit);
     const axis = detectAxis(effectiveMoveTarget);
-    const ancestry = getUnitAncestry(targetUnit);
+    const ancestry = getUnitAncestry(targetUnit, el);
 
     const style = el.style;
     const computed = this.iframe.contentWindow?.getComputedStyle(el);
@@ -786,61 +1533,92 @@ export class Canvas {
   }
 
   /**
-   * Binds dragstart, dragover, and drop handlers inside the iframe document so users can also
-   * drag images, buttons, or blocks directly on the canvas!
+   * Binds dragover and drop handlers inside the iframe document for Palette items
+   * and blocks native `contenteditable` text-drop corruption.
    */
-  private bindIframeDragDrop(doc: Document): void {
-    doc.addEventListener('dragstart', (e: DragEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
+  private bindIframeDragDrop(doc: Document, signal?: AbortSignal): void {
+    doc.addEventListener(
+      'dragstart',
+      (e: DragEvent) => {
+        const target = e.target as HTMLElement | null;
+        if (!target) return;
 
-      const unit =
-        this.activeMoveableUnit && this.activeMoveableUnit.contains(target)
-          ? this.activeMoveableUnit
-          : this.findMoveableUnit(target);
-
-      if (unit && unit !== doc.body) {
-        this.draggedUnit = unit;
-        if (e.dataTransfer) {
-          e.dataTransfer.setData('text/plain', 'arch-move-unit');
-          e.dataTransfer.effectAllowed = 'move';
+        // Prevent browser from dragging raw text/HTML snippets out of contenteditable
+        if (target.nodeType === 3 || target.isContentEditable) {
+          e.preventDefault();
+          return;
         }
-      }
-    });
 
-    doc.addEventListener('dragend', () => {
-      this.draggedUnit = null;
-      this.overlayLayer.style.pointerEvents = 'none';
-      this.clearDropIndicators();
-    });
+        const unit =
+          this.activeMoveableUnit && this.activeMoveableUnit.contains(target)
+            ? this.activeMoveableUnit
+            : this.findMoveableUnit(target);
 
-    doc.addEventListener('dragover', (e: DragEvent) => {
-      e.preventDefault();
-      if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = this.draggedUnit ? 'move' : 'copy';
-      }
+        if (unit && unit !== doc.body) {
+          this.draggedUnit = unit;
+          if (e.dataTransfer) {
+            e.dataTransfer.setData('text/plain', 'arch-move-unit');
+            e.dataTransfer.effectAllowed = 'move';
+          }
+        }
+      },
+      { signal }
+    );
 
-      const target = e.target as HTMLElement;
-      if (!target) return;
-      this.updateDropTargetForElement(target, e.clientY);
-    });
-
-    doc.addEventListener('dragleave', (e: DragEvent) => {
-      const related = e.relatedTarget as HTMLElement | null;
-      if (!related || !doc.body.contains(related)) {
+    doc.addEventListener(
+      'dragend',
+      () => {
+        this.draggedUnit = null;
+        this.overlayLayer.style.pointerEvents = 'none';
         this.clearDropIndicators();
-        this.hoveredDropTarget = null;
-      }
-    });
+      },
+      { signal }
+    );
 
-    doc.addEventListener('drop', (e: DragEvent) => {
-      e.preventDefault();
-      const data = e.dataTransfer?.getData('text/plain') || '';
-      this.executeDrop(data);
-    });
+    doc.addEventListener(
+      'dragover',
+      (e: DragEvent) => {
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = this.draggedUnit ? 'move' : 'copy';
+        }
+
+        const target = e.target as HTMLElement;
+        if (!target) return;
+        this.updateDropTargetForElement(target, e.clientX, e.clientY);
+      },
+      { signal }
+    );
+
+    doc.addEventListener(
+      'dragleave',
+      (e: DragEvent) => {
+        const related = e.relatedTarget as HTMLElement | null;
+        if (!related || !doc.body.contains(related)) {
+          this.clearDropIndicators();
+          this.hoveredDropTarget = null;
+        }
+      },
+      { signal }
+    );
+
+    doc.addEventListener(
+      'drop',
+      (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const data = e.dataTransfer?.getData('text/plain') || '';
+        this.executeDrop(data);
+      },
+      { signal }
+    );
   }
 
   private clearDropIndicators(): void {
+    if (this.dropIndicatorEl) {
+      this.dropIndicatorEl.remove();
+      this.dropIndicatorEl = null;
+    }
     const ifrDoc = this.iframe.contentDocument;
     if (ifrDoc) {
       ifrDoc.querySelectorAll('.arch-drop-line-top, .arch-drop-line-bottom').forEach((el) => {
@@ -850,7 +1628,7 @@ export class Canvas {
   }
 
   /**
-   * Inserts a context-aware email block at the target unit or primary content container (Fixes R3).
+   * Inserts a context-aware email block at the target unit or canonical column slot container (Fixes R3).
    */
   public insertBlock(type: BlockType, targetElement?: HTMLElement | null): void {
     const ifrDoc = this.iframe.contentDocument;
@@ -859,9 +1637,15 @@ export class Canvas {
     const refUnit = targetElement || this.activeMoveableUnit;
 
     if (refUnit && refUnit.parentElement && refUnit !== ifrDoc.body) {
-      const parentTag = refUnit.parentElement.tagName.toLowerCase();
-      const snippet = buildContextAwareBlockHtml(type, parentTag);
-      refUnit.insertAdjacentHTML('afterend', snippet);
+      if (isColumnElement(refUnit)) {
+        const slot = getColumnSlotContainer(refUnit);
+        const snippet = buildContextAwareBlockHtml(type, slot.tagName.toLowerCase());
+        slot.insertAdjacentHTML('beforeend', snippet);
+      } else {
+        const parentTag = refUnit.parentElement.tagName.toLowerCase();
+        const snippet = buildContextAwareBlockHtml(type, parentTag);
+        refUnit.insertAdjacentHTML('afterend', snippet);
+      }
     } else {
       const container = findPrimaryContentContainer(ifrDoc);
       const containerTag = container.tagName.toLowerCase();
@@ -922,6 +1706,8 @@ export class Canvas {
 
   public destroy(): void {
     this.removeFloatingToolbar();
+    this.removeDragGhost();
+    this.clearDropIndicators();
     this.element.remove();
   }
 }

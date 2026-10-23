@@ -126,6 +126,19 @@ export interface BreadcrumbItem {
 }
 
 /**
+ * Node in the Figma-style hierarchical Layers Tree in the left sidebar.
+ */
+export interface LayerNode {
+  id: string;
+  label: string;
+  sublabel?: string;
+  role: UnitRole;
+  type: SelectedElementInfo['type'];
+  element: HTMLElement;
+  children: LayerNode[];
+}
+
+/**
  * Information about a currently selected DOM node and its resolved structural unit on the canvas.
  */
 export interface SelectedElementInfo {

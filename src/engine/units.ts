@@ -11,7 +11,7 @@
  * Solves R13, R14, R17, R18, R19, R21.
  */
 
-import { BreadcrumbItem, SelectedElementInfo, UnitRole } from '../types';
+import { BreadcrumbItem, LayerNode, SelectedElementInfo, UnitRole } from '../types';
 
 const HAIR_AND_NBSP_REGEX = /[\s\u00A0\u2000-\u200D\uFEFF]+/g;
 
@@ -234,9 +234,13 @@ export function isColumnElement(el: HTMLElement): boolean {
   if (!el || !el.tagName) return false;
   const tag = el.tagName.toLowerCase();
   if (isGutterCell(el)) return false;
+  if (el.classList.contains('pad')) return false;
 
   // 1. Explicit column class (e.g. BeeFree/Stripo/MJML `.column`, `.mj-column-*`, `.responsive-column`)
-  if ((tag === 'td' || tag === 'th' || tag === 'div') && /\b(column|col|responsive-column|mj-column)\b/i.test(el.className)) {
+  if (
+    (tag === 'td' || tag === 'th' || tag === 'div') &&
+    /(?:^|\s)(?:column(?:-\d+)?|col(?:-\d+)?|responsive-column|mj-column(?:-[^\s]+)?)(?=\s|$)/i.test(el.className)
+  ) {
     return true;
   }
 
@@ -304,32 +308,111 @@ export function isRowElement(el: HTMLElement): boolean {
   return false;
 }
 
+const ESP_BLOCK_SELECTOR =
+  'table.image_block, table.button_block, table.paragraph_block, table.text_block, table.divider_block, table.heading_block, table.social_block, table.spacer_block, table.html_block, table.list_block';
+
+/**
+ * Checks if `el` is an inner structural padding/border wrapper inside a Column
+ * (such as `<div class="border" style="padding:35px 25px 25px 50px;">` in Taskrabbit/BeeFree)
+ * or `table.row-content` inside `table.row`.
+ * These wrappers belong to the enclosing Column/Row Frame and must NEVER be detached as blocks!
+ */
+export function isStructuralSlotWrapper(el: HTMLElement): boolean {
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName.toLowerCase();
+
+  // `table.row-content` (and its `tbody`/`tr`/`td` shell) is part of the `table.row` Frame
+  if (tag === 'table' && /\brow-content\b/i.test(el.className)) {
+    return true;
+  }
+
+  // A `div` directly inside a Column (`td.column`) that either has class `border`/`column-inner`
+  // or wraps ESP block tables (`table.*_block`)
+  if (tag === 'div' && el.parentElement && isColumnElement(el.parentElement)) {
+    if (/\b(border|column-inner|col-inner|column-content)\b/i.test(el.className)) {
+      return true;
+    }
+    if (el.querySelector(ESP_BLOCK_SELECTOR)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Returns the canonical Auto-Layout Slot Container inside a Column (or single-column Row)
+ * where child Block units actually live.
+ * - For Taskrabbit `td.column > div.border`, returns `div.border` so moved/inserted blocks
+ *   stay inside `.border` and retain the column's 50px/35px padding.
+ * - Otherwise returns the Column itself.
+ */
+export function getColumnSlotContainer(colOrContainer: HTMLElement): HTMLElement {
+  if (!colOrContainer || !colOrContainer.tagName) return colOrContainer;
+
+  if (isRowElement(colOrContainer)) {
+    const firstCol = colOrContainer.querySelector<HTMLElement>('td.column, th.column, div.column');
+    if (firstCol) {
+      return getColumnSlotContainer(firstCol);
+    }
+  }
+
+  if (isColumnElement(colOrContainer)) {
+    const children = getMeaningfulChildren(colOrContainer);
+    if (children.length === 1 && isStructuralSlotWrapper(children[0])) {
+      return children[0];
+    }
+  }
+
+  return colOrContainer;
+}
+
 /**
  * Resolves any clicked or targeted DOM node inside the email into its clean,
  * self-contained moveable structural unit (Block, Column, or Row).
  *
  * Rules:
  * 1. If `target` is already a Row or Column, returns `target`.
- * 2. If inside a known ESP block table (`table.*_block`), returns that block table.
- * 3. Climbs out of compound inner parts (`<a><img></a>`, `<span class="button">`, etc.).
- * 4. Climbs single-child wrapper parents up to the child of the enclosing Column, Row, or Body stack.
+ * 2. If `target` is a structural slot wrapper (`div.border`, `table.row-content`), resolves to its
+ *    child block (if single) or enclosing Column/Row Frame — never detaching `.border`!
+ * 3. If inside a known ESP block table (`table.*_block`), returns that block table.
+ * 4. Climbs out of compound inner parts (`<a><img></a>`, `<span class="button">`, etc.).
+ * 5. Climbs single-child wrapper parents up to the child of the enclosing Column Slot, Row, or Body stack.
  */
 export function resolveUnit(target: HTMLElement): HTMLElement {
   if (!target || !target.tagName) return target;
   const tag = target.tagName.toLowerCase();
   if (tag === 'body' || tag === 'html') return target;
 
-  // If the caller explicitly targeted a Row or Column (e.g. via Breadcrumb or Select Parent)
+  // If the caller explicitly targeted a Row or Column (e.g. via Breadcrumb, Layer Tree, or Select Parent)
   if (isRowElement(target) || isColumnElement(target)) {
     return target;
   }
 
+  // If the user clicked/hovered directly on a structural slot wrapper (`div.border` or `table.row-content`)
+  if (isStructuralSlotWrapper(target)) {
+    const childBlocks = Array.from(target.querySelectorAll<HTMLElement>(ESP_BLOCK_SELECTOR)).filter(
+      (b) => !b.classList.contains('desktop_hide') && (b.style?.display || '').toLowerCase() !== 'none'
+    );
+    if (childBlocks.length === 1) {
+      return childBlocks[0];
+    }
+    const parentColOrRow = target.closest<HTMLElement>('td.column, th.column, div.column, table.row, section');
+    if (parentColOrRow) {
+      return parentColOrRow;
+    }
+  }
+
   // 1. Check for standard ESP block wrapper tables first (BeeFree, Stripo, Pumpkin, Unlayer)
-  const espBlockTable = target.closest<HTMLElement>(
-    'table.image_block, table.button_block, table.paragraph_block, table.text_block, table.divider_block, table.heading_block, table.social_block, table.spacer_block, table.html_block, table.list_block'
-  );
+  const espBlockTable = target.closest<HTMLElement>(ESP_BLOCK_SELECTOR);
   if (espBlockTable) {
     return espBlockTable;
+  }
+
+  // If the user clicked on empty padding of `table.row-content` or its `tr`/`td` outside `td.column`
+  const enclosingRow = target.closest<HTMLElement>('table.row');
+  if (enclosingRow && !target.closest('td.column, th.column, div.column')) {
+    return enclosingRow;
   }
 
   // 2. Start from target and climb out of inline/compound internals first
@@ -361,8 +444,8 @@ export function resolveUnit(target: HTMLElement): HTMLElement {
     if (pTag === 'body' || pTag === 'html' || pTag === 'head') break;
     if (isOuterWrapperTable(parent)) break;
 
-    // Never climb *into* a Column or Row when resolving a Block (the Column/Row is the container)
-    if (isColumnElement(parent) || isRowElement(parent)) break;
+    // Never climb *into* a Column, Row, or Structural Slot Wrapper (`div.border`) when resolving a Block!
+    if (isColumnElement(parent) || isRowElement(parent) || isStructuralSlotWrapper(parent)) break;
 
     // If current is a `<tr>` inside a `<tbody>` or `<table>` that has multiple `<tr>` rows, stop at `<tr>`!
     if (current.tagName.toLowerCase() === 'tr' && (pTag === 'tbody' || pTag === 'table')) {
@@ -395,7 +478,19 @@ export function resolveUnit(target: HTMLElement): HTMLElement {
 }
 
 /**
- * Climbs one structural level up in the 5-level taxonomy (`Block` -> `Column` -> `Row` -> `Body`).
+ * Finds the nearest enclosing Column (`td.column`, multi-cell `<td>`, or flex/grid column `<div>`) for `el`.
+ */
+export function findEnclosingColumn(el: HTMLElement | null): HTMLElement | null {
+  let cur: HTMLElement | null = el;
+  while (cur && cur.tagName && cur.tagName.toLowerCase() !== 'body' && cur.tagName.toLowerCase() !== 'html') {
+    if (isColumnElement(cur)) return cur;
+    cur = cur.parentElement;
+  }
+  return null;
+}
+
+/**
+ * Climbs one structural level up in the 5-level taxonomy (`Leaf (a/img)` -> `Block (td/table)` -> `Column` -> `Row` -> `Body`).
  */
 export function getParentStructuralUnit(unit: HTMLElement): HTMLElement | null {
   if (!unit || !unit.parentElement) return null;
@@ -403,6 +498,13 @@ export function getParentStructuralUnit(unit: HTMLElement): HTMLElement | null {
   if (tag === 'body' || tag === 'html') return null;
 
   const currentRole = classifyUnitRole(unit);
+
+  if (currentRole === 'leaf') {
+    const blockUnit = resolveUnit(unit);
+    if (blockUnit && blockUnit !== unit) {
+      return blockUnit;
+    }
+  }
 
   let cursor: HTMLElement | null = unit.parentElement;
   while (cursor && cursor.tagName.toLowerCase() !== 'html') {
@@ -433,6 +535,10 @@ export function classifyUnitRole(unit: HTMLElement): UnitRole {
   if (tag === 'body' || tag === 'html' || isOuterWrapperTable(unit)) return 'body';
   if (isRowElement(unit)) return 'row';
   if (isColumnElement(unit)) return 'column';
+  if (tag === 'a' || tag === 'img' || tag === 'span' || tag === 'strong' || tag === 'em') {
+    const blockUnit = resolveUnit(unit);
+    if (blockUnit !== unit) return 'leaf';
+  }
   return 'block';
 }
 
@@ -462,6 +568,17 @@ export function classifyElementType(
   if (role === 'row') return 'row';
   if (role === 'column') return 'column';
   if (role === 'body') return 'section';
+
+  // If the user explicitly drilled down to an `<a>` tag (or selected an `<a>` tag directly)
+  if (unit.tagName.toLowerCase() === 'a') {
+    if (unit.querySelector('img') && getVisibleText(unit).length === 0) {
+      return 'image';
+    }
+    return 'button';
+  }
+  if (unit.tagName.toLowerCase() === 'img') {
+    return 'image';
+  }
 
   // Check compound component types on either `selectable` or `unit`
   if (isSocialStripComponent(selectable) || isSocialStripComponent(unit)) return 'social';
@@ -497,10 +614,11 @@ export function classifyElementType(
 }
 
 /**
- * Builds the human-readable ancestry breadcrumb (`Body › Row › Column › Block`) for any unit.
+ * Builds the human-readable ancestry breadcrumb (`Body › Row › Column › Block › Link (a)`) for any unit.
  */
-export function getUnitAncestry(unit: HTMLElement): BreadcrumbItem[] {
+export function getUnitAncestry(unit: HTMLElement, selectedLeaf?: HTMLElement | null): BreadcrumbItem[] {
   const items: BreadcrumbItem[] = [];
+  const blockUnit = resolveUnit(unit);
   let cursor: HTMLElement | null = unit;
 
   while (cursor && cursor.tagName && cursor.tagName.toLowerCase() !== 'html') {
@@ -509,7 +627,7 @@ export function getUnitAncestry(unit: HTMLElement): BreadcrumbItem[] {
       items.unshift({ label: 'Body', role: 'body', element: cursor });
       break;
     }
-    if (cursor === unit || isColumnElement(cursor) || isRowElement(cursor)) {
+    if (cursor === unit || cursor === blockUnit || isColumnElement(cursor) || isRowElement(cursor)) {
       const role = classifyUnitRole(cursor);
       let label = tag.toUpperCase();
       if (role === 'row') {
@@ -518,13 +636,46 @@ export function getUnitAncestry(unit: HTMLElement): BreadcrumbItem[] {
       } else if (role === 'column') {
         const colMatch = cursor.className.match(/\bcolumn-(\d+)\b/i);
         label = colMatch ? `Column ${colMatch[1]}` : 'Column';
+      } else if (tag === 'a') {
+        label = 'Link (a)';
+      } else if (tag === 'img') {
+        label = 'Image (img)';
       } else {
         const type = classifyElementType(cursor, cursor);
         label = type.charAt(0).toUpperCase() + type.slice(1);
       }
-      items.unshift({ label, role, element: cursor });
+      if (!items.some((it) => it.element === cursor)) {
+        items.unshift({ label, role, element: cursor });
+      }
     }
     cursor = cursor.parentElement;
+  }
+
+  // If the user clicked on or inside a deeper element (like `<a href="...">`) while a parent container
+  // (`Row`, `Column`, or `Block/td`) is currently selected, append the deeper `Block` and `Link (a)` to the
+  // breadcrumb trail so the user can jump directly to `Link (a)` with 1 click!
+  if (selectedLeaf && unit.contains(selectedLeaf) && selectedLeaf !== unit) {
+    const leafBlock = resolveUnit(selectedLeaf);
+    if (leafBlock && unit.contains(leafBlock) && !items.some((it) => it.element === leafBlock)) {
+      const bType = classifyElementType(leafBlock, leafBlock);
+      items.push({
+        label: bType.charAt(0).toUpperCase() + bType.slice(1),
+        role: 'block',
+        element: leafBlock
+      });
+    }
+    const anchor =
+      selectedLeaf.tagName.toLowerCase() === 'a'
+        ? selectedLeaf
+        : selectedLeaf.closest<HTMLElement>('a') ||
+          (unit.querySelectorAll('a').length === 1 ? unit.querySelector<HTMLElement>('a') : null);
+    if (anchor && unit.contains(anchor) && !items.some((it) => it.element === anchor)) {
+      items.push({
+        label: 'Link (a)',
+        role: 'leaf',
+        element: anchor
+      });
+    }
   }
 
   return items;
@@ -568,18 +719,21 @@ export function isEditableTextHost(el: HTMLElement): boolean {
     return true;
   }
 
-  // For buttons (`<a>` or inner `<span class="button">`), make only the deepest text element editable,
-  // or the `<a>` itself if it has no child elements and no MSO comments.
+  // For buttons (`<a>` or inner `<span class="button">`), make the single deepest element
+  // that holds the complete visible button label text editable (handles `<strong>`, `<span>`, `<br>`).
   if (isButtonComponent(el)) {
+    if (!/^(a|span|strong|b|em|td)$/.test(tag)) return false;
+    // Do not place contenteditable directly on an `<a>` that contains MSO conditional comments
     if (tag === 'a') {
-      const hasElementChildren = el.children.length > 0;
-      return !hasElementChildren;
+      for (let i = 0; i < el.childNodes.length; i++) {
+        if (el.childNodes[i].nodeType === 8) return false;
+      }
     }
-    // Inner span/strong inside a button: only the innermost element holding the label
-    if ((tag === 'span' || tag === 'strong' || tag === 'b' || tag === 'em') && el.children.length === 0) {
-      return getVisibleText(el).length > 0;
-    }
-    return false;
+    const anchor = (el.tagName.toLowerCase() === 'a' ? el : el.closest('a')) || el.closest('table.button_block') || el;
+    const fullText = getVisibleText(anchor);
+    if (!fullText || getVisibleText(el) !== fullText) return false;
+    const childWithFullText = Array.from(el.children).find((c) => getVisibleText(c) === fullText);
+    return !childWithFullText;
   }
 
   // Do not mark inline children (`span`, `a`, `strong`, `em`) inside a `<p>`, `<h1..h6>`, or `<li>`
@@ -602,4 +756,326 @@ export function isEditableTextHost(el: HTMLElement): boolean {
   }
 
   return false;
+}
+
+/**
+ * Finds the editable text host (`[contenteditable="true"]`) for a clicked target or block unit,
+ * searching both upward and downward so clicking button padding (`<span class="button">`) or an
+ * inner `<a href="...">` inside an `<h1>`/`<p>` always finds the editable text host!
+ */
+export function findEditableTextHost(target: HTMLElement | null, unit?: HTMLElement | null): HTMLElement | null {
+  if (target) {
+    if (target.getAttribute('contenteditable') === 'true') return target;
+    const up = target.closest<HTMLElement>('[contenteditable="true"]');
+    if (up) return up;
+    const down = target.querySelector<HTMLElement>('[contenteditable="true"]');
+    if (down) return down;
+  }
+  if (unit) {
+    if (unit.getAttribute('contenteditable') === 'true') return unit;
+    const up = unit.closest<HTMLElement>('[contenteditable="true"]');
+    if (up) return up;
+    return unit.querySelector<HTMLElement>('[contenteditable="true"]');
+  }
+  return null;
+}
+
+/**
+ * Builds the Top-Down Figma Container Hierarchy Chain (`[Row Frame, Column Frame, Block Frame, Inner <a/img>]`)
+ * for any clicked DOM node so single-click selects the outermost container and double-clicking
+ * drills down step-by-step (`Row -> Column -> Block (td) -> Link (a) / Image (img) -> Inline Text`).
+ */
+export function getContainerChain(target: HTMLElement): HTMLElement[] {
+  if (!target || !target.tagName) return [];
+  const tag = target.tagName.toLowerCase();
+  if (tag === 'body' || tag === 'html') return [];
+
+  const innerUnit = resolveUnit(target);
+  const chain: HTMLElement[] = [];
+
+  // 1. Collect all enclosing Row and Column ancestors from `target` up to `body`
+  const ancestorRows: HTMLElement[] = [];
+  const ancestorCols: HTMLElement[] = [];
+
+  let cur: HTMLElement | null = target;
+  while (cur && cur.tagName && cur.tagName.toLowerCase() !== 'body' && cur.tagName.toLowerCase() !== 'html') {
+    if (isRowElement(cur)) {
+      ancestorRows.unshift(cur);
+    } else if (isColumnElement(cur)) {
+      const colParent = cur.parentElement;
+      const siblingCols = colParent
+        ? Array.from(colParent.children).filter((c) => isColumnElement(c as HTMLElement))
+        : [cur];
+      if (siblingCols.length >= 2 || innerUnit === cur) {
+        ancestorCols.unshift(cur);
+      }
+    }
+    cur = cur.parentElement;
+  }
+
+  if (ancestorRows.length > 0) {
+    chain.push(ancestorRows[0]);
+  }
+
+  // Push any Column that wraps `innerUnit` (e.g. `td.column` in a 2-column or 3-column row)
+  for (const col of ancestorCols) {
+    if (!innerUnit.contains(col) && !chain.includes(col)) {
+      chain.push(col);
+    }
+  }
+
+  // 2. Push `innerUnit` (`table.*_block`, `tr`, `td`, `div` block)
+  if (!chain.includes(innerUnit)) {
+    chain.push(innerUnit);
+  }
+
+  // 3. Push any nested Column inside `innerUnit` (e.g. a 6-column social icon `<td>` inside `table.html_block`)
+  for (const col of ancestorCols) {
+    if (innerUnit !== col && innerUnit.contains(col) && !chain.includes(col)) {
+      chain.push(col);
+    }
+  }
+
+  // 4. Push inner semantic sub-elements (`<p>/<h1..h6>`, `<a href="...">`, `<img>`) inside `deepestContainer`
+  //    so users can drill down past `<td>` / `table.*_block` to select any `<a href="...">` tag directly!
+  const deepestContainer = chain[chain.length - 1];
+  const textBlock = target.closest<HTMLElement>('p, h1, h2, h3, h4, h5, h6, li, blockquote');
+  if (
+    textBlock &&
+    deepestContainer.contains(textBlock) &&
+    textBlock !== deepestContainer &&
+    !chain.includes(textBlock)
+  ) {
+    const anchorsInText = textBlock.querySelectorAll('a');
+    const anchorText = anchorsInText.length === 1 ? getVisibleText(anchorsInText[0]) : '';
+    if (anchorsInText.length > 1 || (anchorsInText.length === 1 && getVisibleText(textBlock) !== anchorText)) {
+      chain.push(textBlock);
+    }
+  }
+
+  // Resolve target `<a>`: either `target.closest('a')` if user clicked on/inside `<a>`,
+  // OR if user clicked/double-clicked on the `<td>`/`<h1>`/`table.*_block` padding around an `<a>`,
+  // find the child `<a>` inside `target` or `deepestContainer`!
+  let targetAnchor = target.closest<HTMLElement>('a');
+  if (!targetAnchor || !deepestContainer.contains(targetAnchor)) {
+    const scopeEl = deepestContainer.contains(target) ? target : deepestContainer;
+    targetAnchor =
+      scopeEl.querySelector<HTMLElement>('a') ||
+      deepestContainer.querySelector<HTMLElement>('a');
+  }
+
+  if (targetAnchor && deepestContainer.contains(targetAnchor) && !chain.includes(targetAnchor)) {
+    chain.push(targetAnchor);
+  }
+
+  return chain;
+}
+
+/**
+ * Generates a short human-readable summary (`label` + `sublabel`) for a Block, Column, Row, or Inner `<a>` Link
+ * in the Figma Layer Tree and Ghost Drag Card.
+ */
+export function describeUnitForLayer(
+  unit: HTMLElement,
+  fallbackIndex = 1
+): { label: string; sublabel: string; role: UnitRole; type: SelectedElementInfo['type'] } {
+  const role = classifyUnitRole(unit);
+  const type = classifyElementType(unit, unit);
+
+  if (role === 'row') {
+    const rowMatch = unit.className.match(/\brow-(\d+)\b/i);
+    const label = rowMatch ? `Row ${rowMatch[1]}` : `Row ${fallbackIndex}`;
+    const cols = unit.querySelectorAll('td.column, th.column, div.column');
+    const sublabel = cols.length > 1 ? `${cols.length} Columns` : 'Section Frame';
+    return { label, sublabel, role, type: 'row' };
+  }
+
+  if (role === 'column') {
+    const colMatch = unit.className.match(/\bcolumn-(\d+)\b/i);
+    const label = colMatch ? `Column ${colMatch[1]}` : `Column ${fallbackIndex}`;
+    const w = unit.getAttribute('width') || unit.style?.width || '';
+    const sublabel = w ? `${Math.round(parseFloat(w))}${w.includes('%') ? '%' : 'px'}` : 'Auto-Layout';
+    return { label, sublabel, role, type: 'column' };
+  }
+
+  if (unit.tagName.toLowerCase() === 'a') {
+    const rawText = (unit.textContent || '').replace(/\s+/g, ' ').trim();
+    const img = unit.querySelector('img');
+    const sublabel =
+      rawText.length > 0
+        ? rawText.slice(0, 26)
+        : (img?.getAttribute('alt') || unit.getAttribute('href') || 'Link').slice(0, 24);
+    return { label: 'Link (a)', sublabel, role: 'leaf', type };
+  }
+
+  const prettyType = type.charAt(0).toUpperCase() + type.slice(1);
+  let sublabel = '';
+
+  if (type === 'image') {
+    const img = (unit.tagName.toLowerCase() === 'img' ? unit : unit.querySelector('img')) as HTMLImageElement | null;
+    const alt = (img?.getAttribute('alt') || img?.getAttribute('title') || '').trim();
+    if (alt) {
+      sublabel = alt.slice(0, 26);
+    } else {
+      const src = img?.getAttribute('src') || '';
+      const file = src.split('/').pop()?.split('?')[0] || 'Image';
+      sublabel = file.slice(0, 24);
+    }
+  } else if (type === 'divider') {
+    sublabel = 'Horizontal Line';
+  } else if (type === 'spacer') {
+    sublabel = 'Vertical Space';
+  } else if (type === 'social') {
+    const count = unit.querySelectorAll('a > img').length;
+    sublabel = `${count || ''} Social Icons`.trim();
+  } else {
+    const rawText = (unit.textContent || '').replace(/\s+/g, ' ').trim();
+    sublabel = rawText.length > 28 ? `${rawText.slice(0, 28)}…` : rawText;
+  }
+
+  return { label: prettyType, sublabel, role, type };
+}
+
+/**
+ * Builds the Figma-style hierarchical Layer Tree (`Row › Column › Block › Link (a)`) from the live iframe DOM.
+ */
+export function buildLayerTree(doc: Document): LayerNode[] {
+  if (!doc || !doc.body) return [];
+
+  let nodeCounter = 1;
+  const isHidden = (el: HTMLElement) =>
+    el.classList.contains('desktop_hide') ||
+    el.classList.contains('arch-hide-desktop') ||
+    (el.style?.display || '').trim().toLowerCase() === 'none';
+
+  const buildInnerAnchorNodes = (blockEl: HTMLElement): LayerNode[] => {
+    const anchors = Array.from(blockEl.querySelectorAll<HTMLElement>('a')).filter(
+      (a) => a !== blockEl && !isHidden(a)
+    );
+    return anchors.map((aEl, aIdx) => {
+      const aDesc = describeUnitForLayer(aEl, aIdx + 1);
+      return {
+        id: `layer-${nodeCounter++}`,
+        label: aDesc.label,
+        sublabel: aDesc.sublabel,
+        role: 'leaf',
+        type: aDesc.type,
+        element: aEl,
+        children: []
+      };
+    });
+  };
+
+  const buildBlockNodes = (slotContainer: HTMLElement): LayerNode[] => {
+    const children = getMeaningfulChildren(slotContainer).filter(
+      (c) => !isGutterCell(c) && !isHidden(c)
+    );
+    return children.map((blockEl, bIdx) => {
+      const desc = describeUnitForLayer(blockEl, bIdx + 1);
+      return {
+        id: `layer-${nodeCounter++}`,
+        label: desc.label,
+        sublabel: desc.sublabel,
+        role: 'block',
+        type: desc.type,
+        element: blockEl,
+        children: buildInnerAnchorNodes(blockEl)
+      };
+    });
+  };
+
+  // Case 1: Explicit `table.row` or `<section>` layout (BeeFree / Taskrabbit / Pumpkin / Multi-Row)
+  const explicitRows = Array.from(doc.body.querySelectorAll<HTMLElement>('table.row, section')).filter(
+    (r) => !r.classList.contains('row-content') && !isHidden(r)
+  );
+
+  if (explicitRows.length > 0) {
+    return explicitRows.map((rowEl, rIdx) => {
+      const rowDesc = describeUnitForLayer(rowEl, rIdx + 1);
+      const cols = Array.from(rowEl.querySelectorAll<HTMLElement>('td.column, th.column, div.column')).filter(
+        (c) => c.closest('table.row, section') === rowEl && !isGutterCell(c) && !isHidden(c)
+      );
+
+      let rowChildren: LayerNode[] = [];
+      if (cols.length > 1) {
+        rowChildren = cols.map((colEl, cIdx) => {
+          const colDesc = describeUnitForLayer(colEl, cIdx + 1);
+          const slot = getColumnSlotContainer(colEl);
+          return {
+            id: `layer-${nodeCounter++}`,
+            label: colDesc.label,
+            sublabel: colDesc.sublabel,
+            role: 'column',
+            type: 'column',
+            element: colEl,
+            children: buildBlockNodes(slot)
+          };
+        });
+      } else if (cols.length === 1) {
+        const slot = getColumnSlotContainer(cols[0]);
+        rowChildren = buildBlockNodes(slot);
+      } else {
+        rowChildren = buildBlockNodes(rowEl);
+      }
+
+      return {
+        id: `layer-${nodeCounter++}`,
+        label: rowDesc.label,
+        sublabel: rowDesc.sublabel,
+        role: 'row',
+        type: 'row',
+        element: rowEl,
+        children: rowChildren
+      };
+    });
+  }
+
+  // Case 2: Classic 600px single-table (`tbody > tr`) or div-only (`div.email-wrapper > div`)
+  let primary: HTMLElement = doc.body;
+  const tables = Array.from(doc.body.querySelectorAll<HTMLElement>('table'));
+  for (const t of tables) {
+    if (isOuterWrapperTable(t)) continue;
+    const w = t.getAttribute('width') || t.style?.maxWidth || t.style?.width || '';
+    if (w.includes('600') || w.includes('640') || !t.parentElement?.closest('table')) {
+      primary = (t.querySelector('tbody') as HTMLElement) || t;
+      break;
+    }
+  }
+  if (primary === doc.body) {
+    const bodyChildren = getMeaningfulChildren(doc.body);
+    if (bodyChildren.length === 1 && bodyChildren[0].tagName.toLowerCase() === 'div') {
+      primary = bodyChildren[0];
+    }
+  }
+
+  const topUnits = getMeaningfulChildren(primary).filter((c) => !isGutterCell(c) && !isHidden(c));
+  return topUnits.map((unitEl, uIdx) => {
+    const desc = describeUnitForLayer(unitEl, uIdx + 1);
+    const cols = Array.from(unitEl.children).filter((c) => isColumnElement(c as HTMLElement)) as HTMLElement[];
+    const children: LayerNode[] =
+      cols.length >= 2
+        ? cols.map((colEl, cIdx) => {
+            const colDesc = describeUnitForLayer(colEl, cIdx + 1);
+            return {
+              id: `layer-${nodeCounter++}`,
+              label: colDesc.label,
+              sublabel: colDesc.sublabel,
+              role: 'column',
+              type: 'column',
+              element: colEl,
+              children: buildBlockNodes(getColumnSlotContainer(colEl))
+            };
+          })
+        : [];
+
+    return {
+      id: `layer-${nodeCounter++}`,
+      label: desc.label,
+      sublabel: desc.sublabel,
+      role: desc.role,
+      type: desc.type,
+      element: unitEl,
+      children
+    };
+  });
 }

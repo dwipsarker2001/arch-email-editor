@@ -99,7 +99,9 @@ export class Inspector {
    * Renders controls for a live clicked DOM element inside the email template.
    */
   private renderElementSettings(info: SelectedElementInfo): void {
-    const typeTitle = info.type.toUpperCase();
+    const activeNode = info.unit || info.element;
+    const isDirectAnchor = activeNode.tagName.toLowerCase() === 'a';
+    const typeTitle = isDirectAnchor ? 'LINK / BUTTON (A)' : info.type.toUpperCase();
     const isHorizontal = info.axis === 'horizontal';
     const upLabel = isHorizontal ? '◀ Left' : '▲ Up';
     const downLabel = isHorizontal ? '▶ Right' : '▼ Down';
@@ -265,7 +267,16 @@ export class Inspector {
       </div>
       <div class="arch-form-group">
         <label class="arch-form-label">Width (px or %)</label>
-        <input type="text" class="arch-input" id="inp-img-width" placeholder="180px or 100%" />
+        <div class="arch-img-resize-row">
+          <input type="range" class="arch-range" id="inp-img-width-range" min="24" max="600" step="1" />
+          <input type="text" class="arch-input arch-img-width-input" id="inp-img-width" placeholder="180px or 100%" />
+        </div>
+        <div class="arch-btn-group" style="margin-top: 6px;">
+          <button type="button" class="arch-btn" data-width-preset="25%">25%</button>
+          <button type="button" class="arch-btn" data-width-preset="50%">50%</button>
+          <button type="button" class="arch-btn" data-width-preset="75%">75%</button>
+          <button type="button" class="arch-btn" data-width-preset="100%">100%</button>
+        </div>
       </div>
       <div class="arch-form-group">
         <label class="arch-form-label">Alignment</label>
@@ -299,10 +310,35 @@ export class Inspector {
     });
 
     const widthInp = container.querySelector<HTMLInputElement>('#inp-img-width')!;
-    widthInp.value = ImageAdapter.getWidth(info.element, info.unit);
-    widthInp.addEventListener('input', (e) => {
-      ImageAdapter.setWidth(info.element, (e.target as HTMLInputElement).value, info.unit);
+    const widthRange = container.querySelector<HTMLInputElement>('#inp-img-width-range')!;
+    const initialWidth = ImageAdapter.getWidth(info.element, info.unit);
+    widthInp.value = initialWidth;
+    const numericInitial = parseInt(initialWidth, 10);
+    widthRange.value = String(!isNaN(numericInitial) && !initialWidth.includes('%') ? numericInitial : 300);
+
+    const applyWidth = (val: string) => {
+      widthInp.value = val;
+      const num = parseInt(val, 10);
+      if (!isNaN(num) && !val.includes('%')) {
+        widthRange.value = String(Math.min(600, Math.max(24, num)));
+      }
+      ImageAdapter.setWidth(info.element, val, info.unit);
       this.events.onChange();
+    };
+
+    widthInp.addEventListener('input', (e) => {
+      applyWidth((e.target as HTMLInputElement).value);
+    });
+
+    widthRange.addEventListener('input', (e) => {
+      applyWidth(`${(e.target as HTMLInputElement).value}px`);
+    });
+
+    container.querySelectorAll<HTMLButtonElement>('[data-width-preset]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const preset = btn.dataset.widthPreset;
+        if (preset) applyWidth(preset);
+      });
     });
 
     const alignSel = container.querySelector<HTMLSelectElement>('#inp-img-align')!;
@@ -314,22 +350,37 @@ export class Inspector {
   }
 
   private renderButtonElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const activeNode = info.unit || info.element;
+    const isLinkTag = activeNode.tagName.toLowerCase() === 'a';
+    const labelTitle = isLinkTag ? 'Link / Button Label (<a>)' : 'Button Label';
+
     container.innerHTML = `
       <div class="arch-form-group">
-        <label class="arch-form-label">Button Label</label>
+        <label class="arch-form-label">${labelTitle}</label>
         <input type="text" class="arch-input" id="inp-btn-label" />
       </div>
       <div class="arch-form-group">
-        <label class="arch-form-label">Target Link URL</label>
+        <label class="arch-form-label">Target Link URL (href)</label>
         <input type="text" class="arch-input" id="inp-btn-url" placeholder="https://..." />
       </div>
       <div class="arch-form-group">
-        <label class="arch-form-label">Button Background Color</label>
+        <label class="arch-form-label">Text Color</label>
+        <input type="color" class="arch-input" id="inp-btn-color" />
+      </div>
+      <div class="arch-form-group">
+        <label class="arch-form-label">Background Color</label>
         <input type="color" class="arch-input" id="inp-btn-bg" />
       </div>
       <div class="arch-form-group">
-        <label class="arch-form-label">Button Text Color</label>
-        <input type="color" class="arch-input" id="inp-btn-color" />
+        <label class="arch-form-label">Font Size</label>
+        <input type="text" class="arch-input" id="inp-btn-size" placeholder="16px" />
+      </div>
+      <div class="arch-form-group">
+        <label class="arch-form-label">Text Decoration</label>
+        <select class="arch-select" id="inp-btn-deco">
+          <option value="none">None</option>
+          <option value="underline">Underline</option>
+        </select>
       </div>
       <div class="arch-form-group">
         <label class="arch-form-label">Border Radius</label>
@@ -373,6 +424,25 @@ export class Inspector {
       this.events.onChange();
     });
 
+    const sizeInp = container.querySelector<HTMLInputElement>('#inp-btn-size')!;
+    sizeInp.value = activeNode.style.fontSize || info.fontSize || '';
+    sizeInp.addEventListener('input', (e) => {
+      TextAdapter.setFontSize(info.element, (e.target as HTMLInputElement).value, this.viewportMode, info.unit);
+      this.events.onChange();
+    });
+
+    const decoSel = container.querySelector<HTMLSelectElement>('#inp-btn-deco')!;
+    const currentDeco = (activeNode.style.textDecoration || info.element.style.textDecoration || '').toLowerCase();
+    decoSel.value = currentDeco.includes('underline') ? 'underline' : 'none';
+    decoSel.addEventListener('change', (e) => {
+      const val = (e.target as HTMLSelectElement).value;
+      activeNode.style.textDecoration = val;
+      if (info.element !== activeNode) {
+        info.element.style.textDecoration = val;
+      }
+      this.events.onChange();
+    });
+
     const radiusInp = container.querySelector<HTMLInputElement>('#inp-btn-radius')!;
     radiusInp.value = ButtonAdapter.getBorderRadius(info.element, info.unit);
     radiusInp.addEventListener('input', (e) => {
@@ -411,6 +481,7 @@ export class Inspector {
           <option value="right">Right</option>
         </select>
       </div>
+      <div id="inspector-inner-links"></div>
     `;
 
     const copyInp = container.querySelector<HTMLTextAreaElement>('#inp-text-copy')!;
@@ -439,6 +510,68 @@ export class Inspector {
     alignSel.addEventListener('change', (e) => {
       TextAdapter.setAlignment(info.element, (e.target as HTMLSelectElement).value as any, this.viewportMode, info.unit);
       this.events.onChange();
+    });
+
+    const linksHolder = container.querySelector<HTMLElement>('#inspector-inner-links');
+    if (linksHolder) {
+      this.renderInnerLinksCard(linksHolder, info);
+    }
+  }
+
+  /**
+   * When a parent container (`<td>`, `<h1>`, `<p>`, `table`) is selected and contains `<a href="...">` tags,
+   * renders a quick-select & inline editor card for every `<a>` inside that container.
+   */
+  private renderInnerLinksCard(holder: HTMLElement, info: SelectedElementInfo): void {
+    const scope = info.unit || info.element;
+    const anchors = Array.from(scope.querySelectorAll<HTMLAnchorElement>('a')).filter(
+      (a) => (a.style?.display || '').toLowerCase() !== 'none'
+    );
+    if (anchors.length === 0) return;
+
+    holder.innerHTML = `
+      <div class="arch-form-group" style="margin-top:10px;border-top:1px solid var(--arch-border);padding-top:10px;">
+        <label class="arch-form-label">Inner Links (&lt;a&gt;) (${anchors.length})</label>
+        <div class="arch-inner-links-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+    `;
+
+    const listEl = holder.querySelector<HTMLElement>('.arch-inner-links-list')!;
+    anchors.forEach((aEl, idx) => {
+      const card = document.createElement('div');
+      card.style.cssText =
+        'border:1px solid var(--arch-border);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:5px;background:rgba(13,153,255,0.03);';
+      const labelVal = ButtonAdapter.getLabel(aEl, aEl);
+      const hrefVal = aEl.getAttribute('href') || '';
+
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:600;">
+          <span>Link #${idx + 1} (&lt;a&gt;)</span>
+          <button type="button" class="arch-btn btn-select-inner-a" style="padding:2px 8px;font-size:11px;">Select &lt;a&gt;</button>
+        </div>
+        <input type="text" class="arch-input inp-inner-a-label" placeholder="Link text" />
+        <input type="text" class="arch-input inp-inner-a-href" placeholder="https://..." />
+      `;
+
+      const lblInput = card.querySelector<HTMLInputElement>('.inp-inner-a-label')!;
+      lblInput.value = labelVal;
+      lblInput.addEventListener('input', (e) => {
+        ButtonAdapter.setLabel(aEl, (e.target as HTMLInputElement).value, aEl);
+        this.events.onChange();
+      });
+
+      const hrefInput = card.querySelector<HTMLInputElement>('.inp-inner-a-href')!;
+      hrefInput.value = hrefVal;
+      hrefInput.addEventListener('input', (e) => {
+        aEl.setAttribute('href', (e.target as HTMLInputElement).value);
+        this.events.onChange();
+      });
+
+      card.querySelector('.btn-select-inner-a')?.addEventListener('click', () => {
+        this.events.onSelectElementNode?.(aEl);
+      });
+
+      listEl.appendChild(card);
     });
   }
 

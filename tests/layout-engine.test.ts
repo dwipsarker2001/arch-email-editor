@@ -552,17 +552,446 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     expect(row4Cols[0].classList.contains('column-2')).toBe(true);
     expect(row4Cols[1].classList.contains('column-1')).toBe(true);
 
-    // 3. Clicking block-1 in row-11 and moving DOWN skips the hidden .desktop_hide block-2 and moves after block-3
+    // 3. Clicking block-1 in row-11 and moving DOWN moves BOTH block-1 (.mobile_hide) AND its paired twin block-2 (.desktop_hide) after block-3!
     const visFirst = ifrDoc.querySelector('.row-11 .vis-first') as HTMLElement;
     visFirst.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     editor.moveSelectedElement('down');
 
     const row11Blocks = Array.from(ifrDoc.querySelectorAll('.row-11 .border > table'));
-    expect(row11Blocks[row11Blocks.length - 1].classList.contains('block-1')).toBe(true);
+    expect(row11Blocks[0].classList.contains('block-3')).toBe(true);
+    expect(row11Blocks[1].classList.contains('block-1')).toBe(true);
+    expect(row11Blocks[2].classList.contains('block-2')).toBe(true);
 
-    // 4. Exported HTML must not leak draggable="true"
+    // 4. Dropping a block onto <div class="border"> or <td class="column"> places it INSIDE <div class="border"> (Auto-Layout Slot)
+    const row2Block = ifrDoc.querySelector('.row-2 table.heading_block') as HTMLElement;
+    const row11Border = ifrDoc.querySelector('.row-11 .border') as HTMLElement;
+    const movedIntoSlot = moveUnitToTarget(row2Block, row11Border, 'after');
+    expect(movedIntoSlot).toBe(true);
+    expect(row11Border.contains(row2Block)).toBe(true);
+
+    // 5. Figma Layers Tree in left sidebar lists all Rows, Columns, and Blocks and syncs selection on click
+    const layerRows = container.querySelectorAll('.arch-layer-row');
+    expect(layerRows.length).toBeGreaterThan(3);
+    (layerRows[0] as HTMLElement).click();
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBeTruthy();
+
+    // 6. Exported HTML must not leak draggable="true"
     const exported = editor.getHTML();
     expect(exported).not.toContain('draggable=');
+
+    editor.destroy();
+  });
+
+  it('preserves card cap borders (border-top / border-bottom) when reordering slice rows and adapts text contrast across dark/light sections', () => {
+    const editor = ArchEmailEditor.create(container);
+    const cardSlicesHtml = `<!DOCTYPE html>
+<html>
+<body>
+  <table class="nl-container" width="100%" role="presentation">
+    <tbody><tr><td>
+      <table class="row row-2" width="100%" role="presentation">
+        <tbody><tr><td>
+          <table class="row-content" style="background-color:#0d4635;border-top:1px solid #0d4635;border-left:1px solid #0d4635;border-right:1px solid #0d4635;">
+            <tbody><tr><td class="column column-1">
+              <table class="heading_block block-1"><tr><td><h1 class="hero-h1" style="color:#ffffff;">White Text on Dark Green</h1></td></tr></table>
+            </td></tr></tbody>
+          </table>
+        </td></tr></tbody>
+      </table>
+      <table class="row row-3" width="100%" role="presentation">
+        <tbody><tr><td>
+          <table class="row-content" style="background-color:#ffffff;border-bottom:1px solid #0d4635;border-left:1px solid #0d4635;border-right:1px solid #0d4635;">
+            <tbody><tr><td class="column column-1">
+              <table class="paragraph_block block-1"><tr><td><p class="light-p" style="color:#0d4635;">Body copy on white card</p></td></tr></table>
+            </td></tr></tbody>
+          </table>
+        </td></tr></tbody>
+      </table>
+    </td></tr></tbody>
+  </table>
+</body>
+</html>`;
+
+    editor.importHTML(cardSlicesHtml);
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+
+    // 1. Move row-3 UP above row-2 -> border-top stays on the top row (row-3) and border-bottom stays on the bottom row (row-2)!
+    const row3 = ifrDoc.querySelector('table.row-3') as HTMLElement;
+    const row2 = ifrDoc.querySelector('table.row-2') as HTMLElement;
+    editor.selectParentUnit();
+    moveUnitToTarget(row3, row2, 'before');
+
+    const orderedRows = Array.from(ifrDoc.querySelectorAll('table.row'));
+    expect(orderedRows[0]).toBe(row3);
+    expect(orderedRows[1]).toBe(row2);
+
+    const topContent = orderedRows[0].querySelector('table.row-content') as HTMLElement;
+    const bottomContent = orderedRows[1].querySelector('table.row-content') as HTMLElement;
+    expect(topContent.style.borderTop).toContain('1px solid');
+    expect(topContent.style.borderBottom).toBe('');
+    expect(bottomContent.style.borderBottom).toContain('1px solid');
+    expect(bottomContent.style.borderTop).toBe('');
+
+    // 2. Move the white heading block from dark-green row-2 into white-background row-3 -> text color adapts to dark so it stays visible!
+    const heroBlock = ifrDoc.querySelector('.row-2 table.heading_block') as HTMLElement;
+    const lightBlock = ifrDoc.querySelector('.row-3 table.paragraph_block') as HTMLElement;
+    moveUnitToTarget(heroBlock, lightBlock, 'before');
+
+    const heroH1 = heroBlock.querySelector('.hero-h1') as HTMLElement;
+    expect(heroH1.style.color).not.toBe('#ffffff');
+    expect(heroH1.style.color).not.toBe('rgb(255, 255, 255)');
+
+    editor.destroy();
+  });
+
+  it('supports Figma Top-Down Container Drill-Down (Row -> Column -> Block -> Inline Text Edit), Horizontal Column Frame Drag-Swap, and Direct Button Text Selection', () => {
+    const editor = ArchEmailEditor.create(container);
+    const figmaFrameHtml = `<!DOCTYPE html>
+<html>
+<body>
+  <table class="nl-container" width="100%" role="presentation">
+    <tbody><tr><td>
+      <table class="row row-5" width="100%" role="presentation">
+        <tbody><tr><td>
+          <table class="row-content" width="600" role="presentation">
+            <tbody><tr class="reverse">
+              <td class="column column-1 first" width="50%">
+                <div class="border" style="padding:20px 0 20px 35px;">
+                  <table class="heading_block block-1" width="100%" role="presentation">
+                    <tr><td class="pad"><h1>Furniture Assembly</h1></td></tr>
+                  </table>
+                  <table class="button_block block-2" width="100%" role="presentation">
+                    <tr><td class="pad">
+                      <div class="alignment" align="left">
+                        <a href="https://example.com/book" class="button" style="background-color:#0d4635;color:#ffffff;display:inline-block;">
+                          <span style="padding-left:20px;padding-right:20px;"><span class="btn-label">Book Assembly Now</span></span>
+                        </a>
+                      </div>
+                    </td></tr>
+                  </table>
+                </div>
+              </td>
+              <td class="column column-2 last" width="50%">
+                <div class="border" style="padding:0;">
+                  <table class="image_block block-1" width="100%" role="presentation">
+                    <tr><td class="pad"><img class="col2-img" src="https://example.com/chair.png" width="250"></td></tr>
+                  </table>
+                </div>
+              </td>
+            </tr></tbody>
+          </table>
+        </td></tr></tbody>
+      </table>
+    </td></tr></tbody>
+  </table>
+</body>
+</html>`;
+
+    editor.importHTML(figmaFrameHtml);
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+
+    const row5 = ifrDoc.querySelector('table.row-5') as HTMLElement;
+    const col1 = ifrDoc.querySelector('td.column-1') as HTMLElement;
+    const col2 = ifrDoc.querySelector('td.column-2') as HTMLElement;
+    const btnBlock = ifrDoc.querySelector('table.button_block') as HTMLElement;
+    const btnAnchor = ifrDoc.querySelector('a.button') as HTMLElement;
+    const btnLabel = ifrDoc.querySelector('.btn-label') as HTMLElement;
+
+    // Button anchor must have draggable="false" so native browser link drag never blocks text selection
+    expect(btnAnchor.getAttribute('draggable')).toBe('false');
+
+    // LEVEL 1: First single click (detail: 1) inside the button selects the outermost Top Container (Row Frame: row-5)
+    btnLabel.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(row5);
+
+    // LEVEL 2: First double-click drills down from Row Frame -> Column Frame (col-1)
+    btnLabel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(col1);
+
+    // Clicking inside sibling column (col-2) while at Column depth switches directly to sibling Column Frame (col-2)!
+    const col2Img = ifrDoc.querySelector('.col2-img') as HTMLElement;
+    col2Img.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(col2);
+
+    // Switch back to col-1 at Column depth
+    btnLabel.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(col1);
+
+    // HORIZONTAL COLUMN FRAME SWAP: Dragging/moving col-1 onto col-2 (even with 'before' on adjacent sibling) swaps the two columns
+    const swapped = moveUnitToTarget(col1, col2, 'before');
+    expect(swapped).toBe(true);
+    const colsAfterSwap = Array.from(ifrDoc.querySelectorAll('.row-5 td.column'));
+    expect(colsAfterSwap[0]).toBe(col2);
+    expect(colsAfterSwap[1]).toBe(col1);
+
+    // Positional classes (.first / .last) and asymmetric .border horizontal padding are mirrored cleanly
+    expect(col2.classList.contains('first')).toBe(true);
+    expect(col1.classList.contains('last')).toBe(true);
+    const col1Border = col1.querySelector('.border') as HTMLElement;
+    expect(col1Border.style.paddingLeft).toBe('0px');
+    expect(col1Border.style.paddingRight).toBe('35px');
+
+    // Dragging the sole image block inside col-2 onto a block inside col-1 ALSO swaps the two Column Frames instead of emptying col-2
+    const col2ImageBlock = col2.querySelector('table.image_block') as HTMLElement;
+    const swappedBack = moveUnitToTarget(col2ImageBlock, btnBlock, 'after');
+    expect(swappedBack).toBe(true);
+    const colsAfterSwapBack = Array.from(ifrDoc.querySelectorAll('.row-5 td.column'));
+    expect(colsAfterSwapBack[0]).toBe(col1);
+    expect(colsAfterSwapBack[1]).toBe(col2);
+
+    // LEVEL 3: Second double-click on the button drills down from Column Frame (col-1) -> Block Frame (button_block)
+    btnLabel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(btnBlock);
+
+    // LEVEL 4: Third double-click drills down inside Block/td to select the `<a class="button">` tag itself!
+    btnLabel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(btnAnchor);
+
+    // LEVEL 5: Fourth double-click (or clicking inside the already-selected `<a>` tag) enters Inline Text Edit Mode on the button text!
+    btnLabel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    const editingEl = ifrDoc.querySelector('.arch-editing-text') as HTMLElement;
+    expect(editingEl).toBeTruthy();
+    expect(editingEl.getAttribute('contenteditable')).toBe('true');
+    expect(editingEl.textContent).toContain('Book Assembly Now');
+
+    // Pressing Escape once exits Inline Text Edit Mode while keeping the `<a>` tag selected
+    ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(btnAnchor);
+
+    // Pressing Escape climbs up step-by-step: Link (`<a>`) -> Block Frame -> Column Frame -> Row Frame
+    ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(btnBlock);
+    ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(col1);
+    ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(row5);
+
+    editor.destroy();
+  });
+
+  it('drills down past <td> into inner <a> tags and smoothly reorders 3-column rows horizontally while preserving divider borders', () => {
+    const editor = ArchEmailEditor.create(container);
+    const threeColHtml = `<!DOCTYPE html>
+<html>
+<body>
+  <table class="nl-container" width="100%" role="presentation">
+    <tbody><tr><td>
+      <table class="row row-13" width="100%" role="presentation">
+        <tbody><tr><td>
+          <table class="row-content" width="600" style="background-color:#65ccb2;" role="presentation">
+            <tbody><tr>
+              <td class="column column-1" width="33.33%" style="border-right:1px solid #0a2b14;">
+                <table class="heading_block block-1" width="100%" role="presentation">
+                  <tr><td class="pad td-col-1">
+                    <h1><a class="link-1" href="https://example.com/mounting"><span>Mounting ❯</span></a></h1>
+                  </td></tr>
+                </table>
+              </td>
+              <td class="column column-2" width="33.33%" style="border-right:1px solid #0a2b14;">
+                <table class="heading_block block-1" width="100%" role="presentation">
+                  <tr><td class="pad td-col-2">
+                    <h1><span><a class="link-2" href="https://example.com/assembly"><span><span>Furniture Assembly ❯</span></span></a></span></h1>
+                  </td></tr>
+                </table>
+              </td>
+              <td class="column column-3" width="33.33%">
+                <table class="heading_block block-1" width="100%" role="presentation">
+                  <tr><td class="pad td-col-3">
+                    <h1><a class="link-3" href="https://example.com/cleaning"><span>Cleaning ❯</span></a></h1>
+                  </td></tr>
+                </table>
+              </td>
+            </tr></tbody>
+          </table>
+        </td></tr></tbody>
+      </table>
+    </td></tr></tbody>
+  </table>
+</body>
+</html>`;
+
+    editor.importHTML(threeColHtml);
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+
+    const row13 = ifrDoc.querySelector('table.row-13') as HTMLElement;
+    const col1 = ifrDoc.querySelector('td.column-1') as HTMLElement;
+    const col2 = ifrDoc.querySelector('td.column-2') as HTMLElement;
+    const col3 = ifrDoc.querySelector('td.column-3') as HTMLElement;
+    const tdCol1 = ifrDoc.querySelector('.td-col-1') as HTMLElement;
+    const link1 = ifrDoc.querySelector('a.link-1') as HTMLElement;
+
+    // 1. Even when clicking/double-clicking on the outer `<td class="pad">` (around `<a>`),
+    //    drilling down goes: Row 13 -> Column 1 -> Heading Block -> Link (`<a class="link-1">`)!
+    tdCol1.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(row13);
+
+    tdCol1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(col1);
+
+    tdCol1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(col1.querySelector('table.heading_block'));
+
+    tdCol1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(link1);
+
+    // 2. When `<a class="link-1">` is selected, the Inspector displays Link/Button (`<a>`) controls
+    const labelInput = container.querySelector('#inp-btn-label') as HTMLInputElement;
+    const urlInput = container.querySelector('#inp-btn-url') as HTMLInputElement;
+    expect(labelInput).toBeTruthy();
+    expect(labelInput.value).toBe('Mounting ❯');
+    expect(urlInput.value).toBe('https://example.com/mounting');
+
+    labelInput.value = 'TV Mounting ❯';
+    labelInput.dispatchEvent(new Event('input'));
+    expect(link1.textContent).toBe('TV Mounting ❯');
+
+    // 3. Moving horizontally in a 3-column row:
+    //    a) Moving `link1` (or `col1`) onto `col3` (even with `'before'`) places `col1` at the end (`[col2, col3, col1]`)
+    //       and updates `border-right` dividers so `col2` and `col3` have `border-right` and `col1` (now rightmost) has none!
+    moveUnitToTarget(link1, col3, 'before');
+    let cols = Array.from(ifrDoc.querySelectorAll('.row-13 td.column')) as HTMLElement[];
+    expect(cols).toEqual([col2, col3, col1]);
+    expect(cols[0].style.borderRight).toContain('1px solid');
+    expect(cols[1].style.borderRight).toContain('1px solid');
+    expect(cols[2].style.borderRight).toBe('');
+
+    //    b) Moving `col1` (now at index 2) leftward onto `col2` (at index 0, even with `'after'`) places `col1` back at index 0!
+    moveUnitToTarget(col1, col2, 'after');
+    cols = Array.from(ifrDoc.querySelectorAll('.row-13 td.column')) as HTMLElement[];
+    expect(cols).toEqual([col1, col2, col3]);
+    expect(cols[0].style.borderRight).toContain('1px solid');
+    expect(cols[1].style.borderRight).toContain('1px solid');
+    expect(cols[2].style.borderRight).toBe('');
+
+    editor.destroy();
+  });
+
+  it('prevents link navigation on click/drag-release and supports live image resize via corner handles and inspector', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+
+    const linkedImgHtml = `<!DOCTYPE html>
+<html>
+<body>
+  <table class="row row-1" width="100%">
+    <tbody><tr><td>
+      <table class="row-content stack" width="600">
+        <tbody><tr>
+          <td class="column column-1" width="100%">
+            <table class="image_block block-1" width="100%">
+              <tbody><tr><td class="pad">
+                <div class="alignment" align="center">
+                  <div class="fullWidth" style="max-width: 300px;">
+                    <a href="https://example.com/promo" target="_blank" class="promo-link">
+                      <img src="https://example.com/banner.png" style="display: block; height: auto; border: 0; width: 100%;" width="300" alt="Promo" />
+                    </a>
+                  </div>
+                </div>
+              </td></tr></tbody>
+            </table>
+          </td>
+        </tr></tbody>
+      </table>
+    </td></tr></tbody>
+  </table>
+</body>
+</html>`;
+
+    editor.importHTML(linkedImgHtml);
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+    const img = ifrDoc.querySelector('img') as HTMLImageElement;
+    const sizeWrapper = ifrDoc.querySelector('.fullWidth') as HTMLElement;
+
+    // 1. Clicking on an image inside `<a href="...">` MUST prevent browser link navigation (`defaultPrevented === true`)
+    const clickEv = new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 });
+    img.dispatchEvent(clickEv);
+    expect(clickEv.defaultPrevented).toBe(true);
+
+    // 2. Even after a drag/mouseup that sets `suppressNextClick`, the subsequent click MUST still prevent link navigation!
+    img.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 100, clientY: 100 }));
+    img.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 120, clientY: 120 }));
+    img.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    const postDragClick = new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 });
+    img.dispatchEvent(postDragClick);
+    expect(postDragClick.defaultPrevented).toBe(true);
+
+    // 3. Selecting the image renders 4 corner `.arch-resize-handle` handles on the canvas overlay
+    const seHandle = container.querySelector('.arch-resize-handle--se') as HTMLElement;
+    expect(seHandle).toBeTruthy();
+
+    // Dragging the SE corner handle right by +80px resizes the image and its `.alignment > div` wrapper from 300px to 380px
+    seHandle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 200, clientY: 200 }));
+    window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 280, clientY: 200 }));
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+    expect(img.getAttribute('width')).toBe('380');
+    expect(img.style.maxWidth).toBe('380px');
+    expect(sizeWrapper.style.maxWidth).toBe('380px');
+
+    // 4. Using the Inspector range slider or preset buttons also resizes the image cleanly
+    const preset50 = container.querySelector('[data-width-preset="50%"]') as HTMLButtonElement;
+    expect(preset50).toBeTruthy();
+    preset50.click();
+    expect(sizeWrapper.style.maxWidth).toBe('50%');
+    expect(img.style.width).toBe('50%');
+
+    editor.destroy();
+  });
+
+  it('selects text on single click without entering edit mode, and enters text edit mode only on double click', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+
+    const sampleHtml = `<!DOCTYPE html>
+<html>
+<body>
+  <table class="row row-1" width="100%">
+    <tbody><tr><td>
+      <table class="text_block" width="100%">
+        <tbody><tr><td class="pad">
+          <p class="para-text">Click to select, double click to edit me!</p>
+        </td></tr></tbody>
+      </table>
+    </td></tr></tbody>
+  </table>
+</body>
+</html>`;
+
+    editor.importHTML(sampleHtml);
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+    const p = ifrDoc.querySelector('.para-text') as HTMLElement;
+    expect(p).toBeTruthy();
+
+    // 1. Single click on text selects the outer frame, does NOT enter edit mode
+    p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBeTruthy();
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
+
+    // 2. Clicking again while selected keeps it selected, still does NOT enter edit mode
+    p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBeTruthy();
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
+
+    // 3. Double-click drills down to the text block, keeping selection without entering edit mode
+    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('.text_block'));
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
+
+    // 4. Double-clicking the selected text block enters text edit mode (.arch-editing-text is active)
+    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBe(p);
+
+    // 5. Pressing Escape exits text edit mode
+    ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
 
     editor.destroy();
   });

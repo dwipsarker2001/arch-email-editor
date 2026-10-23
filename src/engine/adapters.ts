@@ -258,6 +258,11 @@ export function resolveImageAnatomy(el: HTMLElement, unit?: HTMLElement): ImageA
 }
 
 export const ImageAdapter = {
+  findImage(el: HTMLElement, unit?: HTMLElement): HTMLImageElement | null {
+    const img = resolveImageAnatomy(el, unit).img;
+    return img.tagName.toLowerCase() === 'img' ? (img as HTMLImageElement) : null;
+  },
+
   getSrc(el: HTMLElement, unit?: HTMLElement): string {
     return resolveImageAnatomy(el, unit).img.getAttribute('src') || '';
   },
@@ -322,9 +327,15 @@ export const ImageAdapter = {
       img.setAttribute('width', numStr);
       if (sizeWrapper) {
         sizeWrapper.style.maxWidth = normalized;
+        img.style.maxWidth = normalized;
         img.style.width = '100%';
       } else {
         img.style.maxWidth = normalized;
+        img.style.width = normalized;
+      }
+      img.style.height = 'auto';
+      if (img.hasAttribute('height') && img.getAttribute('height') !== 'auto') {
+        img.setAttribute('height', 'auto');
       }
     } else if (normalized.endsWith('%')) {
       if (sizeWrapper) {
@@ -332,6 +343,7 @@ export const ImageAdapter = {
       }
       img.style.maxWidth = normalized;
       img.style.width = normalized;
+      img.style.height = 'auto';
     }
   },
 
