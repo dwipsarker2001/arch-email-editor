@@ -909,9 +909,12 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     const sizeWrapper = ifrDoc.querySelector('.fullWidth') as HTMLElement;
 
     // 1. Clicking on an image inside `<a href="...">` MUST prevent browser link navigation (`defaultPrevented === true`)
+    //    and select ONLY the outer Row Frame (NOT `td` and `img` together!)
     const clickEv = new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 });
     img.dispatchEvent(clickEv);
     expect(clickEv.defaultPrevented).toBe(true);
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('table.row-1'));
+    expect(container.querySelector('.arch-resize-handle--se')).toBeNull();
 
     // 2. Even after a drag/mouseup that sets `suppressNextClick`, the subsequent click MUST still prevent link navigation!
     img.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 100, clientY: 100 }));
@@ -921,7 +924,19 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     img.dispatchEvent(postDragClick);
     expect(postDragClick.defaultPrevented).toBe(true);
 
-    // 3. Selecting the image renders 4 corner `.arch-resize-handle` handles on the canvas overlay
+    // 3. Double-clicking drills down one by one: Row -> Image Block (td) -> Link (<a>) -> Image (<img>)!
+    //    While on Image Block (td) or Link (<a>), `img` resize handles are NOT shown (never selects td and img together)
+    img.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('table.image_block'));
+    expect(container.querySelector('.arch-resize-handle--se')).toBeNull();
+
+    img.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('a.promo-link'));
+    expect(container.querySelector('.arch-resize-handle--se')).toBeNull();
+
+    // Next double-click selects ONLY `<img>` and renders the 4 corner `.arch-resize-handle` handles on `<img>`
+    img.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(img);
     const seHandle = container.querySelector('.arch-resize-handle--se') as HTMLElement;
     expect(seHandle).toBeTruthy();
 
@@ -944,7 +959,7 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     editor.destroy();
   });
 
-  it('selects text on single click without entering edit mode, and enters text edit mode only on double click', () => {
+  it('selects text parent to child (Row -> td/Block -> p) and enters text edit mode only on double-clicking selected p', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const editor = new ArchEmailEditor(container);
@@ -970,28 +985,37 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     const p = ifrDoc.querySelector('.para-text') as HTMLElement;
     expect(p).toBeTruthy();
 
-    // 1. Single click on text selects the outer frame, does NOT enter edit mode
+    // 1. Single click on text selects the outer Row frame, does NOT enter edit mode
     p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBeTruthy();
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('table.row-1'));
     expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
 
     // 2. Clicking again while selected keeps it selected, still does NOT enter edit mode
     p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBeTruthy();
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('table.row-1'));
     expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
 
-    // 3. Double-click drills down to the text block, keeping selection without entering edit mode
+    // 3. 1st Double-click drills down to the parent `td`/Block (`table.text_block`), NOT edit mode
     p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('.text_block'));
     expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
 
-    // 4. Double-clicking the selected text block enters text edit mode (.arch-editing-text is active)
+    // 4. 2nd Double-click drills down from `td`/Block to select `<p>` itself (still NOT edit mode!)
+    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
+
+    // 5. 3rd Double-click (while `<p>` is selected) makes `<p>` editable (`.arch-editing-text` is active)
     p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
     expect(ifrDoc.querySelector('.arch-editing-text')).toBe(p);
 
-    // 5. Pressing Escape exits text edit mode
+    // 6. Pressing Escape exits text edit mode while keeping `<p>` selected, then climbs up `p -> td/Block -> Row`
     ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
+
+    ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('.text_block'));
 
     editor.destroy();
   });

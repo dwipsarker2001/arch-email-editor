@@ -375,8 +375,7 @@ export class Canvas {
     this.activeImageResize = null;
     this.suppressNextClick = true;
     this.overlayLayer.style.pointerEvents = 'none';
-    const imgUnit = this.findMoveableUnit(state.img);
-    this.selectUnit(state.img, imgUnit);
+    this.selectUnit(state.img, state.img);
     this.adjustHeight();
     this.onStructureChanged();
   }
@@ -615,6 +614,10 @@ export class Canvas {
     const styleEl = doc.createElement('style');
     styleEl.id = 'arch-canvas-editor-style';
     styleEl.textContent = `
+      *, *:focus, *:focus-visible, [contenteditable], [contenteditable="true"] {
+        outline: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
       [contenteditable="true"]:not(.arch-editing-text),
       [contenteditable="true"]:not(.arch-editing-text) * {
         cursor: default !important;
@@ -623,10 +626,11 @@ export class Canvas {
         caret-color: transparent !important;
       }
       .arch-editing-text, .arch-editing-text * {
+        outline: none !important;
         cursor: text !important;
         user-select: text !important;
         -webkit-user-select: text !important;
-        caret-color: auto !important;
+        caret-color: #0d99ff !important;
       }
       .arch-selected-element {
         outline: 2px solid #0d99ff !important;
@@ -1019,9 +1023,9 @@ export class Canvas {
     const chain = getContainerChain(selectable);
     if (chain.length === 0) return;
 
-    // 1. If clicking inside the currently selected container, keep it selected (NEVER enter edit mode on single click)
+    // 1. If clicking inside the currently selected container, keep ONLY that container selected (NEVER enter edit mode on single click)
     if (this.activeMoveableUnit && chain.includes(this.activeMoveableUnit)) {
-      this.selectUnit(selectable, this.activeMoveableUnit);
+      this.selectUnit(this.activeMoveableUnit, this.activeMoveableUnit);
       return;
     }
 
@@ -1034,7 +1038,7 @@ export class Canvas {
         const sameRoleUnit = chain.find((u) => classifyUnitRole(u) === activeRole);
         if (sameRoleUnit) {
           this.exitTextEditMode();
-          this.selectUnit(selectable, sameRoleUnit);
+          this.selectUnit(sameRoleUnit, sameRoleUnit);
           return;
         }
       }
@@ -1042,11 +1046,11 @@ export class Canvas {
 
     // 3. Otherwise select the Top Container (`chain[0]`, the Row Frame)!
     this.exitTextEditMode();
-    this.selectUnit(selectable, chain[0]);
+    this.selectUnit(chain[0], chain[0]);
   }
 
   /**
-   * Handles Figma-style Double-Click Drill-Down (`Row Frame` -> `Column Frame` -> `Block Frame` -> `Inline Text Edit`).
+   * Handles Figma-style Double-Click Drill-Down (`Row Frame` -> `Column Frame` -> `Block Frame (td)` -> `Leaf (p / a / img)` -> `Inline Text Edit`).
    */
   public handleIframeDoubleClick(e: MouseEvent): void {
     const target = e.target as HTMLElement | null;
@@ -1064,16 +1068,15 @@ export class Canvas {
 
     const currentIdx = this.activeMoveableUnit ? chain.indexOf(this.activeMoveableUnit) : -1;
 
-    // Case 1: Drill down to the next child container (`Row` -> `Column` -> `Block (td)` -> `Link (a)`)
+    // Case 1: Drill down one step from parent to child (`Row` -> `Column` -> `Block (td)` -> `p / a / img`)
     if (currentIdx >= 0 && currentIdx < chain.length - 1) {
       const nextUnit = chain[currentIdx + 1];
-      const nextSelectable = nextUnit.contains(selectable) ? selectable : nextUnit;
       this.exitTextEditMode();
-      this.selectUnit(nextSelectable, nextUnit);
+      this.selectUnit(nextUnit, nextUnit);
       return;
     }
 
-    // Case 2: Already at the innermost Block/Leaf (`currentIdx === chain.length - 1`) -> Enter Inline Text Edit Mode!
+    // Case 2: Already at the innermost Leaf (`currentIdx === chain.length - 1`) -> Enter Inline Text Edit Mode!
     if (currentIdx === chain.length - 1) {
       const leafBlock = chain[currentIdx];
       const leafSelectable = leafBlock.contains(selectable) ? selectable : leafBlock;
@@ -1086,9 +1089,8 @@ export class Canvas {
 
     // Case 3: Nothing in `chain` was selected yet -> select the first child level (`chain[1]` or `chain[0]`)
     const initialUnit = chain.length > 1 ? chain[1] : chain[0];
-    const initialSelectable = initialUnit.contains(selectable) ? selectable : initialUnit;
     this.exitTextEditMode();
-    this.selectUnit(initialSelectable, initialUnit);
+    this.selectUnit(initialUnit, initialUnit);
   }
 
   /**
@@ -1288,16 +1290,15 @@ export class Canvas {
     this.floatingToolbar = toolbar;
 
     // If this unit is actively selected, also render the Figma Dimensions Badge (`W × H`)
-    // and 4 corner resize handles when an image is selected
+    // and 4 corner resize handles ONLY when the `<img>` leaf itself is selected (never while a parent Row/Column/td is selected!)
     if (this.activeMoveableUnit === unit) {
       const targetEl = innerTarget || this.selectedElement || unit;
-      const isImageContext =
-        targetEl.tagName.toLowerCase() === 'img' ||
-        classifyElementType(targetEl, unit) === 'image' ||
-        classifyElementType(targetEl, targetEl) === 'image';
-      const targetImg = isImageContext ? ImageAdapter.findImage(targetEl, unit) : null;
+      const isDirectImageSelected =
+        unit.tagName.toLowerCase() === 'img' ||
+        (targetEl.tagName.toLowerCase() === 'img' && targetEl !== unit);
+      const targetImg = isDirectImageSelected ? ImageAdapter.findImage(targetEl, unit) : null;
 
-      const rect = (targetImg || unit).getBoundingClientRect();
+      const rect = (unit.tagName.toLowerCase() === 'img' && targetImg ? targetImg : unit).getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
         const dim = document.createElement('div');
         dim.className = 'arch-dimensions-pill';

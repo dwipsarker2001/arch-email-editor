@@ -497,6 +497,12 @@ export function getParentStructuralUnit(unit: HTMLElement): HTMLElement | null {
   const tag = unit.tagName.toLowerCase();
   if (tag === 'body' || tag === 'html') return null;
 
+  const chain = getContainerChain(unit);
+  const idx = chain.indexOf(unit);
+  if (idx > 0) {
+    return chain[idx - 1];
+  }
+
   const currentRole = classifyUnitRole(unit);
 
   if (currentRole === 'leaf') {
@@ -535,7 +541,18 @@ export function classifyUnitRole(unit: HTMLElement): UnitRole {
   if (tag === 'body' || tag === 'html' || isOuterWrapperTable(unit)) return 'body';
   if (isRowElement(unit)) return 'row';
   if (isColumnElement(unit)) return 'column';
-  if (tag === 'a' || tag === 'img' || tag === 'span' || tag === 'strong' || tag === 'em') {
+  if (
+    tag === 'a' ||
+    tag === 'img' ||
+    tag === 'p' ||
+    /^h[1-6]$/.test(tag) ||
+    tag === 'li' ||
+    tag === 'blockquote' ||
+    tag === 'span' ||
+    tag === 'strong' ||
+    tag === 'em' ||
+    tag === 'hr'
+  ) {
     const blockUnit = resolveUnit(unit);
     if (blockUnit !== unit) return 'leaf';
   }
@@ -836,10 +853,28 @@ export function getContainerChain(target: HTMLElement): HTMLElement[] {
     }
   }
 
-  // 4. Push inner semantic sub-elements (`<p>/<h1..h6>`, `<a href="...">`, `<img>`) inside `deepestContainer`
-  //    so users can drill down past `<td>` / `table.*_block` to select any `<a href="...">` tag directly!
+  // 4. Push inner semantic sub-elements (`<td>`, `<p>/<h1..h6>`, `<a href="...">`, `<img>`) inside `deepestContainer`
+  //    so users can drill down step-by-step from parent to child for ALL content types (`td -> p`, `td -> a -> img`, etc.)!
   const deepestContainer = chain[chain.length - 1];
-  const textBlock = target.closest<HTMLElement>('p, h1, h2, h3, h4, h5, h6, li, blockquote');
+  const scopeEl = deepestContainer.contains(target) ? target : deepestContainer;
+
+  // If `deepestContainer` is a generic `<table>` or `<tr>` (not a Beefree `*_block` table), include the enclosing `<td>` cell
+  const dTag = deepestContainer.tagName.toLowerCase();
+  if ((dTag === 'table' || dTag === 'tr' || dTag === 'tbody') && !/_block\b/i.test(deepestContainer.className)) {
+    const enclosingCell = target.closest<HTMLElement>('td, th');
+    if (enclosingCell && deepestContainer.contains(enclosingCell) && !chain.includes(enclosingCell)) {
+      chain.push(enclosingCell);
+    }
+  }
+
+  let textBlock = target.closest<HTMLElement>('p, h1, h2, h3, h4, h5, h6, li, blockquote');
+  if (!textBlock || !deepestContainer.contains(textBlock)) {
+    const candidates = scopeEl.querySelectorAll<HTMLElement>('p, h1, h2, h3, h4, h5, h6, li, blockquote');
+    if (candidates.length === 1) {
+      textBlock = candidates[0];
+    }
+  }
+
   if (
     textBlock &&
     deepestContainer.contains(textBlock) &&
@@ -848,7 +883,7 @@ export function getContainerChain(target: HTMLElement): HTMLElement[] {
   ) {
     const anchorsInText = textBlock.querySelectorAll('a');
     const anchorText = anchorsInText.length === 1 ? getVisibleText(anchorsInText[0]) : '';
-    if (anchorsInText.length > 1 || (anchorsInText.length === 1 && getVisibleText(textBlock) !== anchorText)) {
+    if (anchorsInText.length !== 1 || getVisibleText(textBlock) !== anchorText) {
       chain.push(textBlock);
     }
   }
@@ -858,7 +893,6 @@ export function getContainerChain(target: HTMLElement): HTMLElement[] {
   // find the child `<a>` inside `target` or `deepestContainer`!
   let targetAnchor = target.closest<HTMLElement>('a');
   if (!targetAnchor || !deepestContainer.contains(targetAnchor)) {
-    const scopeEl = deepestContainer.contains(target) ? target : deepestContainer;
     targetAnchor =
       scopeEl.querySelector<HTMLElement>('a') ||
       deepestContainer.querySelector<HTMLElement>('a');
@@ -866,6 +900,24 @@ export function getContainerChain(target: HTMLElement): HTMLElement[] {
 
   if (targetAnchor && deepestContainer.contains(targetAnchor) && !chain.includes(targetAnchor)) {
     chain.push(targetAnchor);
+  }
+
+  // Resolve target `<img>`: allows drilling down from `td` / `table.image_block` / `<a>` directly to the `<img>` leaf
+  let targetImg = target.closest<HTMLElement>('img');
+  if (!targetImg || !deepestContainer.contains(targetImg)) {
+    const imgs = scopeEl.querySelectorAll<HTMLElement>('img');
+    if (imgs.length === 1) {
+      targetImg = imgs[0];
+    } else {
+      const allImgs = deepestContainer.querySelectorAll<HTMLElement>('img');
+      if (allImgs.length === 1) {
+        targetImg = allImgs[0];
+      }
+    }
+  }
+
+  if (targetImg && deepestContainer.contains(targetImg) && !chain.includes(targetImg)) {
+    chain.push(targetImg);
   }
 
   return chain;
@@ -898,7 +950,8 @@ export function describeUnitForLayer(
     return { label, sublabel, role, type: 'column' };
   }
 
-  if (unit.tagName.toLowerCase() === 'a') {
+  const uTag = unit.tagName.toLowerCase();
+  if (uTag === 'a') {
     const rawText = (unit.textContent || '').replace(/\s+/g, ' ').trim();
     const img = unit.querySelector('img');
     const sublabel =
@@ -906,6 +959,20 @@ export function describeUnitForLayer(
         ? rawText.slice(0, 26)
         : (img?.getAttribute('alt') || unit.getAttribute('href') || 'Link').slice(0, 24);
     return { label: 'Link (a)', sublabel, role: 'leaf', type };
+  }
+
+  if (uTag === 'img') {
+    const alt = (unit.getAttribute('alt') || unit.getAttribute('title') || '').trim();
+    const src = unit.getAttribute('src') || '';
+    const file = src.split('/').pop()?.split('?')[0] || 'Image';
+    return { label: 'Image (img)', sublabel: (alt || file).slice(0, 24), role: 'leaf', type: 'image' };
+  }
+
+  if (uTag === 'p' || /^h[1-6]$/.test(uTag) || uTag === 'li' || uTag === 'blockquote') {
+    const rawText = (unit.textContent || '').replace(/\s+/g, ' ').trim();
+    const sublabel = rawText.length > 28 ? `${rawText.slice(0, 28)}…` : rawText;
+    const tagLabel = uTag === 'p' ? 'Paragraph (p)' : /^h[1-6]$/.test(uTag) ? `Heading (${uTag})` : `Text (${uTag})`;
+    return { label: tagLabel, sublabel, role, type };
   }
 
   const prettyType = type.charAt(0).toUpperCase() + type.slice(1);
