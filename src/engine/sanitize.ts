@@ -191,23 +191,44 @@ export function serializeCleanDocument(
   clone.querySelectorAll('#arch-canvas-editor-style, .arch-floating-toolbar').forEach((el) => el.remove());
 
   // Strip temporary editor classes and attributes
-  clone.querySelectorAll('[contenteditable], [spellcheck], [draggable], [data-arch-placeholder], [class]').forEach((el) => {
-    el.removeAttribute('contenteditable');
-    el.removeAttribute('spellcheck');
-    el.removeAttribute('draggable');
-    el.removeAttribute('data-arch-placeholder');
-
-    if (el.hasAttribute('class')) {
-      const classes = (el.getAttribute('class') || '')
-        .split(/\s+/)
-        .filter((c) => c && !c.startsWith('arch-selected') && !c.startsWith('arch-drop') && !c.startsWith('arch-hover'));
-      if (classes.length === 0) {
-        el.removeAttribute('class');
-      } else {
-        el.setAttribute('class', classes.join(' '));
+  clone
+    .querySelectorAll(
+      '[contenteditable], [spellcheck], [draggable], [data-arch-placeholder], [data-arch-displaced], [data-arch-displace-x], [class]'
+    )
+    .forEach((el) => {
+      if (el.hasAttribute('data-arch-displace-x') && (el as HTMLElement).style) {
+        (el as HTMLElement).style.removeProperty('transform');
+        if (!el.getAttribute('style')?.trim()) {
+          el.removeAttribute('style');
+        }
       }
-    }
-  });
+      el.removeAttribute('contenteditable');
+      el.removeAttribute('spellcheck');
+      el.removeAttribute('draggable');
+      el.removeAttribute('data-arch-placeholder');
+      el.removeAttribute('data-arch-displaced');
+      el.removeAttribute('data-arch-displace-x');
+
+      if (el.hasAttribute('class')) {
+        const classes = (el.getAttribute('class') || '')
+          .split(/\s+/)
+          .filter(
+            (c) =>
+              c &&
+              !c.startsWith('arch-selected') &&
+              !c.startsWith('arch-drop') &&
+              !c.startsWith('arch-hover') &&
+              !c.startsWith('arch-col-') &&
+              !c.startsWith('arch-dragging') &&
+              !c.startsWith('arch-editing')
+          );
+        if (classes.length === 0) {
+          el.removeAttribute('class');
+        } else {
+          el.setAttribute('class', classes.join(' '));
+        }
+      }
+    });
 
   // Restore original <html> attributes (like xmlns:v, xmlns:o, lang, style)
   if (meta && meta.htmlAttrs) {

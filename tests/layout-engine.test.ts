@@ -1030,4 +1030,75 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
 
     editor.destroy();
   });
+
+  it('animates 3-column displacement transitions live during left/right drag and cleans up on drop & export', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+
+    const threeColHtml = `<!DOCTYPE html>
+<html>
+<body>
+  <table class="row row-1" width="100%">
+    <tbody><tr><td>
+      <table class="row-content" width="600">
+        <tbody><tr>
+          <td class="column column-1" width="33.33%"><p class="p1">Col 1</p></td>
+          <td class="column column-2" width="33.33%"><p class="p2">Col 2</p></td>
+          <td class="column column-3" width="33.33%"><p class="p3">Col 3</p></td>
+        </tr></tbody>
+      </table>
+    </td></tr></tbody>
+  </table>
+</body>
+</html>`;
+
+    editor.importHTML(threeColHtml);
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+    const col1 = ifrDoc.querySelector('td.column-1') as HTMLElement;
+    const col2 = ifrDoc.querySelector('td.column-2') as HTMLElement;
+    const col3 = ifrDoc.querySelector('td.column-3') as HTMLElement;
+    const canvas = (editor as any).canvas;
+
+    // 1. Start dragging `col2` and hover over `col1` (moving LEFT):
+    //    `col1` smoothly slides to the RIGHT (`+200px`), while `col2` slides to the LEFT (`-200px`)!
+    canvas.draggedUnit = col2;
+    canvas.updateDropTargetForElement(col1, 40, 20);
+
+    expect(col1.classList.contains('arch-col-displace-ready')).toBe(true);
+    expect(col1.dataset.archDisplaced).toBe('right');
+    expect(col1.style.transform).toBe('translate3d(200px, 0, 0)');
+    expect(col2.dataset.archDisplaced).toBe('left');
+    expect(col2.style.transform).toBe('translate3d(-200px, 0, 0)');
+    expect(col3.dataset.archDisplaced).toBeUndefined();
+
+    // 2. Dragging `col3` all the way LEFT onto `col1`:
+    //    Both `col1` and `col2` slide to the RIGHT (`+200px`), while `col3` slides LEFT (`-400px`)!
+    canvas.draggedUnit = col3;
+    canvas.updateDropTargetForElement(col1, 40, 20);
+
+    expect(col1.dataset.archDisplaced).toBe('right');
+    expect(col1.style.transform).toBe('translate3d(200px, 0, 0)');
+    expect(col2.dataset.archDisplaced).toBe('right');
+    expect(col2.style.transform).toBe('translate3d(200px, 0, 0)');
+    expect(col3.dataset.archDisplaced).toBe('left');
+    expect(col3.style.transform).toBe('translate3d(-400px, 0, 0)');
+
+    // 3. Exported HTML while mid-drag or after drop strips all temporary transition classes and transforms
+    const exportedMidDrag = editor.getHTML();
+    expect(exportedMidDrag).not.toContain('arch-col-displace-ready');
+    expect(exportedMidDrag).not.toContain('data-arch-displaced');
+    expect(exportedMidDrag).not.toContain('translate3d');
+
+    // 4. Executing drop commits the reorder (`[col3, col1, col2]`) and removes all inline transforms
+    canvas.executeDrop('arch-move-unit');
+    const colsAfterDrop = Array.from(ifrDoc.querySelectorAll('td.column'));
+    expect(colsAfterDrop).toEqual([col3, col1, col2]);
+    expect(col1.style.transform).toBe('');
+    expect(col2.style.transform).toBe('');
+    expect(col3.style.transform).toBe('');
+
+    editor.destroy();
+  });
 });

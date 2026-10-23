@@ -400,13 +400,40 @@ export class Canvas {
   }
 
   /**
-   * Updates the Figma Auto-Layout Insertion Line on the compatible target unit.
+   * Updates the Figma Auto-Layout Insertion Line and Live Column Displacement Preview on the compatible target unit.
    */
-  private updateDropTargetForElement(rawTarget: HTMLElement, iframeRelativeX: number, iframeRelativeY: number): void {
+  public updateDropTargetForElement(rawTarget: HTMLElement, iframeRelativeX: number, iframeRelativeY: number): void {
     const effectiveDragged = this.draggedUnit ? resolveEffectiveMoveUnit(this.draggedUnit) : null;
-    const targetUnit = effectiveDragged
+    let targetUnit = effectiveDragged
       ? resolveCompatibleDropTarget(effectiveDragged, rawTarget)
       : this.findMoveableUnit(rawTarget);
+
+    // Oscillation-free untransformed slot hit-testing during horizontal column drag:
+    // Because displaced columns are visually translated via `transform: translate3d(dx, 0, 0)`,
+    // resolve the hovered column slot from each column's untransformed layout bounds (`rect.left - dx`).
+    if (
+      effectiveDragged &&
+      isColumnElement(effectiveDragged) &&
+      effectiveDragged.parentElement &&
+      (effectiveDragged.parentElement.contains(rawTarget) || rawTarget.contains(effectiveDragged.parentElement))
+    ) {
+      const cols = getMoveableSiblings(effectiveDragged).filter((c) => isColumnElement(c));
+      if (cols.length >= 2 && cols[0].getBoundingClientRect().width > 0) {
+        const hitCol = cols.find((col) => {
+          const dx = parseFloat(col.dataset.archDisplaceX || '0') || 0;
+          const r = col.getBoundingClientRect();
+          return iframeRelativeX >= r.left - dx && iframeRelativeX <= r.right - dx;
+        });
+        if (hitCol === effectiveDragged) {
+          this.clearDropIndicators(true);
+          this.hoveredDropTarget = null;
+          return;
+        }
+        if (hitCol) {
+          targetUnit = hitCol;
+        }
+      }
+    }
 
     if (
       !targetUnit ||
@@ -414,13 +441,33 @@ export class Canvas {
       targetUnit === effectiveDragged ||
       targetUnit.tagName.toLowerCase() === 'body'
     ) {
+      if (
+        effectiveDragged &&
+        (targetUnit === this.draggedUnit || targetUnit === effectiveDragged)
+      ) {
+        this.clearDropIndicators(true);
+        this.hoveredDropTarget = null;
+      }
       return;
     }
 
-    this.clearDropIndicators();
+    this.clearDropIndicators(false, true);
     this.hoveredDropTarget = targetUnit;
 
-    const rect = targetUnit.getBoundingClientRect();
+    const targetDx = parseFloat(targetUnit.dataset.archDisplaceX || '0') || 0;
+    const rawRect = targetUnit.getBoundingClientRect();
+    const rect =
+      targetDx !== 0 && rawRect.width > 0
+        ? ({
+            left: rawRect.left - targetDx,
+            right: rawRect.right - targetDx,
+            top: rawRect.top,
+            bottom: rawRect.bottom,
+            width: rawRect.width,
+            height: rawRect.height
+          } as DOMRect)
+        : rawRect;
+
     const isHorizontal = isColumnElement(targetUnit) && effectiveDragged && isColumnElement(effectiveDragged);
     let isBefore = isHorizontal
       ? iframeRelativeX < rect.left + rect.width / 2
@@ -439,6 +486,12 @@ export class Canvas {
 
     this.hoveredDropPosition = isBefore ? 'before' : 'after';
 
+    if (isHorizontal && effectiveDragged && effectiveDragged.parentElement === targetUnit.parentElement) {
+      this.applyColumnDisplacementPreview(effectiveDragged, targetUnit, this.hoveredDropPosition);
+    } else {
+      this.clearColumnDisplacementPreview(true);
+    }
+
     if (isBefore) {
       targetUnit.classList.add('arch-drop-line-top');
     } else {
@@ -446,6 +499,104 @@ export class Canvas {
     }
 
     this.renderFigmaDropIndicator(targetUnit, rect, isBefore, !!isHorizontal);
+  }
+
+  /**
+   * Smoothly animates sibling columns in a 2-column or 3-column row (`transform: translate3d(dx, 0, 0)`)
+   * as the user drags a column left or right:
+   * - Dragging a column to the LEFT (`destIdx < dragIdx`) slides the left column(s) to the RIGHT (`+dx`).
+   * - Dragging a column to the RIGHT (`destIdx > dragIdx`) slides the right column(s) to the LEFT (`-dx`).
+   */
+  private applyColumnDisplacementPreview(
+    draggedCol: HTMLElement,
+    targetCol: HTMLElement,
+    position: 'before' | 'after'
+  ): void {
+    const cols = getMoveableSiblings(draggedCol).filter((c) => isColumnElement(c));
+    const dragIdx = cols.indexOf(draggedCol);
+    const targetIdx = cols.indexOf(targetCol);
+    if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) {
+      this.clearColumnDisplacementPreview(true);
+      return;
+    }
+
+    const insertBeforeIdx = position === 'before' ? targetIdx : targetIdx + 1;
+    const destIdx =
+      insertBeforeIdx === dragIdx || insertBeforeIdx === dragIdx + 1
+        ? targetIdx
+        : insertBeforeIdx > dragIdx
+          ? insertBeforeIdx - 1
+          : insertBeforeIdx;
+
+    const getColAdvance = (col: HTMLElement): number => {
+      const r = col.getBoundingClientRect();
+      if (r.width > 0) return Math.round(r.width);
+      if (col.offsetWidth > 0) return col.offsetWidth;
+      const wRaw = col.getAttribute('width') || col.style.width || '';
+      const parsed = parseFloat(wRaw);
+      if (!isNaN(parsed) && parsed > 0) {
+        return wRaw.includes('%') ? Math.round(600 * (parsed / 100)) : Math.round(parsed);
+      }
+      return Math.round(600 / cols.length);
+    };
+
+    const dragWidth = getColAdvance(draggedCol);
+
+    cols.forEach((col, i) => {
+      col.classList.add('arch-col-displace-ready');
+      let dx = 0;
+      if (destIdx < dragIdx) {
+        if (i >= destIdx && i < dragIdx) {
+          // Displaced left column(s) slide to the RIGHT
+          dx = dragWidth;
+        } else if (i === dragIdx) {
+          // Dragged column slides to the LEFT
+          dx = -cols.slice(destIdx, dragIdx).reduce((sum, c) => sum + getColAdvance(c), 0);
+        }
+      } else if (destIdx > dragIdx) {
+        if (i > dragIdx && i <= destIdx) {
+          // Displaced right column(s) slide to the LEFT
+          dx = -dragWidth;
+        } else if (i === dragIdx) {
+          // Dragged column slides to the RIGHT
+          dx = cols.slice(dragIdx + 1, destIdx + 1).reduce((sum, c) => sum + getColAdvance(c), 0);
+        }
+      }
+
+      if (dx !== 0) {
+        col.style.transform = `translate3d(${dx}px, 0, 0)`;
+        col.dataset.archDisplaceX = `${dx}`;
+        col.dataset.archDisplaced = dx > 0 ? 'right' : 'left';
+      } else {
+        col.style.removeProperty('transform');
+        delete col.dataset.archDisplaceX;
+        delete col.dataset.archDisplaced;
+      }
+    });
+  }
+
+  /**
+   * Clears live column displacement transforms.
+   * - When `keepTransition = true` (e.g. pointer moved back to home slot), keeps `.arch-col-displace-ready`
+   *   so columns smoothly glide back to `0px`.
+   * - When `keepTransition = false` (e.g. on drop commit), removes transition classes and inline transforms immediately.
+   */
+  private clearColumnDisplacementPreview(keepTransition = false): void {
+    const ifrDoc = this.iframe.contentDocument;
+    if (!ifrDoc) return;
+    ifrDoc
+      .querySelectorAll<HTMLElement>('.arch-col-displace-ready, .arch-col-flip-invert, [data-arch-displaced]')
+      .forEach((col) => {
+        if (!keepTransition) {
+          col.classList.remove('arch-col-displace-ready', 'arch-col-flip-invert');
+        }
+        col.style.removeProperty('transform');
+        if (!col.getAttribute('style')?.trim()) {
+          col.removeAttribute('style');
+        }
+        delete col.dataset.archDisplaceX;
+        delete col.dataset.archDisplaced;
+      });
   }
 
   /**
@@ -643,6 +794,21 @@ export class Canvas {
       .arch-dragging-source {
         opacity: 0.35 !important;
         transition: opacity 0.12s ease !important;
+      }
+      .arch-col-displace-ready {
+        transition: transform 220ms cubic-bezier(0.2, 0, 0, 1) !important;
+        will-change: transform !important;
+        position: relative !important;
+      }
+      .arch-col-flip-invert {
+        transition: none !important;
+        position: relative !important;
+      }
+      .arch-dragging-source.arch-col-displace-ready {
+        opacity: 0.9 !important;
+        z-index: 10 !important;
+        pointer-events: none !important;
+        box-shadow: 0 8px 20px rgba(13, 153, 255, 0.22) !important;
       }
       .arch-drop-line-top {
         box-shadow: inset 0 3px 0 0 #0d99ff !important;
@@ -1146,6 +1312,16 @@ export class Canvas {
       this.selectUnit(unit, unit);
     }
 
+    const effectiveTarget = resolveEffectiveMoveUnit(unit);
+    const colsBefore = isColumnElement(effectiveTarget)
+      ? getMoveableSiblings(effectiveTarget).filter((c) => isColumnElement(c))
+      : [];
+    const oldLeftMap = new Map<HTMLElement, number>();
+    colsBefore.forEach((col) => {
+      const r = col.getBoundingClientRect();
+      if (r.width > 0) oldLeftMap.set(col, r.left);
+    });
+
     const snapshotBefore = this.getCleanHTML();
     const moved = moveUnit(unit, direction);
     if (moved) {
@@ -1155,6 +1331,28 @@ export class Canvas {
         return;
       }
       this.onStructureChanged();
+
+      // Play smooth FLIP transition when swapping columns via `◀` / `▶` buttons in a real browser
+      if (oldLeftMap.size >= 2) {
+        oldLeftMap.forEach((oldLeft, col) => {
+          const newLeft = col.getBoundingClientRect().left;
+          const deltaX = Math.round(oldLeft - newLeft);
+          if (Math.abs(deltaX) > 1) {
+            col.classList.remove('arch-col-displace-ready');
+            col.classList.add('arch-col-flip-invert');
+            col.style.transform = `translate3d(${deltaX}px, 0, 0)`;
+            requestAnimationFrame(() => {
+              col.classList.remove('arch-col-flip-invert');
+              col.classList.add('arch-col-displace-ready');
+              col.style.removeProperty('transform');
+              setTimeout(() => {
+                col.classList.remove('arch-col-displace-ready');
+                if (!col.getAttribute('style')?.trim()) col.removeAttribute('style');
+              }, 240);
+            });
+          }
+        });
+      }
     }
   }
 
@@ -1620,10 +1818,13 @@ export class Canvas {
     );
   }
 
-  private clearDropIndicators(): void {
+  private clearDropIndicators(keepDisplacementTransition = false, skipDisplacementClear = false): void {
     if (this.dropIndicatorEl) {
       this.dropIndicatorEl.remove();
       this.dropIndicatorEl = null;
+    }
+    if (!skipDisplacementClear) {
+      this.clearColumnDisplacementPreview(keepDisplacementTransition);
     }
     const ifrDoc = this.iframe.contentDocument;
     if (ifrDoc) {
