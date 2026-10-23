@@ -111,6 +111,7 @@ export class Canvas {
   private containerRectCache: DOMRect | null = null;
   private displaceKey = '';
   private dropMemoDragged: HTMLElement | null = null;
+  private slotRectCache = new Map<HTMLElement, { rect: DOMRect; scrollX: number; scrollY: number }>();
   private activeImageResize: {
     img: HTMLElement;
     unit: HTMLElement;
@@ -276,10 +277,19 @@ export class Canvas {
         if (enclosingCol && getMoveableSiblings(enclosingCol).length >= 2) {
           if (isRowElement(cand.unit) || enclosingCol.contains(cand.unit)) {
             cand.unit = enclosingCol;
-            this.selectUnit(cand.startTarget, enclosingCol);
           }
         }
+      } else {
+        // Vertical drag: escalate single-child inner units (`<p>`, `<td>`, or sole `table.*_block` / `table.row` in `<tr>`)
+        // to their effective moveable unit so `this.draggedUnit` matches the displaced unit.
+        const effective = resolveEffectiveMoveUnit(cand.unit);
+        if (effective && effective !== cand.unit) {
+          cand.unit = effective;
+        }
       }
+
+      this.selectUnit(cand.unit, cand.unit);
+      this.removeFloatingToolbar();
 
       // Threshold exceeded -> activate Figma Pointer Drag!
       cand.active = true;
@@ -424,7 +434,7 @@ export class Canvas {
 
     // Oscillation-free untransformed slot hit-testing during horizontal column drag:
     // Because displaced columns are visually translated via `transform: translate3d(dx, 0, 0)`,
-    // resolve the hovered column slot from each column's untransformed layout bounds (`rect.left - dx`).
+    // resolve the hovered column slot from each column's cached untransformed layout bounds.
     if (
       effectiveDragged &&
       isColumnElement(effectiveDragged) &&
@@ -432,11 +442,11 @@ export class Canvas {
       (effectiveDragged.parentElement.contains(rawTarget) || rawTarget.contains(effectiveDragged.parentElement))
     ) {
       const cols = getMoveableSiblings(effectiveDragged).filter((c) => isColumnElement(c));
-      if (cols.length >= 2 && cols[0].getBoundingClientRect().width > 0) {
+      this.cacheSiblingSlots(cols);
+      if (cols.length >= 2 && this.getSlotRect(cols[0]).width > 0) {
         const hitCol = cols.find((col) => {
-          const dx = parseFloat(col.dataset.archDisplaceX || '0') || 0;
-          const r = col.getBoundingClientRect();
-          return iframeRelativeX >= r.left - dx && iframeRelativeX <= r.right - dx;
+          const r = this.getSlotRect(col);
+          return iframeRelativeX >= r.left && iframeRelativeX <= r.right;
         });
         if (hitCol === effectiveDragged) {
           this.clearDropIndicators(true);
@@ -449,10 +459,11 @@ export class Canvas {
       }
     }
 
-    // Same for vertical drag (rows / blocks): hit-test the pointer against each sibling's untransformed slot.
+    // Same for vertical drag (rows / blocks): hit-test the pointer against each sibling's cached untransformed slot.
     if (effectiveDragged && !isColumnElement(effectiveDragged) && effectiveDragged.parentElement) {
-      const parentRect = effectiveDragged.parentElement.getBoundingClientRect();
       const peers = getMoveableSiblings(effectiveDragged);
+      this.cacheSiblingSlots(peers);
+      const parentRect = effectiveDragged.parentElement.getBoundingClientRect();
       if (
         peers.length >= 2 &&
         parentRect.width > 0 &&
@@ -471,6 +482,19 @@ export class Canvas {
           return;
         }
         if (hit) {
+          // Entry threshold on tall neighbors (`height >= 140px`): require crossing at least 15% (up to 24px)
+          // past the shared edge before flipping the slot, preventing 1px boundary jumps.
+          const r = this.getSlotRect(hit);
+          const sIdx = peers.indexOf(effectiveDragged);
+          const hIdx = peers.indexOf(hit);
+          if (hit !== this.hoveredDropTarget && r.height >= 140 && Math.abs(hIdx - sIdx) === 1) {
+            const margin = Math.min(24, r.height * 0.15);
+            const entered =
+              hIdx > sIdx ? iframeRelativeY >= r.top + margin : iframeRelativeY <= r.bottom - margin;
+            if (!entered) {
+              return;
+            }
+          }
           targetUnit = hit;
         } else if (this.hoveredDropTarget && peers.includes(this.hoveredDropTarget)) {
           return; // pointer in a gap between siblings: keep the current slot (no flicker)
@@ -529,33 +553,91 @@ export class Canvas {
     this.hoveredDropTarget = targetUnit;
     this.hoveredDropPosition = nextPosition;
 
-    if (
+    const isDisplacingSiblings = Boolean(
       effectiveDragged &&
-      effectiveDragged.parentElement === targetUnit.parentElement &&
-      isColumnElement(effectiveDragged) === isColumnElement(targetUnit)
-    ) {
+        effectiveDragged.parentElement === targetUnit.parentElement &&
+        isColumnElement(effectiveDragged) === isColumnElement(targetUnit)
+    );
+
+    if (isDisplacingSiblings && effectiveDragged) {
       this.applySiblingDisplacementPreview(effectiveDragged, targetUnit, this.hoveredDropPosition);
     } else {
       this.clearColumnDisplacementPreview(true);
-    }
-
-    if (isBefore) {
-      targetUnit.classList.add('arch-drop-line-top');
-    } else {
-      targetUnit.classList.add('arch-drop-line-bottom');
+      if (isBefore) {
+        targetUnit.classList.add('arch-drop-line-top');
+      } else {
+        targetUnit.classList.add('arch-drop-line-bottom');
+      }
     }
 
     this.renderFigmaDropIndicator(targetUnit, rect, isBefore, !!isHorizontal);
   }
 
   /**
-   * Layout rect of `el` with any live displacement transform (`data-arch-displace-x/y`) subtracted,
-   * so hit-testing and the insertion line always use the stable, untransformed slot (no oscillation).
+   * Snapshots the true untransformed `getBoundingClientRect()` of each sibling in `els`
+   * before any CSS transition/transform is applied, preventing mid-transition `getBoundingClientRect()` drift.
+   */
+  private cacheSiblingSlots(els: HTMLElement[]): void {
+    const win = this.iframe.contentWindow;
+    const scrollX = win?.scrollX || 0;
+    const scrollY = win?.scrollY || 0;
+    for (const el of els) {
+      if (this.slotRectCache.has(el)) continue;
+      if (el.dataset.archDisplaceX || el.dataset.archDisplaceY) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 || r.height > 0) {
+        this.slotRectCache.set(el, {
+          rect: {
+            left: r.left,
+            right: r.right,
+            top: r.top,
+            bottom: r.bottom,
+            width: r.width,
+            height: r.height,
+            x: r.left,
+            y: r.top,
+            toJSON: () => ({})
+          } as DOMRect,
+          scrollX,
+          scrollY
+        });
+      }
+    }
+  }
+
+  /**
+   * Untransformed layout slot rect of `el`.
+   * Uses `slotRectCache` so active 200ms CSS transitions never corrupt hit-testing or displacement distances.
    */
   private getSlotRect(el: HTMLElement): DOMRect {
+    const cached = this.slotRectCache.get(el);
+    if (cached) {
+      const win = this.iframe.contentWindow;
+      const dScrollX = (win?.scrollX || 0) - cached.scrollX;
+      const dScrollY = (win?.scrollY || 0) - cached.scrollY;
+      if (dScrollX === 0 && dScrollY === 0) {
+        return cached.rect;
+      }
+      return {
+        left: cached.rect.left - dScrollX,
+        right: cached.rect.right - dScrollX,
+        top: cached.rect.top - dScrollY,
+        bottom: cached.rect.bottom - dScrollY,
+        width: cached.rect.width,
+        height: cached.rect.height,
+        x: cached.rect.left - dScrollX,
+        y: cached.rect.top - dScrollY,
+        toJSON: () => ({})
+      } as DOMRect;
+    }
+
     const r = el.getBoundingClientRect();
     const dx = parseFloat(el.dataset.archDisplaceX || '0') || 0;
     const dy = parseFloat(el.dataset.archDisplaceY || '0') || 0;
+    if (!dx && !dy && (r.width > 0 || r.height > 0)) {
+      this.cacheSiblingSlots([el]);
+      return r;
+    }
     if ((!dx && !dy) || (r.width <= 0 && r.height <= 0)) return r;
     return {
       left: r.left - dx,
@@ -571,7 +653,7 @@ export class Canvas {
    * Figma Auto-Layout style live displacement of same-parent siblings while dragging
    * (`transform: translate3d`, GPU-composited, 200ms ease):
    * - Columns move horizontally (axis `x`); Rows / Blocks move vertically (axis `y`).
-   * - Dragging toward the start slides the bypassed siblings forward (`+d`); toward the end, backward (`-d`).
+   * - Uses cached untransformed slot endpoints so items of unequal heights/widths never drift or overshoot.
    */
   private applySiblingDisplacementPreview(
     dragged: HTMLElement,
@@ -599,42 +681,58 @@ export class Canvas {
     if (this.displaceKey === key) return;
     this.displaceKey = key;
 
-    // Distance one item occupies along the axis, including the gap that follows it.
-    const advance = (i: number): number => {
-      const el = items[i];
-      const r = this.getSlotRect(el);
-      if (axis === 'x') {
-        if (r.width > 0) return Math.round(r.width);
-        if (el.offsetWidth > 0) return el.offsetWidth;
-        const wRaw = el.getAttribute('width') || el.style.width || '';
-        const parsed = parseFloat(wRaw);
-        if (!isNaN(parsed) && parsed > 0) {
-          return wRaw.includes('%') ? Math.round(600 * (parsed / 100)) : Math.round(parsed);
-        }
-        return Math.round(600 / items.length);
-      }
-      if (items[i + 1]) return Math.round(this.getSlotRect(items[i + 1]).top - r.top);
-      const gapBefore = items[i - 1] ? r.top - this.getSlotRect(items[i - 1]).bottom : 0;
-      return Math.round(r.height + gapBefore);
-    };
+    // 1. Snapshot all sibling slots BEFORE touching any transform/dataset attributes
+    this.cacheSiblingSlots(items);
+    const slots = items.map((el) => this.getSlotRect(el));
+    const hasGeometry = axis === 'x' ? slots[dragIdx].width > 0 : slots[dragIdx].height > 0;
 
-    const dragSize = advance(dragIdx);
-    const sumAdvance = (from: number, to: number): number => {
-      let sum = 0;
-      for (let i = from; i < to; i++) sum += advance(i);
-      return sum;
-    };
+    let bypassedDelta = 0;
+    let draggedDelta = 0;
+
+    if (hasGeometry) {
+      const startOf = (s: DOMRect) => (axis === 'x' ? s.left : s.top);
+      const endOf = (s: DOMRect) => (axis === 'x' ? s.right : s.bottom);
+      if (destIdx < dragIdx) {
+        bypassedDelta = Math.round(endOf(slots[dragIdx]) - endOf(slots[dragIdx - 1]));
+        draggedDelta = Math.round(startOf(slots[destIdx]) - startOf(slots[dragIdx]));
+      } else {
+        bypassedDelta = Math.round(startOf(slots[dragIdx]) - startOf(slots[dragIdx + 1]));
+        draggedDelta = Math.round(endOf(slots[destIdx]) - endOf(slots[dragIdx]));
+      }
+    } else {
+      // Fallback for zero-layout environments (e.g. jsdom without mocked rects)
+      const fallbackAdvance = (el: HTMLElement): number => {
+        if (axis === 'x') {
+          if (el.offsetWidth > 0) return el.offsetWidth;
+          const wRaw = el.getAttribute('width') || el.style.width || '';
+          const parsed = parseFloat(wRaw);
+          if (!isNaN(parsed) && parsed > 0) {
+            return wRaw.includes('%') ? Math.round(600 * (parsed / 100)) : Math.round(parsed);
+          }
+          return Math.round(600 / items.length);
+        }
+        return el.offsetHeight || 60;
+      };
+      const dragSize = fallbackAdvance(dragged);
+      if (destIdx < dragIdx) {
+        bypassedDelta = dragSize;
+        draggedDelta = -items.slice(destIdx, dragIdx).reduce((s, c) => s + fallbackAdvance(c), 0);
+      } else {
+        bypassedDelta = -dragSize;
+        draggedDelta = items.slice(dragIdx + 1, destIdx + 1).reduce((s, c) => s + fallbackAdvance(c), 0);
+      }
+    }
 
     items.forEach((el, i) => {
       el.classList.add('arch-col-displace-ready');
       let d = 0;
       if (destIdx < dragIdx) {
-        if (i >= destIdx && i < dragIdx) d = dragSize;
-        else if (i === dragIdx) d = -sumAdvance(destIdx, dragIdx);
+        if (i >= destIdx && i < dragIdx) d = bypassedDelta;
+        else if (i === dragIdx) d = draggedDelta;
       } else if (i > dragIdx && i <= destIdx) {
-        d = -dragSize;
+        d = bypassedDelta;
       } else if (i === dragIdx) {
-        d = sumAdvance(dragIdx + 1, destIdx + 1);
+        d = draggedDelta;
       }
 
       delete el.dataset.archDisplaceX;
@@ -658,6 +756,9 @@ export class Canvas {
    */
   private clearColumnDisplacementPreview(keepTransition = false): void {
     this.displaceKey = '';
+    if (!keepTransition) {
+      this.slotRectCache.clear();
+    }
     const ifrDoc = this.iframe.contentDocument;
     if (!ifrDoc) return;
     ifrDoc
@@ -1945,19 +2046,36 @@ export class Canvas {
     if (!ifrDoc || !ifrDoc.body) return;
 
     const refUnit = targetElement || this.activeMoveableUnit;
-    const enclosingRow = refUnit?.closest<HTMLElement>('table.row, section');
+    const rawRow =
+      refUnit?.closest<HTMLElement>('table.row, section') ||
+      (refUnit ? resolveEffectiveMoveUnit(refUnit) : null);
+    const effectiveRow =
+      rawRow && (isRowElement(rawRow) || rawRow.tagName.toLowerCase() === 'tr')
+        ? resolveEffectiveMoveUnit(rawRow)
+        : null;
 
-    if (enclosingRow && enclosingRow.parentElement) {
-      const parentTag = enclosingRow.parentElement.tagName.toLowerCase();
+    if (effectiveRow && effectiveRow.parentElement && effectiveRow !== ifrDoc.body) {
+      const parentTag = effectiveRow.parentElement.tagName.toLowerCase();
       const wrapInTr = parentTag === 'tbody' || parentTag === 'table';
       const html = buildRowLayoutHtml(layout, wrapInTr);
-      enclosingRow.insertAdjacentHTML('afterend', html);
+      effectiveRow.insertAdjacentHTML('afterend', html);
     } else {
-      const container = findPrimaryContentContainer(ifrDoc);
-      const containerTag = container.tagName.toLowerCase();
-      const wrapInTr = containerTag === 'tbody' || containerTag === 'table';
-      const html = buildRowLayoutHtml(layout, wrapInTr);
-      container.insertAdjacentHTML('beforeend', html);
+      const existingRows = ifrDoc.body.querySelectorAll<HTMLElement>('table.row, section');
+      if (existingRows.length > 0) {
+        const lastRow = resolveEffectiveMoveUnit(existingRows[existingRows.length - 1]);
+        const parentTag = lastRow.parentElement?.tagName.toLowerCase() || 'td';
+        const wrapInTr = parentTag === 'tbody' || parentTag === 'table';
+        lastRow.insertAdjacentHTML('afterend', buildRowLayoutHtml(layout, wrapInTr));
+      } else {
+        const container = findPrimaryContentContainer(ifrDoc);
+        const rowContainer = isColumnElement(container)
+          ? (container.closest('table.row')?.parentElement as HTMLElement) || ifrDoc.body
+          : container;
+        const containerTag = rowContainer.tagName.toLowerCase();
+        const wrapInTr = containerTag === 'tbody' || containerTag === 'table';
+        const html = buildRowLayoutHtml(layout, wrapInTr);
+        rowContainer.insertAdjacentHTML('beforeend', html);
+      }
     }
 
     this.onStructureChanged();

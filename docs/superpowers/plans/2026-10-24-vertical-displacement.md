@@ -1,31 +1,10 @@
-# Figma-style Vertical Displacement Implementation Plan
+# Figma-style Vertical & Horizontal Displacement — Root-Cause Audit & Fix Plan
 
-**Goal:** Rows and blocks slide smoothly up/down while dragging (like columns do left/right), and ▲▼◀▶ button moves glide instead of snapping.
+**Goal:** Eliminate the "items look so far during vertical drag" bug and make all vertical/horizontal drag & button movements smooth, accurate, and oscillation-free across every email template structure.
 
-**Architecture:** One axis-generic `applySiblingDisplacementPreview` (x for columns, y for rows/blocks) in `Canvas.ts`. Displacement is stored in `data-arch-displace-x|y`; `getSlotRect` subtracts it so hit-testing and the insertion line always use the stable untransformed slot (no oscillation). Existing perf guards (rAF, slot memo) apply unchanged.
-
-**Spec:** user request 2026-10-24 ("vertical movement ... figma like").
-
-## Global Constraints
-- Transitions: `200ms cubic-bezier(0.2, 0, 0, 1)`, `transform` only (GPU).
-- Export (`serializeCleanDocument`) must contain no `transform`, `data-arch-displace*`, `arch-col-*`.
-- No new dependencies.
-
-## Review Focus
-- Pointer in the gap between siblings: keep the current slot (no flicker).
-- Pointer back on the dragged item's home slot: everything glides home.
-- Unequal heights / gaps: advance = next-top − top (gap included).
-- Cross-container drops (different parent): no displacement, only the insertion line.
-- Mid-drag export / drop: clean HTML, no leftover inline transform.
-
-### Task 1: Vertical displacement
-**Files:** Modify `src/components/Canvas.ts`, `src/engine/sanitize.ts`; Test `tests/layout-engine.test.ts`
-**Produces:** `getSlotRect(el)`, `applySiblingDisplacementPreview(dragged, target, position)`
-
-- [x] Failing test: `slides sibling rows/blocks vertically ... cleans up on drop & export`
-- [x] Generalize column displacement to both axes, add vertical slot hit-test with gap hold
-- [x] Strip `data-arch-displace-y` on export
-- [x] `npm test && npm run build`
-
-### Task 2: FLIP for ▲▼◀▶
-- [x] Snapshot all moveable siblings' left/top in `moveSelectedElement`, invert → reflow → play
+## Root-Cause Audit & Fixes
+1. **Mid-Transition `getBoundingClientRect()` Corruption:** Cache untransformed sibling slot rects in `slotRectCache` before applying `translate3d` transforms; compute displacements from exact cached slot endpoints (`slot(destIdx).start - slot(dragIdx).start` and `slot(dragIdx).end - slot(dragIdx - 1).end`).
+2. **Dual Drop Lines & Destination Slot Alignment:** Omit `.arch-drop-line-top/bottom` on sliding siblings and place `.arch-figma-drop-indicator` at the true destination slot edge.
+3. **Directional Entry Threshold & Hysteresis:** Prevent 1px boundary jumps when touching a tall sibling row.
+4. **`draggedUnit` Escalation & HUD Cleanup:** Escalate `draggedUnit` to `resolveEffectiveMoveUnit` and hide floating toolbar/handles while dragging.
+5. **`<tr>` Wrapper Escalation & Row Insertion:** Allow `resolveEffectiveMoveUnit` and `resolveCompatibleDropTarget` to climb to multi-row `<tr>` wrappers, and prevent `insertRowLayout` from inserting 600px rows inside a narrow `td.column`.

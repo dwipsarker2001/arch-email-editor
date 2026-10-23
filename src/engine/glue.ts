@@ -230,7 +230,13 @@ export function resolveEffectiveMoveUnit(unit: HTMLElement): HTMLElement {
 
   let cursor: HTMLElement | null = unit.parentElement;
   while (cursor && cursor.tagName && cursor.tagName.toLowerCase() !== 'body' && cursor.tagName.toLowerCase() !== 'html') {
-    if (isColumnElement(cursor) || isRowElement(cursor)) {
+    const cTag = cursor.tagName.toLowerCase();
+    const isTableRowInMultiRowBody =
+      cTag === 'tr' &&
+      (cursor.parentElement?.tagName.toLowerCase() === 'tbody' ||
+        cursor.parentElement?.tagName.toLowerCase() === 'table') &&
+      !cursor.closest('table.row');
+    if (isColumnElement(cursor) || isRowElement(cursor) || isTableRowInMultiRowBody) {
       const peers = getMoveableSiblings(cursor);
       if (peers.length > 1) {
         return cursor;
@@ -330,11 +336,33 @@ export function resolveCompatibleDropTarget(
 
   // 1. If explicitly dragging a Row (`table.row`), target the hovered Row
   if (isRowElement(draggedUnit)) {
+    const effectiveRow = resolveEffectiveMoveUnit(draggedUnit);
+    if (effectiveRow.tagName.toLowerCase() === 'tr' && effectiveRow.parentElement) {
+      let cur: HTMLElement | null = rawTarget;
+      while (cur && cur.parentElement && cur.parentElement !== effectiveRow.parentElement) {
+        cur = cur.parentElement;
+      }
+      if (cur && cur.parentElement === effectiveRow.parentElement && cur !== effectiveRow) {
+        return cur;
+      }
+    }
     const targetRow = rawTarget.closest<HTMLElement>('table.row, section') || resolveUnit(rawTarget);
     if (targetRow && targetRow !== draggedUnit && !draggedUnit.contains(targetRow)) {
       return targetRow;
     }
     return null;
+  }
+
+  // 1b. If dragging a `<tr>` row inside a multi-row `<tbody>`/`<table>` (e.g. Default Template or 2-Column Sample),
+  //     always resolve `rawTarget` to the sibling `<tr>` in that same `<tbody>` (even when hovering nested button/grid tables).
+  if (draggedUnit.tagName.toLowerCase() === 'tr' && draggedUnit.parentElement) {
+    let cur: HTMLElement | null = rawTarget;
+    while (cur && cur.parentElement && cur.parentElement !== draggedUnit.parentElement) {
+      cur = cur.parentElement;
+    }
+    if (cur && cur.parentElement === draggedUnit.parentElement && cur !== draggedUnit) {
+      return cur;
+    }
   }
 
   // 2. If explicitly dragging a Column (`td.column` or multi-cell `<td>`), target a sibling/peer Column
@@ -414,6 +442,15 @@ export function moveUnitToTarget(
   position: 'before' | 'after'
 ): boolean {
   if (!sourceUnit || !targetUnit || sourceUnit === targetUnit) return false;
+
+  // If sourceUnit is a Row (e.g., a multi-column `<tr>` or `table.row` wrapped in `<tr><td>`) and targetUnit is a `<tr>` in `<tbody>`,
+  // escalate sourceUnit to its enclosing `<tr>` sibling so they reorder at the `<tbody>` level.
+  if (isRowElement(sourceUnit) && sourceUnit.parentElement !== targetUnit.parentElement) {
+    const effSource = resolveEffectiveMoveUnit(sourceUnit);
+    if (effSource.parentElement && effSource.parentElement === targetUnit.parentElement) {
+      sourceUnit = effSource;
+    }
+  }
 
   // If targetUnit is a Row (`table.row`) and sourceUnit is a Block inside another Row,
   // check if sourceUnit is the sole block of its Row -> move the entire Row!

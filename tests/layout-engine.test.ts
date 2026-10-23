@@ -1160,4 +1160,88 @@ describe('Figma vertical displacement', () => {
     expect(r1.style.transform).toBe('');
     editor.destroy();
   });
+
+  it('never inflates vertical displacement when getBoundingClientRect is mid-transition across unequal-height rows and supports <tr>-wrapped rows', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+
+    editor.importHTML(`<!DOCTYPE html>
+<html><body>
+  <table class="nl-container" width="100%"><tbody><tr><td>
+    <table class="row row-1" width="100%"><tbody><tr><td><p>Header (100px)</p></td></tr></tbody></table>
+    <table class="row row-2" width="100%"><tbody><tr><td><p>Hero (300px)</p></td></tr></tbody></table>
+    <table class="row row-3" width="100%"><tbody><tr><td><p>Footer (120px)</p></td></tr></tbody></table>
+  </td></tr></tbody></table>
+</body></html>`);
+
+    const ifrDoc = (container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement).contentDocument!;
+    const [r1, r2, r3] = ['row-1', 'row-2', 'row-3'].map((c) => ifrDoc.querySelector(`.${c}`) as HTMLElement);
+    const canvas = (editor as any).canvas;
+
+    // Simulate a real browser mid-transition: at t=20ms of a 200ms transition, getBoundingClientRect().top
+    // only reflects 15% of the target transform (`dy * 0.15`), NOT 100% of `dy`!
+    const naturalLayout = [
+      { top: 0, height: 100 },
+      { top: 100, height: 300 },
+      { top: 400, height: 120 }
+    ];
+    [r1, r2, r3].forEach((el, i) => {
+      el.getBoundingClientRect = () => {
+        const dy = parseFloat(el.dataset.archDisplaceY || '0') || 0;
+        const inFlightDy = dy * 0.15;
+        const top = naturalLayout[i].top + inFlightDy;
+        return {
+          left: 0,
+          right: 600,
+          width: 600,
+          height: naturalLayout[i].height,
+          top,
+          bottom: top + naturalLayout[i].height
+        } as DOMRect;
+      };
+    });
+    r1.parentElement!.getBoundingClientRect = () =>
+      ({ left: 0, right: 600, width: 600, height: 520, top: 0, bottom: 520 }) as DOMRect;
+
+    // Step 1: Drag r3 (120px tall, at top=400) up onto r2 (300px tall, at top=100)
+    canvas.draggedUnit = r3;
+    canvas.updateDropTargetForElement(r2, 40, 200);
+    expect(r2.style.transform).toBe('translate3d(0, 120px, 0)');
+    expect(r3.style.transform).toBe('translate3d(0, -300px, 0)');
+
+    // Step 2: While r2 and r3 are only 15% through their CSS transition, move pointer up onto r1 (at y=30)!
+    // Displacement must remain exact (+120px for r1 & r2, -400px for r3) and NEVER inflate/fly far away!
+    canvas.updateDropTargetForElement(r1, 40, 30);
+    expect(r1.style.transform).toBe('translate3d(0, 120px, 0)');
+    expect(r2.style.transform).toBe('translate3d(0, 120px, 0)');
+    expect(r3.style.transform).toBe('translate3d(0, -400px, 0)');
+    // Displaced target must not show duplicate inset box-shadow line while sliding
+    expect(r1.classList.contains('arch-drop-line-top')).toBe(false);
+
+    // Step 3: Verify single-table `<tr>`-wrapped multi-column rows (like examples/index.html) escalate to `<tr>` and reorder cleanly
+    editor.importHTML(`<!DOCTYPE html>
+<html><body>
+  <table width="100%"><tr><td>
+    <table width="600"><tbody>
+      <tr class="tr-header"><td><h1>Header</h1></td></tr>
+      <tr class="tr-grid"><td>
+        <table width="100%"><tr>
+          <td class="responsive-col" width="270"><h3>Left</h3></td>
+          <td width="20"></td>
+          <td class="responsive-col" width="270"><h3>Right</h3></td>
+        </tr></table>
+      </td></tr>
+      <tr class="tr-footer"><td><p>Footer</p></td></tr>
+    </tbody></table>
+  </td></tr></table>
+</body></html>`);
+    const trHeader = ifrDoc.querySelector('tr.tr-header') as HTMLElement;
+    const trGrid = ifrDoc.querySelector('tr.tr-grid') as HTMLElement;
+    const innerGridRow = trGrid.querySelector('table tr') as HTMLElement;
+    expect(moveUnitToTarget(innerGridRow, trHeader, 'before')).toBe(true);
+    expect(Array.from(trHeader.parentElement!.children)[0]).toBe(trGrid);
+
+    editor.destroy();
+  });
 });
