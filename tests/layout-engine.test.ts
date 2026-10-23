@@ -1102,3 +1102,62 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     editor.destroy();
   });
 });
+
+describe('Figma vertical displacement', () => {
+  it('slides sibling rows/blocks vertically during up/down drag, ignores displaced geometry when hit-testing, and cleans up on drop & export', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+
+    editor.importHTML(`<!DOCTYPE html>
+<html><body>
+  <table class="nl-container" width="100%"><tbody><tr><td>
+    <table class="row row-1" width="100%"><tbody><tr><td><p>One</p></td></tr></tbody></table>
+    <table class="row row-2" width="100%"><tbody><tr><td><p>Two</p></td></tr></tbody></table>
+    <table class="row row-3" width="100%"><tbody><tr><td><p>Three</p></td></tr></tbody></table>
+  </td></tr></tbody></table>
+</body></html>`);
+
+    const ifrDoc = (container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement).contentDocument!;
+    const [r1, r2, r3] = ['row-1', 'row-2', 'row-3'].map((c) => ifrDoc.querySelector(`.${c}`) as HTMLElement);
+    const canvas = (editor as any).canvas;
+
+    // jsdom has no layout: three 100px-tall rows stacked at 0/100/200, rects follow the live displacement
+    [r1, r2, r3].forEach((el, i) => {
+      el.getBoundingClientRect = () => {
+        const dy = parseFloat(el.dataset.archDisplaceY || '0') || 0;
+        return { left: 0, right: 600, width: 600, height: 100, top: i * 100 + dy, bottom: i * 100 + 100 + dy } as DOMRect;
+      };
+    });
+    r1.parentElement!.getBoundingClientRect = () =>
+      ({ left: 0, right: 600, width: 600, height: 300, top: 0, bottom: 300 }) as DOMRect;
+
+    // Drag row-3 up onto row-1: rows 1 & 2 slide DOWN 100px, row-3 slides UP 200px
+    canvas.draggedUnit = r3;
+    canvas.updateDropTargetForElement(r1, 40, 20);
+    expect(r1.dataset.archDisplaced).toBe('down');
+    expect(r1.style.transform).toBe('translate3d(0, 100px, 0)');
+    expect(r2.style.transform).toBe('translate3d(0, 100px, 0)');
+    expect(r3.dataset.archDisplaced).toBe('up');
+    expect(r3.style.transform).toBe('translate3d(0, -200px, 0)');
+
+    // Pointer now sits over displaced row-2 geometry (y=150 is row-2's untransformed slot) -> hit-test uses slots, no oscillation
+    canvas.updateDropTargetForElement(r1, 40, 150);
+    expect(canvas.hoveredDropTarget).toBe(r2);
+
+    // Back over its own home slot: everything glides home
+    canvas.updateDropTargetForElement(r3, 40, 250);
+    expect(r1.style.transform).toBe('');
+    expect(r3.style.transform).toBe('');
+
+    canvas.updateDropTargetForElement(r1, 40, 20);
+    const exported = editor.getHTML();
+    expect(exported).not.toContain('translate3d');
+    expect(exported).not.toContain('data-arch-displace');
+
+    canvas.executeDrop('arch-move-unit');
+    expect(Array.from(ifrDoc.querySelectorAll('table.row'))).toEqual([r3, r1, r2]);
+    expect(r1.style.transform).toBe('');
+    editor.destroy();
+  });
+});

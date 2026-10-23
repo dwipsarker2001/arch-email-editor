@@ -449,6 +449,35 @@ export class Canvas {
       }
     }
 
+    // Same for vertical drag (rows / blocks): hit-test the pointer against each sibling's untransformed slot.
+    if (effectiveDragged && !isColumnElement(effectiveDragged) && effectiveDragged.parentElement) {
+      const parentRect = effectiveDragged.parentElement.getBoundingClientRect();
+      const peers = getMoveableSiblings(effectiveDragged);
+      if (
+        peers.length >= 2 &&
+        parentRect.width > 0 &&
+        iframeRelativeX >= parentRect.left &&
+        iframeRelativeX <= parentRect.right &&
+        iframeRelativeY >= parentRect.top &&
+        iframeRelativeY <= parentRect.bottom
+      ) {
+        const hit = peers.find((p) => {
+          const r = this.getSlotRect(p);
+          return iframeRelativeY >= r.top && iframeRelativeY <= r.bottom;
+        });
+        if (hit === effectiveDragged) {
+          this.clearDropIndicators(true);
+          this.hoveredDropTarget = null;
+          return;
+        }
+        if (hit) {
+          targetUnit = hit;
+        } else if (this.hoveredDropTarget && peers.includes(this.hoveredDropTarget)) {
+          return; // pointer in a gap between siblings: keep the current slot (no flicker)
+        }
+      }
+    }
+
     if (
       !targetUnit ||
       targetUnit === this.draggedUnit ||
@@ -465,19 +494,7 @@ export class Canvas {
       return;
     }
 
-    const targetDx = parseFloat(targetUnit.dataset.archDisplaceX || '0') || 0;
-    const rawRect = targetUnit.getBoundingClientRect();
-    const rect =
-      targetDx !== 0 && rawRect.width > 0
-        ? ({
-            left: rawRect.left - targetDx,
-            right: rawRect.right - targetDx,
-            top: rawRect.top,
-            bottom: rawRect.bottom,
-            width: rawRect.width,
-            height: rawRect.height
-          } as DOMRect)
-        : rawRect;
+    const rect = this.getSlotRect(targetUnit);
 
     const isHorizontal = isColumnElement(targetUnit) && effectiveDragged && isColumnElement(effectiveDragged);
     let isBefore = isHorizontal
@@ -512,8 +529,12 @@ export class Canvas {
     this.hoveredDropTarget = targetUnit;
     this.hoveredDropPosition = nextPosition;
 
-    if (isHorizontal && effectiveDragged && effectiveDragged.parentElement === targetUnit.parentElement) {
-      this.applyColumnDisplacementPreview(effectiveDragged, targetUnit, this.hoveredDropPosition);
+    if (
+      effectiveDragged &&
+      effectiveDragged.parentElement === targetUnit.parentElement &&
+      isColumnElement(effectiveDragged) === isColumnElement(targetUnit)
+    ) {
+      this.applySiblingDisplacementPreview(effectiveDragged, targetUnit, this.hoveredDropPosition);
     } else {
       this.clearColumnDisplacementPreview(true);
     }
@@ -528,19 +549,39 @@ export class Canvas {
   }
 
   /**
-   * Smoothly animates sibling columns in a 2-column or 3-column row (`transform: translate3d(dx, 0, 0)`)
-   * as the user drags a column left or right:
-   * - Dragging a column to the LEFT (`destIdx < dragIdx`) slides the left column(s) to the RIGHT (`+dx`).
-   * - Dragging a column to the RIGHT (`destIdx > dragIdx`) slides the right column(s) to the LEFT (`-dx`).
+   * Layout rect of `el` with any live displacement transform (`data-arch-displace-x/y`) subtracted,
+   * so hit-testing and the insertion line always use the stable, untransformed slot (no oscillation).
    */
-  private applyColumnDisplacementPreview(
-    draggedCol: HTMLElement,
-    targetCol: HTMLElement,
+  private getSlotRect(el: HTMLElement): DOMRect {
+    const r = el.getBoundingClientRect();
+    const dx = parseFloat(el.dataset.archDisplaceX || '0') || 0;
+    const dy = parseFloat(el.dataset.archDisplaceY || '0') || 0;
+    if ((!dx && !dy) || (r.width <= 0 && r.height <= 0)) return r;
+    return {
+      left: r.left - dx,
+      right: r.right - dx,
+      top: r.top - dy,
+      bottom: r.bottom - dy,
+      width: r.width,
+      height: r.height
+    } as DOMRect;
+  }
+
+  /**
+   * Figma Auto-Layout style live displacement of same-parent siblings while dragging
+   * (`transform: translate3d`, GPU-composited, 200ms ease):
+   * - Columns move horizontally (axis `x`); Rows / Blocks move vertically (axis `y`).
+   * - Dragging toward the start slides the bypassed siblings forward (`+d`); toward the end, backward (`-d`).
+   */
+  private applySiblingDisplacementPreview(
+    dragged: HTMLElement,
+    target: HTMLElement,
     position: 'before' | 'after'
   ): void {
-    const cols = getMoveableSiblings(draggedCol).filter((c) => isColumnElement(c));
-    const dragIdx = cols.indexOf(draggedCol);
-    const targetIdx = cols.indexOf(targetCol);
+    const axis: 'x' | 'y' = isColumnElement(dragged) ? 'x' : 'y';
+    const items = getMoveableSiblings(dragged).filter((c) => axis === 'y' || isColumnElement(c));
+    const dragIdx = items.indexOf(dragged);
+    const targetIdx = items.indexOf(target);
     if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) {
       this.clearColumnDisplacementPreview(true);
       return;
@@ -554,61 +595,65 @@ export class Canvas {
           ? insertBeforeIdx - 1
           : insertBeforeIdx;
 
-    const getColAdvance = (col: HTMLElement): number => {
-      const r = col.getBoundingClientRect();
-      if (r.width > 0) return Math.round(r.width);
-      if (col.offsetWidth > 0) return col.offsetWidth;
-      const wRaw = col.getAttribute('width') || col.style.width || '';
-      const parsed = parseFloat(wRaw);
-      if (!isNaN(parsed) && parsed > 0) {
-        return wRaw.includes('%') ? Math.round(600 * (parsed / 100)) : Math.round(parsed);
-      }
-      return Math.round(600 / cols.length);
-    };
-
-    const key = `${dragIdx}:${destIdx}`;
+    const key = `${axis}:${dragIdx}:${destIdx}`;
     if (this.displaceKey === key) return;
     this.displaceKey = key;
 
-    const dragWidth = getColAdvance(draggedCol);
+    // Distance one item occupies along the axis, including the gap that follows it.
+    const advance = (i: number): number => {
+      const el = items[i];
+      const r = this.getSlotRect(el);
+      if (axis === 'x') {
+        if (r.width > 0) return Math.round(r.width);
+        if (el.offsetWidth > 0) return el.offsetWidth;
+        const wRaw = el.getAttribute('width') || el.style.width || '';
+        const parsed = parseFloat(wRaw);
+        if (!isNaN(parsed) && parsed > 0) {
+          return wRaw.includes('%') ? Math.round(600 * (parsed / 100)) : Math.round(parsed);
+        }
+        return Math.round(600 / items.length);
+      }
+      if (items[i + 1]) return Math.round(this.getSlotRect(items[i + 1]).top - r.top);
+      const gapBefore = items[i - 1] ? r.top - this.getSlotRect(items[i - 1]).bottom : 0;
+      return Math.round(r.height + gapBefore);
+    };
 
-    cols.forEach((col, i) => {
-      col.classList.add('arch-col-displace-ready');
-      let dx = 0;
+    const dragSize = advance(dragIdx);
+    const sumAdvance = (from: number, to: number): number => {
+      let sum = 0;
+      for (let i = from; i < to; i++) sum += advance(i);
+      return sum;
+    };
+
+    items.forEach((el, i) => {
+      el.classList.add('arch-col-displace-ready');
+      let d = 0;
       if (destIdx < dragIdx) {
-        if (i >= destIdx && i < dragIdx) {
-          // Displaced left column(s) slide to the RIGHT
-          dx = dragWidth;
-        } else if (i === dragIdx) {
-          // Dragged column slides to the LEFT
-          dx = -cols.slice(destIdx, dragIdx).reduce((sum, c) => sum + getColAdvance(c), 0);
-        }
-      } else if (destIdx > dragIdx) {
-        if (i > dragIdx && i <= destIdx) {
-          // Displaced right column(s) slide to the LEFT
-          dx = -dragWidth;
-        } else if (i === dragIdx) {
-          // Dragged column slides to the RIGHT
-          dx = cols.slice(dragIdx + 1, destIdx + 1).reduce((sum, c) => sum + getColAdvance(c), 0);
-        }
+        if (i >= destIdx && i < dragIdx) d = dragSize;
+        else if (i === dragIdx) d = -sumAdvance(destIdx, dragIdx);
+      } else if (i > dragIdx && i <= destIdx) {
+        d = -dragSize;
+      } else if (i === dragIdx) {
+        d = sumAdvance(dragIdx + 1, destIdx + 1);
       }
 
-      if (dx !== 0) {
-        col.style.transform = `translate3d(${dx}px, 0, 0)`;
-        col.dataset.archDisplaceX = `${dx}`;
-        col.dataset.archDisplaced = dx > 0 ? 'right' : 'left';
+      delete el.dataset.archDisplaceX;
+      delete el.dataset.archDisplaceY;
+      if (d !== 0) {
+        el.style.transform = axis === 'x' ? `translate3d(${d}px, 0, 0)` : `translate3d(0, ${d}px, 0)`;
+        el.dataset[axis === 'x' ? 'archDisplaceX' : 'archDisplaceY'] = `${d}`;
+        el.dataset.archDisplaced = axis === 'x' ? (d > 0 ? 'right' : 'left') : d > 0 ? 'down' : 'up';
       } else {
-        col.style.removeProperty('transform');
-        delete col.dataset.archDisplaceX;
-        delete col.dataset.archDisplaced;
+        el.style.removeProperty('transform');
+        delete el.dataset.archDisplaced;
       }
     });
   }
 
   /**
-   * Clears live column displacement transforms.
+   * Clears live displacement transforms.
    * - When `keepTransition = true` (e.g. pointer moved back to home slot), keeps `.arch-col-displace-ready`
-   *   so columns smoothly glide back to `0px`.
+   *   so items smoothly glide back to `0px`.
    * - When `keepTransition = false` (e.g. on drop commit), removes transition classes and inline transforms immediately.
    */
   private clearColumnDisplacementPreview(keepTransition = false): void {
@@ -626,6 +671,7 @@ export class Canvas {
           col.removeAttribute('style');
         }
         delete col.dataset.archDisplaceX;
+        delete col.dataset.archDisplaceY;
         delete col.dataset.archDisplaced;
       });
   }
@@ -1344,13 +1390,11 @@ export class Canvas {
     }
 
     const effectiveTarget = resolveEffectiveMoveUnit(unit);
-    const colsBefore = isColumnElement(effectiveTarget)
-      ? getMoveableSiblings(effectiveTarget).filter((c) => isColumnElement(c))
-      : [];
-    const oldLeftMap = new Map<HTMLElement, number>();
-    colsBefore.forEach((col) => {
-      const r = col.getBoundingClientRect();
-      if (r.width > 0) oldLeftMap.set(col, r.left);
+    // FLIP snapshot of every sibling (rows, blocks and columns) so ▲ ▼ ◀ ▶ moves glide instead of snapping
+    const oldPos = new Map<HTMLElement, { left: number; top: number }>();
+    getMoveableSiblings(effectiveTarget).forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 || r.height > 0) oldPos.set(el, { left: r.left, top: r.top });
     });
 
     const snapshotBefore = this.getCleanHTML();
@@ -1363,25 +1407,24 @@ export class Canvas {
       }
       this.onStructureChanged();
 
-      // Play smooth FLIP transition when swapping columns via `◀` / `▶` buttons in a real browser
-      if (oldLeftMap.size >= 2) {
-        oldLeftMap.forEach((oldLeft, col) => {
-          const newLeft = col.getBoundingClientRect().left;
-          const deltaX = Math.round(oldLeft - newLeft);
-          if (Math.abs(deltaX) > 1) {
-            col.classList.remove('arch-col-displace-ready');
-            col.classList.add('arch-col-flip-invert');
-            col.style.transform = `translate3d(${deltaX}px, 0, 0)`;
-            requestAnimationFrame(() => {
-              col.classList.remove('arch-col-flip-invert');
-              col.classList.add('arch-col-displace-ready');
-              col.style.removeProperty('transform');
-              setTimeout(() => {
-                col.classList.remove('arch-col-displace-ready');
-                if (!col.getAttribute('style')?.trim()) col.removeAttribute('style');
-              }, 240);
-            });
-          }
+      // Play smooth FLIP transition (Invert -> reflow -> Play) in a real browser
+      if (oldPos.size >= 2) {
+        oldPos.forEach((old, el) => {
+          const r = el.getBoundingClientRect();
+          const dx = Math.round(old.left - r.left);
+          const dy = Math.round(old.top - r.top);
+          if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) return;
+          el.classList.remove('arch-col-displace-ready');
+          el.classList.add('arch-col-flip-invert');
+          el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+          void el.offsetWidth; // commit the inverted start frame
+          el.classList.remove('arch-col-flip-invert');
+          el.classList.add('arch-col-displace-ready');
+          el.style.removeProperty('transform');
+          setTimeout(() => {
+            el.classList.remove('arch-col-displace-ready');
+            if (!el.getAttribute('style')?.trim()) el.removeAttribute('style');
+          }, 240);
         });
       }
     }

@@ -193,10 +193,10 @@ export function serializeCleanDocument(
   // Strip temporary editor classes and attributes
   clone
     .querySelectorAll(
-      '[contenteditable], [spellcheck], [draggable], [data-arch-placeholder], [data-arch-displaced], [data-arch-displace-x], [class]'
+      '[contenteditable], [spellcheck], [draggable], [data-arch-placeholder], [data-arch-displaced], [data-arch-displace-x], [data-arch-displace-y], [class]'
     )
     .forEach((el) => {
-      if (el.hasAttribute('data-arch-displace-x') && (el as HTMLElement).style) {
+      if ((el.hasAttribute('data-arch-displace-x') || el.hasAttribute('data-arch-displace-y')) && (el as HTMLElement).style) {
         (el as HTMLElement).style.removeProperty('transform');
         if (!el.getAttribute('style')?.trim()) {
           el.removeAttribute('style');
@@ -208,6 +208,7 @@ export function serializeCleanDocument(
       el.removeAttribute('data-arch-placeholder');
       el.removeAttribute('data-arch-displaced');
       el.removeAttribute('data-arch-displace-x');
+      el.removeAttribute('data-arch-displace-y');
 
       if (el.hasAttribute('class')) {
         const classes = (el.getAttribute('class') || '')
