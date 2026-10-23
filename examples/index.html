@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vanilla HTML Demo - Arch Email Editor</title>
+  <link rel="stylesheet" href="../dist/arch-email-editor.css" />
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+    }
+    .header {
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .header p {
+      margin: 4px 0 0 0;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    .demo-nav {
+      display: flex;
+      gap: 12px;
+    }
+    .demo-nav a {
+      color: #38bdf8;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border: 1px solid #334155;
+      border-radius: 6px;
+    }
+    .demo-nav a:hover {
+      background-color: #1e293b;
+    }
+    .editor-wrapper {
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+      height: 720px;
+    }
+    .external-bar {
+      margin-top: 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      background-color: #1e293b;
+      padding: 16px;
+      border-radius: 8px;
+    }
+    .preview-box {
+      margin-top: 20px;
+      background-color: #ffffff;
+      color: #000000;
+      border-radius: 8px;
+      overflow: hidden;
+      display: none;
+    }
+    .preview-box iframe {
+      width: 100%;
+      height: 500px;
+      border: none;
+    }
+    button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 13px;
+      background-color: #2563eb;
+      color: #ffffff;
+    }
+    button:hover {
+      background-color: #1d4ed8;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>📬 Arch Email Editor — Vanilla HTML Demo</h1>
+      <p>Demonstrates direct usage via standard <code>&lt;script&gt;</code> tag and <code>&lt;link&gt;</code> stylesheet (Like CKEditor).</p>
+    </div>
+    <div class="demo-nav">
+      <a href="react-demo.html">React Demo ⚛️</a>
+      <a href="vue-demo.html">Vue Demo 🟢</a>
+    </div>
+  </div>
+
+  <div class="editor-wrapper">
+    <div id="editor-container" style="width: 100%; height: 100%;"></div>
+  </div>
+
+  <div class="external-bar">
+    <button id="btn-show-html" type="button">👁️ Render Live Email Preview</button>
+    <button id="btn-get-json" type="button" style="background-color: #475569;">📋 Log JSON to Console</button>
+    <span style="color: #94a3b8; font-size: 13px;">External API integration: <code>editor.getHTML()</code> & <code>editor.getJSON()</code></span>
+  </div>
+
+  <div class="preview-box" id="preview-box">
+    <div style="padding: 10px 16px; background-color: #f1f5f9; border-bottom: 1px solid #cbd5e1; font-weight: 600; font-size: 13px; display: flex; justify-content: space-between;">
+      <span>Email Client Preview (Rendered from compiled table HTML)</span>
+      <button style="background: none; border: none; color: #64748b; cursor: pointer;" onclick="document.getElementById('preview-box').style.display='none'">✕ Close</button>
+    </div>
+    <iframe id="preview-iframe"></iframe>
+  </div>
+
+  <!-- Include ArchEmailEditor UMD Bundle -->
+  <script src="../dist/arch-email-editor.umd.js"></script>
+
+  <script>
+    // Initialize editor instance directly from window.ArchEmailEditor
+    const Editor = window.ArchEmailEditor.create ? window.ArchEmailEditor : window.ArchEmailEditor.ArchEmailEditor;
+    const editor = Editor.create('#editor-container', {
+      onChange: (doc) => {
+        console.log('Document updated in real-time:', doc);
+      }
+    });
+
+    document.getElementById('btn-get-json').addEventListener('click', () => {
+      const json = editor.getJSON();
+      console.log('Exported JSON template:', json);
+      alert('Template JSON logged to browser console! (' + json.blocks.length + ' blocks)');
+    });
+
+    document.getElementById('btn-show-html').addEventListener('click', () => {
+      const html = editor.getHTML();
+      const previewBox = document.getElementById('preview-box');
+      const iframe = document.getElementById('preview-iframe');
+      previewBox.style.display = 'block';
+      iframe.srcdoc = html;
+      previewBox.scrollIntoView({ behavior: 'smooth' });
+    });
+  </script>
+</body>
+</html>
