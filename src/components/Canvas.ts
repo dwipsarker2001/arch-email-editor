@@ -268,23 +268,34 @@ export class Canvas {
     if (!cand.active) {
       if (Math.hypot(dx, dy) < 5) return;
 
+      // Resolve the effective unit for dragging
+      const effectiveCand = resolveEffectiveMoveUnit(cand.unit);
+      const candPeers = getMoveableSiblings(effectiveCand);
+      const hasHorizontalPeers = candPeers.length >= 2 && detectAxis(effectiveCand) === 'horizontal';
+
       // Direction-aware Auto-Column Drag Initiator:
-      // If `cand.unit` is a multi-column Row (or an inner Block/Link inside a multi-column Row),
-      // and the user drags HORIZONTALLY (`|dx| > |dy|`), automatically switch the drag unit to the
-      // enclosing Column (`td.column`) so 2-column and 3-column rows can be reordered horizontally in 1 motion!
+      // ONLY escalate to `enclosingCol` if the dragged unit is explicitly a Row (`isRowElement`),
+      // OR if the unit has NO horizontal peers in its own container to reorder between!
       if (Math.abs(dx) > Math.abs(dy) * 1.1) {
-        const enclosingCol = findEnclosingColumn(cand.startTarget);
-        if (enclosingCol && getMoveableSiblings(enclosingCol).length >= 2) {
-          if (isRowElement(cand.unit) || enclosingCol.contains(cand.unit)) {
+        if (!hasHorizontalPeers && isRowElement(cand.unit)) {
+          const enclosingCol = findEnclosingColumn(cand.startTarget);
+          if (enclosingCol && getMoveableSiblings(enclosingCol).length >= 2) {
             cand.unit = enclosingCol;
+          } else {
+            cand.unit = effectiveCand;
           }
+        } else {
+          cand.unit = effectiveCand;
         }
       } else {
-        // Vertical drag: escalate single-child inner units (`<p>`, `<td>`, or sole `table.*_block` / `table.row` in `<tr>`)
-        // to their effective moveable unit so `this.draggedUnit` matches the displaced unit.
-        const effective = resolveEffectiveMoveUnit(cand.unit);
-        if (effective && effective !== cand.unit) {
-          cand.unit = effective;
+        // Vertical drag: escalate single-child inner units to their effective moveable unit
+        if (!hasHorizontalPeers) {
+          const effective = resolveEffectiveMoveUnit(cand.unit);
+          if (effective && effective !== cand.unit) {
+            cand.unit = effective;
+          }
+        } else {
+          cand.unit = effectiveCand;
         }
       }
 
@@ -1618,6 +1629,7 @@ export class Canvas {
         this.update({ version: '1.0', settings: {} as any, blocks: [], rawHtml: snapshotBefore }, null, true);
         return;
       }
+      this.selectUnit(effectiveTarget, effectiveTarget);
       this.onStructureChanged();
 
       // Play smooth FLIP transition (Invert -> reflow -> Play) in a real browser

@@ -566,12 +566,22 @@ export function detectAxis(unit: HTMLElement): 'vertical' | 'horizontal' {
   if (isColumnElement(unit)) return 'horizontal';
 
   const unitDisp = (unit.style?.display || '').toLowerCase();
-  if (unitDisp.includes('inline') || (unit.style?.cssFloat || '').toLowerCase() === 'left') {
+  const unitFloat = (unit.style?.cssFloat || unit.style?.float || '').toLowerCase();
+
+  if (
+    unitDisp.includes('inline') ||
+    unitFloat === 'left' ||
+    unitFloat === 'right' ||
+    isSocialStripComponent(unit)
+  ) {
     return 'horizontal';
   }
 
   const parent = unit.parentElement;
   if (parent) {
+    if (isSocialStripComponent(parent)) {
+      return 'horizontal';
+    }
     const pDisp = (parent.style?.display || '').toLowerCase();
     if (pDisp.includes('flex') && (!parent.style.flexDirection || parent.style.flexDirection.startsWith('row'))) {
       return 'horizontal';
@@ -588,7 +598,14 @@ export function detectAxis(unit: HTMLElement): 'vertical' | 'horizontal' {
 
     const peers = getMeaningfulChildren(parent).filter((c) => !isGutterCell(c));
     if (peers.length >= 2) {
-      if (peers.some((p) => (p.style?.display || '').toLowerCase().includes('inline'))) {
+      if (
+        peers.some((p) => {
+          const d = (p.style?.display || '').toLowerCase();
+          const f = (p.style?.cssFloat || p.style?.float || '').toLowerCase();
+          const a = (p.getAttribute('align') || '').toLowerCase();
+          return d.includes('inline') || f === 'left' || f === 'right' || a === 'left' || a === 'right';
+        })
+      ) {
         return 'horizontal';
       }
       const r0 = peers[0].getBoundingClientRect();

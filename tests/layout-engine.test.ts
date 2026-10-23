@@ -1366,4 +1366,106 @@ describe('Figma vertical displacement', () => {
 
     editor.destroy();
   });
+
+  it('drills down into social icon strip and drags icons between each other without moving parent td column', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+
+    const html = `<table class="row" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+  <tbody>
+    <tr>
+      <td class="column col-left" width="50%">
+        <p>HOLO</p>
+      </td>
+      <td class="column col-right" width="50%">
+        <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+          <tbody>
+            <tr>
+              <td align="right" class="o" style="font-size:0px;padding:0;word-break:break-word;">
+                <!--[if mso | IE]><table align="right" border="0" cellpadding="0" cellspacing="0" role="presentation"><tr><td><![endif]-->
+                <table align="right" border="0" cellpadding="0" cellspacing="0" role="presentation" style="float:none;display:inline-table;" class="icon-x">
+                  <tbody><tr><td><a href="https://x.com"><img height="24" width="24" src="x.png" alt="X"></a></td></tr></tbody>
+                </table>
+                <!--[if mso | IE]></td><td><![endif]-->
+                <table align="right" border="0" cellpadding="0" cellspacing="0" role="presentation" style="float:none;display:inline-table;" class="icon-insta">
+                  <tbody><tr><td><a href="https://instagram.com"><img height="24" width="24" src="instagram.png" alt="Instagram"></a></td></tr></tbody>
+                </table>
+                <!--[if mso | IE]></td><td><![endif]-->
+                <table align="right" border="0" cellpadding="0" cellspacing="0" role="presentation" style="float:none;display:inline-table;" class="icon-linkedin">
+                  <tbody><tr><td><a href="https://linkedin.com"><img height="24" width="24" src="linkedin.png" alt="LinkedIn"></a></td></tr></tbody>
+                </table>
+                <!--[if mso | IE]></td></tr></table><![endif]-->
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  </tbody>
+</table>`;
+
+    editor.importHTML(html);
+    const ifrDoc = (container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement).contentDocument!;
+    const colRight = ifrDoc.querySelector('.col-right') as HTMLElement;
+    const iconX = ifrDoc.querySelector('.icon-x') as HTMLElement;
+    const iconInsta = ifrDoc.querySelector('.icon-insta') as HTMLElement;
+    const iconLinkedin = ifrDoc.querySelector('.icon-linkedin') as HTMLElement;
+    const imgX = iconX.querySelector('img') as HTMLElement;
+    const canvas = (editor as any).canvas;
+
+    // 1. Single click on X icon selects the outer Row frame (Figma container model)
+    imgX.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('table.row'));
+
+    // 2. Double-click drills down to Right Column
+    imgX.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(colRight);
+
+    // 3. Double-click again drills down into the X icon table itself
+    imgX.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(iconX);
+
+    // Mock horizontal rects for the 3 icons (40px wide each, at x=400, 440, 480)
+    [iconX, iconInsta, iconLinkedin].forEach((el, i) => {
+      el.getBoundingClientRect = () => {
+        const dx = parseFloat(el.dataset.archDisplaceX || '0') || 0;
+        return {
+          left: 400 + i * 40 + dx,
+          right: 440 + i * 40 + dx,
+          width: 40,
+          height: 24,
+          top: 10,
+          bottom: 34
+        } as DOMRect;
+      };
+    });
+
+    // 4. Starting pointer drag horizontally on the selected X icon:
+    //    It MUST drag the X icon itself (iconX), NEVER escalating to the parent td.col-right!
+    imgX.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 410, clientY: 20, button: 0 }));
+    canvas.handlePointerDragMove(430, 20); // 20px rightward drag
+
+    expect(canvas.draggedUnit).toBe(iconX);
+    expect(canvas.draggedUnit).not.toBe(colRight);
+
+    // 5. Dragging over Instagram icon:
+    //    Instagram displaces left (-40px), X displaces right (+40px), drop line is vertical
+    canvas.updateDropTargetForElement(iconInsta, 450, 20);
+    expect(iconX.dataset.archDisplaced).toBe('right');
+    expect(iconInsta.dataset.archDisplaced).toBe('left');
+    expect(iconInsta.style.transform).toBe('translate3d(-40px, 0, 0)');
+    expect(canvas.dropIndicatorEl?.classList.contains('arch-figma-drop-indicator--vertical')).toBe(true);
+
+    // 6. Committing drop swaps the icons inside td.o while keeping MSO comments intact
+    canvas.finishPointerDrag();
+    const iconClasses = Array.from(ifrDoc.querySelectorAll('td.o > table')).map((t) => t.className.replace(/\s*arch-selected-element\s*/, '').trim());
+    expect(iconClasses).toEqual(['icon-insta', 'icon-x', 'icon-linkedin']);
+
+    // MSO comments between the swapped tables remain valid
+    const rawHTML = ifrDoc.body.innerHTML;
+    expect(rawHTML).toContain('<!--[if mso | IE]></td><td><![endif]-->');
+
+    editor.destroy();
+  });
 });
