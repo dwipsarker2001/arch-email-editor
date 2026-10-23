@@ -1244,4 +1244,63 @@ describe('Figma vertical displacement', () => {
 
     editor.destroy();
   });
+
+  it('correctly detects horizontal axis and animates horizontal live displacement for inline-block menu links with MSO comments', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+
+    const html = `<div class="menu-links" contenteditable="true" spellcheck="false">
+<!--[if mso]><table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style=""><tr style="text-align:center;"><![endif]-->
+<!--[if mso]><td style="padding:10px;"><![endif]--><a href="#" target="_blank" title="HALLOWEEN" style="display:inline-block;" class="arch-selected-element">HALLOWEEN</a><!--[if mso]></td><![endif]-->
+<!--[if mso]><td style="padding:10px;"><![endif]--><a href="#" target="_blank" title="NEW" style="display:inline-block;">NEW</a><!--[if mso]></td><![endif]-->
+<!--[if mso]><td style="padding:10px;"><![endif]--><a href="#" target="_blank" title="GIFTS" style="display:inline-block;">GIFTS</a><!--[if mso]></td><![endif]-->
+<!--[if mso]></tr></table><![endif]-->
+</div>`;
+
+    editor.importHTML(html);
+    const ifrDoc = (container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement).contentDocument!;
+    const a1 = ifrDoc.querySelector('a[title="HALLOWEEN"]') as HTMLElement;
+    const a2 = ifrDoc.querySelector('a[title="NEW"]') as HTMLElement;
+    const a3 = ifrDoc.querySelector('a[title="GIFTS"]') as HTMLElement;
+    const canvas = (editor as any).canvas;
+
+    // Mock horizontal layout: each link is 100px wide, arranged at left: 0, 100, 200
+    [a1, a2, a3].forEach((el, i) => {
+      el.getBoundingClientRect = () => {
+        const dx = parseFloat(el.dataset.archDisplaceX || '0') || 0;
+        return {
+          left: i * 100 + dx,
+          right: (i + 1) * 100 + dx,
+          width: 100,
+          height: 36,
+          top: 10,
+          bottom: 46
+        } as DOMRect;
+      };
+    });
+
+    // 1. Dragging HALLOWEEN (a1) to the right onto NEW (a2):
+    //    NEW slides to the LEFT (translate3d(-100px, 0, 0)) on the X axis, and HALLOWEEN slides to the RIGHT!
+    canvas.draggedUnit = a1;
+    canvas.updateDropTargetForElement(a2, 150, 20);
+
+    expect(a1.dataset.archDisplaced).toBe('right');
+    expect(a1.style.transform).toBe('translate3d(100px, 0, 0)');
+    expect(a2.dataset.archDisplaced).toBe('left');
+    expect(a2.style.transform).toBe('translate3d(-100px, 0, 0)');
+    expect(canvas.dropIndicatorEl?.classList.contains('arch-figma-drop-indicator--vertical')).toBe(true);
+
+    // 2. Committing drop swaps the links and preserves MSO comments
+    canvas.executeDrop('arch-move-unit');
+    const reordered = Array.from(ifrDoc.querySelectorAll('a')).map((a) => a.getAttribute('title'));
+    expect(reordered).toEqual(['NEW', 'HALLOWEEN', 'GIFTS']);
+
+    // MSO comments are preserved around the moved links
+    const rawInner = ifrDoc.body.innerHTML;
+    expect(rawInner).toContain('<!--[if mso]><td style="padding:10px;"><![endif]--><a href="#" target="_blank" title="NEW"');
+    expect(rawInner).toContain('<!--[if mso]><td style="padding:10px;"><![endif]--><a href="#" target="_blank" title="HALLOWEEN"');
+
+    editor.destroy();
+  });
 });

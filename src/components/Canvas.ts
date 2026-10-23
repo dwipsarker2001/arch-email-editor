@@ -432,19 +432,20 @@ export class Canvas {
       ? resolveCompatibleDropTarget(effectiveDragged, rawTarget)
       : this.findMoveableUnit(rawTarget);
 
-    // Oscillation-free untransformed slot hit-testing during horizontal column drag:
-    // Because displaced columns are visually translated via `transform: translate3d(dx, 0, 0)`,
-    // resolve the hovered column slot from each column's cached untransformed layout bounds.
+    const isHorizontalDrag = effectiveDragged ? detectAxis(effectiveDragged) === 'horizontal' : false;
+
+    // Oscillation-free untransformed slot hit-testing during horizontal drag:
+    // (columns, menu links with display:inline-block, social icon strips, etc.)
     if (
       effectiveDragged &&
-      isColumnElement(effectiveDragged) &&
+      isHorizontalDrag &&
       effectiveDragged.parentElement &&
       (effectiveDragged.parentElement.contains(rawTarget) || rawTarget.contains(effectiveDragged.parentElement))
     ) {
-      const cols = getMoveableSiblings(effectiveDragged).filter((c) => isColumnElement(c));
-      this.cacheSiblingSlots(cols);
-      if (cols.length >= 2 && this.getSlotRect(cols[0]).width > 0) {
-        const hitCol = cols.find((col) => {
+      const peers = getMoveableSiblings(effectiveDragged);
+      this.cacheSiblingSlots(peers);
+      if (peers.length >= 2 && this.getSlotRect(peers[0]).width > 0) {
+        const hitCol = peers.find((col) => {
           const r = this.getSlotRect(col);
           return iframeRelativeX >= r.left && iframeRelativeX <= r.right;
         });
@@ -460,7 +461,7 @@ export class Canvas {
     }
 
     // Same for vertical drag (rows / blocks): hit-test the pointer against each sibling's cached untransformed slot.
-    if (effectiveDragged && !isColumnElement(effectiveDragged) && effectiveDragged.parentElement) {
+    if (effectiveDragged && !isHorizontalDrag && effectiveDragged.parentElement) {
       const peers = getMoveableSiblings(effectiveDragged);
       this.cacheSiblingSlots(peers);
       const parentRect = effectiveDragged.parentElement.getBoundingClientRect();
@@ -520,7 +521,8 @@ export class Canvas {
 
     const rect = this.getSlotRect(targetUnit);
 
-    const isHorizontal = isColumnElement(targetUnit) && effectiveDragged && isColumnElement(effectiveDragged);
+    const isHorizontal =
+      Boolean(targetUnit && effectiveDragged && detectAxis(targetUnit) === 'horizontal' && isHorizontalDrag);
     let isBefore = isHorizontal
       ? iframeRelativeX < rect.left + rect.width / 2
       : iframeRelativeY < rect.top + rect.height / 2;
@@ -556,7 +558,7 @@ export class Canvas {
     const isDisplacingSiblings = Boolean(
       effectiveDragged &&
         effectiveDragged.parentElement === targetUnit.parentElement &&
-        isColumnElement(effectiveDragged) === isColumnElement(targetUnit)
+        detectAxis(effectiveDragged) === detectAxis(targetUnit)
     );
 
     if (isDisplacingSiblings && effectiveDragged) {
@@ -570,7 +572,7 @@ export class Canvas {
       }
     }
 
-    this.renderFigmaDropIndicator(targetUnit, rect, isBefore, !!isHorizontal);
+    this.renderFigmaDropIndicator(targetUnit, rect, isBefore, isHorizontal);
   }
 
   /**
@@ -660,8 +662,8 @@ export class Canvas {
     target: HTMLElement,
     position: 'before' | 'after'
   ): void {
-    const axis: 'x' | 'y' = isColumnElement(dragged) ? 'x' : 'y';
-    const items = getMoveableSiblings(dragged).filter((c) => axis === 'y' || isColumnElement(c));
+    const axis: 'x' | 'y' = detectAxis(dragged) === 'horizontal' ? 'x' : 'y';
+    const items = getMoveableSiblings(dragged);
     const dragIdx = items.indexOf(dragged);
     const targetIdx = items.indexOf(target);
     if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) {

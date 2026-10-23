@@ -564,13 +564,53 @@ export function classifyUnitRole(unit: HTMLElement): UnitRole {
  */
 export function detectAxis(unit: HTMLElement): 'vertical' | 'horizontal' {
   if (isColumnElement(unit)) return 'horizontal';
+
+  const unitDisp = (unit.style?.display || '').toLowerCase();
+  if (unitDisp.includes('inline') || (unit.style?.cssFloat || '').toLowerCase() === 'left') {
+    return 'horizontal';
+  }
+
   const parent = unit.parentElement;
   if (parent) {
-    const disp = parent.style?.display || '';
-    if (disp.includes('flex') && (!parent.style.flexDirection || parent.style.flexDirection.startsWith('row'))) {
+    const pDisp = (parent.style?.display || '').toLowerCase();
+    if (pDisp.includes('flex') && (!parent.style.flexDirection || parent.style.flexDirection.startsWith('row'))) {
+      return 'horizontal';
+    }
+    if (
+      parent.classList.contains('menu-links') ||
+      parent.classList.contains('menu') ||
+      parent.classList.contains('nav') ||
+      parent.classList.contains('social-links') ||
+      parent.classList.contains('social')
+    ) {
+      return 'horizontal';
+    }
+
+    const peers = getMeaningfulChildren(parent).filter((c) => !isGutterCell(c));
+    if (peers.length >= 2) {
+      if (peers.some((p) => (p.style?.display || '').toLowerCase().includes('inline'))) {
+        return 'horizontal';
+      }
+      const r0 = peers[0].getBoundingClientRect();
+      const r1 = peers[1].getBoundingClientRect();
+      if ((r0.width > 0 || r0.height > 0) && (r1.width > 0 || r1.height > 0)) {
+        const dx = Math.abs(r1.left - r0.left);
+        const dy = Math.abs(r1.top - r0.top);
+        if (dx > dy && dx > 8) {
+          return 'horizontal';
+        }
+      }
+    }
+  }
+
+  const tag = unit.tagName.toLowerCase();
+  if ((tag === 'a' || tag === 'img' || tag === 'span') && parent) {
+    const peers = getMeaningfulChildren(parent).filter((c) => !isGutterCell(c));
+    if (peers.length >= 2 && peers.every((p) => p.tagName.toLowerCase() === tag)) {
       return 'horizontal';
     }
   }
+
   return 'vertical';
 }
 
