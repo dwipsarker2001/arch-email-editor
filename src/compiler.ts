@@ -15,6 +15,7 @@
  */
 
 import { EmailDocument, BlockNode } from './types';
+import { sanitizeEmailHtml } from './engine/sanitize';
 
 /**
  * Normalizes any arbitrary JSON input into a guaranteed valid EmailDocument AST.
@@ -365,8 +366,9 @@ export function compileToEmailHtml(inputDoc: EmailDocument): string {
  * and multi-column tables are NEVER broken.
  */
 export function parseHtmlToDocument(htmlString: string): EmailDocument {
+  const safeHtml = sanitizeEmailHtml(htmlString);
   const parser = new DOMParser();
-  const parsedDoc = parser.parseFromString(htmlString, 'text/html');
+  const parsedDoc = parser.parseFromString(safeHtml, 'text/html');
   const body = parsedDoc.body;
 
   // 1. Extract Background Color
@@ -448,6 +450,10 @@ export function parseHtmlToDocument(htmlString: string): EmailDocument {
         processed.add(el);
       }
     } else if (tagName === 'a') {
+      // Do not classify linked images (`<a><img/></a>`) as buttons
+      if (el.querySelector('img') && !(el.textContent || '').trim()) {
+        continue;
+      }
       const label = el.textContent?.trim() || 'Click Here';
       const url = el.getAttribute('href') || '#';
       const bg = styleObj['background-color'] || styleObj['background'] || '#2563eb';
@@ -515,7 +521,7 @@ export function parseHtmlToDocument(htmlString: string): EmailDocument {
     }
   }
 
-  // Preserve the entire raw HTML so imported templates are NEVER broken
+  // Preserve the entire sanitized HTML so imported templates are NEVER broken
   return {
     version: '1.0',
     settings: {
@@ -525,6 +531,6 @@ export function parseHtmlToDocument(htmlString: string): EmailDocument {
       textColor: '#334155'
     },
     blocks,
-    rawHtml: htmlString
+    rawHtml: safeHtml
   };
 }

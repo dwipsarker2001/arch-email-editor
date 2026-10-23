@@ -3,13 +3,41 @@
  * 
  * Core architectural principle: Framework-agnostic document state.
  * Supports both structured block ASTs and full prebuilt HTML email templates
- * (preserving media queries, nested tables, and head styles without breaking).
+ * (preserving media queries, nested tables, MSO VML, and head styles without breaking).
  */
 
 /**
  * Supported email block types.
  */
-export type BlockType = 'heading' | 'text' | 'button' | 'image' | 'divider' | 'html';
+export type BlockType =
+  | 'heading'
+  | 'text'
+  | 'button'
+  | 'image'
+  | 'divider'
+  | 'spacer'
+  | 'social'
+  | 'html';
+
+/**
+ * Supported multi-column row layout presets.
+ */
+export type RowLayoutType =
+  | '1-col'
+  | '2-col-50-50'
+  | '2-col-33-67'
+  | '2-col-67-33'
+  | '3-col';
+
+/**
+ * Responsive preview & style customization viewport mode.
+ */
+export type ViewportMode = 'desktop' | 'tablet' | 'mobile';
+
+/**
+ * Five-level structural taxonomy role for any node in an email layout.
+ */
+export type UnitRole = 'body' | 'row' | 'column' | 'block' | 'leaf';
 
 /**
  * Visual styling attributes for a block.
@@ -89,11 +117,33 @@ export interface EmailDocument {
 }
 
 /**
- * Information about a currently selected DOM node on the visual canvas.
+ * Breadcrumb item representing an ancestor in the 5-level structural taxonomy.
+ */
+export interface BreadcrumbItem {
+  label: string;
+  role: UnitRole;
+  element: HTMLElement;
+}
+
+/**
+ * Information about a currently selected DOM node and its resolved structural unit on the canvas.
  */
 export interface SelectedElementInfo {
   tagName: string;
-  type: 'heading' | 'text' | 'button' | 'image' | 'section' | 'other';
+  type:
+    | 'heading'
+    | 'text'
+    | 'button'
+    | 'image'
+    | 'divider'
+    | 'spacer'
+    | 'social'
+    | 'column'
+    | 'row'
+    | 'section'
+    | 'other';
+  unitRole?: UnitRole;
+  axis?: 'vertical' | 'horizontal';
   text?: string;
   src?: string;
   alt?: string;
@@ -103,7 +153,17 @@ export interface SelectedElementInfo {
   fontSize?: string;
   textAlign?: string;
   padding?: string;
+  width?: string;
+  height?: string;
+  borderRadius?: string;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  canSelectParent?: boolean;
+  ancestry?: BreadcrumbItem[];
+  /** The inner clicked DOM element (e.g. <img>, <a>, <p>) */
   element: HTMLElement;
+  /** The resolved moveable structural unit (e.g. table.button_block, table.row, td.column) */
+  unit?: HTMLElement;
 }
 
 /**

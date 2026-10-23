@@ -2,19 +2,28 @@
  * Arch Email Editor - Core Controller & Component Orchestrator
  *
  * Architecture pattern: Component Orchestrator + Core Controller.
- * 
+ *
  * Cleanly breaks responsibilities across focused sub-components:
- * - Toolbar: Top actions (Import HTML, Export JSON/HTML, Clear)
- * - Palette: Left draggable block palette
- * - Canvas: Central real-fidelity email WYSIWYG canvas (isolated iframe)
- * - Inspector: Right property controls
+ * - Toolbar: Top actions (Undo/Redo, Viewport Switcher, Size Meter, Import HTML, Export JSON/HTML, Clear)
+ * - Palette: Left draggable block & row layout palette
+ * - Canvas: Central real-fidelity email WYSIWYG canvas (isolated iframe + parent overlay)
+ * - Inspector: Right smart property controls + structural breadcrumb
  * - ImportModal: File upload and paste HTML modal
  * - ExportModal: Formatted code viewer and copy-to-clipboard
+ * - HistoryManager: Unified Undo/Redo snapshot stack
  *
  * 100% Vanilla TypeScript with zero runtime framework dependencies.
  */
 
-import { EmailDocument, BlockNode, BlockType, EditorOptions, SelectedElementInfo } from './types';
+import {
+  EmailDocument,
+  BlockNode,
+  BlockType,
+  EditorOptions,
+  RowLayoutType,
+  SelectedElementInfo,
+  ViewportMode
+} from './types';
 import {
   compileToEmailHtml,
   parseHtmlToDocument,
@@ -26,6 +35,7 @@ import { Canvas } from './components/Canvas';
 import { Inspector } from './components/Inspector';
 import { ImportModal } from './components/ImportModal';
 import { ExportModal } from './components/ExportModal';
+import { HistoryManager } from './engine/history';
 
 export class ArchEmailEditor {
   /** Target container element where the editor is rendered */
@@ -42,6 +52,8 @@ export class ArchEmailEditor {
   private rootElement: HTMLElement | null = null;
   /** Event bus mapping event names to subscriber callbacks */
   private listeners: Map<string, Function[]> = new Map();
+  /** Unified Undo/Redo history manager */
+  private history: HistoryManager = new HistoryManager(50);
 
   // Modular UI Components
   private toolbar: Toolbar | null = null;
@@ -104,7 +116,8 @@ export class ArchEmailEditor {
     this.document = normalizeDocument(doc);
     this.selectedBlockId = null;
     this.selectedElement = null;
-    this.updateViews();
+    this.updateViews(true);
+    this.recordHistory();
     this.emit('change', this.getJSON());
   }
 
@@ -130,7 +143,8 @@ export class ArchEmailEditor {
     this.selectedBlockId = null;
     this.selectedElement = null;
     this.canvas?.clearSelection();
-    this.updateViews();
+    this.updateViews(true);
+    this.recordHistory();
     this.emit('change', this.getJSON());
   }
 
@@ -143,10 +157,72 @@ export class ArchEmailEditor {
   }
 
   /**
+   * Undo the most recent structural or content change.
+   */
+  public undo(): void {
+    const prevHtml = this.history.undo();
+    if (prevHtml !== null) {
+      this.document.rawHtml = prevHtml;
+      this.selectedElement = null;
+      this.canvas?.clearSelection();
+      this.updateViews(true);
+      this.syncToolbarState();
+      this.emit('change', this.getJSON());
+    }
+  }
+
+  /**
+   * Redo a previously undone change.
+   */
+  public redo(): void {
+    const nextHtml = this.history.redo();
+    if (nextHtml !== null) {
+      this.document.rawHtml = nextHtml;
+      this.selectedElement = null;
+      this.canvas?.clearSelection();
+      this.updateViews(true);
+      this.syncToolbarState();
+      this.emit('change', this.getJSON());
+    }
+  }
+
+  /**
+   * Moves the currently selected canvas element/unit up or down (or left/right for columns).
+   */
+  public moveSelectedElement(direction: 'up' | 'down'): void {
+    this.canvas?.moveSelectedElement(direction);
+  }
+
+  /**
+   * Duplicates the currently selected canvas element/unit.
+   */
+  public duplicateSelectedElement(): void {
+    this.canvas?.duplicateSelectedElement();
+  }
+
+  /**
+   * Selects the parent structural container (`Block` -> `Column` -> `Row` -> `Body`).
+   */
+  public selectParentUnit(): void {
+    this.canvas?.selectParentUnit();
+  }
+
+  /**
+   * Switches the responsive preview and customization mode (`desktop` | `tablet` | `mobile`).
+   */
+  public setViewportMode(mode: ViewportMode): void {
+    this.canvas?.setViewportMode(mode);
+    this.inspector?.setViewportMode(mode);
+    if (this.selectedElement) {
+      this.inspector?.update(this.document, this.selectedBlockId, this.selectedElement);
+    }
+  }
+
+  /**
    * Reorders an existing block to a new target index.
    */
   public reorderBlock(sourceId: string, targetIndex: number): void {
-    const currentIndex = this.document.blocks.findIndex(b => b.id === sourceId);
+    const currentIndex = this.document.blocks.findIndex((b) => b.id === sourceId);
     if (currentIndex === -1) return;
 
     const [movedBlock] = this.document.blocks.splice(currentIndex, 1);
@@ -156,8 +232,9 @@ export class ArchEmailEditor {
     this.document.blocks.splice(safeIndex, 0, movedBlock);
     this.selectedBlockId = movedBlock.id;
     this.selectedElement = null;
-    this.document.rawHtml = compileToEmailHtml(this.document);
-    this.updateViews();
+    this.document.rawHtml = compileToEmailHtml({ ...this.document, rawHtml: undefined });
+    this.updateViews(true);
+    this.recordHistory();
     this.emit('change', this.getJSON());
     this.emit('select', movedBlock);
   }
@@ -171,8 +248,9 @@ export class ArchEmailEditor {
     this.document.blocks.splice(safeIndex, 0, newBlock);
     this.selectedBlockId = newBlock.id;
     this.selectedElement = null;
-    this.document.rawHtml = compileToEmailHtml(this.document);
-    this.updateViews();
+    this.document.rawHtml = compileToEmailHtml({ ...this.document, rawHtml: undefined });
+    this.updateViews(true);
+    this.recordHistory();
     this.emit('change', this.getJSON());
     this.emit('select', newBlock);
   }
@@ -191,21 +269,32 @@ export class ArchEmailEditor {
     }
 
     this.updateViews();
+    this.recordHistory();
     this.emit('change', this.getJSON());
     this.emit('select', newBlock);
+  }
+
+  /**
+   * Inserts a multi-column row layout into the email.
+   */
+  public addRowLayout(layout: RowLayoutType): void {
+    this.canvas?.insertRowLayout(layout);
+    this.recordHistory();
+    this.emit('change', this.getJSON());
   }
 
   /**
    * Removes a block by identifier.
    */
   public removeBlock(id: string): void {
-    this.document.blocks = this.document.blocks.filter(b => b.id !== id);
+    this.document.blocks = this.document.blocks.filter((b) => b.id !== id);
     if (this.selectedBlockId === id) {
       this.selectedBlockId = null;
       this.emit('select', null);
     }
-    this.document.rawHtml = compileToEmailHtml(this.document);
-    this.updateViews();
+    this.document.rawHtml = compileToEmailHtml({ ...this.document, rawHtml: undefined });
+    this.updateViews(true);
+    this.recordHistory();
     this.emit('change', this.getJSON());
   }
 
@@ -213,7 +302,7 @@ export class ArchEmailEditor {
    * Moves a block up or down in the block order.
    */
   public moveBlock(id: string, direction: 'up' | 'down'): void {
-    const index = this.document.blocks.findIndex(b => b.id === id);
+    const index = this.document.blocks.findIndex((b) => b.id === id);
     if (index === -1) return;
 
     if (direction === 'up' && index > 0) {
@@ -226,8 +315,9 @@ export class ArchEmailEditor {
       this.document.blocks[index] = temp;
     }
 
-    this.document.rawHtml = compileToEmailHtml(this.document);
-    this.updateViews();
+    this.document.rawHtml = compileToEmailHtml({ ...this.document, rawHtml: undefined });
+    this.updateViews(true);
+    this.recordHistory();
     this.emit('change', this.getJSON());
   }
 
@@ -244,13 +334,13 @@ export class ArchEmailEditor {
   public off(event: string, callback: Function): void {
     const list = this.listeners.get(event);
     if (!list) return;
-    this.listeners.set(event, list.filter(cb => cb !== callback));
+    this.listeners.set(event, list.filter((cb) => cb !== callback));
   }
 
   private emit(event: string, ...args: any[]): void {
     const list = this.listeners.get(event);
     if (list) {
-      list.forEach(cb => cb(...args));
+      list.forEach((cb) => cb(...args));
     }
   }
 
@@ -270,21 +360,32 @@ export class ArchEmailEditor {
     // 2. Initialize Toolbar
     this.toolbar = new Toolbar({
       onImportHtml: () => this.importModal?.open(this.rootElement!),
-      onExportJson: () => this.exportModal?.open(this.rootElement!, 'Exported Template JSON', JSON.stringify(this.getJSON(), null, 2)),
-      onExportHtml: () => this.exportModal?.open(this.rootElement!, 'Exported Email HTML', this.getHTML()),
+      onExportJson: () =>
+        this.exportModal?.open(
+          this.rootElement!,
+          'Exported Template JSON',
+          JSON.stringify(this.getJSON(), null, 2)
+        ),
+      onExportHtml: () =>
+        this.exportModal?.open(this.rootElement!, 'Exported Email HTML', this.getHTML()),
+      onUndo: () => this.undo(),
+      onRedo: () => this.redo(),
+      onViewportChange: (mode) => this.setViewportMode(mode),
       onClear: () => {
         this.document.blocks = [];
         this.document.rawHtml = '';
         this.selectedBlockId = null;
         this.selectedElement = null;
-        this.updateViews();
+        this.updateViews(true);
+        this.recordHistory();
         this.emit('change', this.getJSON());
       }
     });
 
     // 3. Initialize Palette
     this.palette = new Palette({
-      onAddBlock: (type) => this.addBlock(type)
+      onAddBlock: (type) => this.addBlock(type),
+      onAddRowLayout: (layout) => this.addRowLayout(layout)
     });
 
     // 4. Initialize Canvas
@@ -293,6 +394,7 @@ export class ArchEmailEditor {
       onSelectElement: (info) => this.selectElement(info),
       onContentChange: (cleanHtml) => {
         this.document.rawHtml = cleanHtml;
+        this.recordHistory();
         this.emit('change', this.getJSON());
       },
       onAddBlock: (type) => this.addBlock(type),
@@ -306,14 +408,17 @@ export class ArchEmailEditor {
     this.inspector = new Inspector({
       onChange: () => {
         if (this.canvas) {
-          const cleanHtml = this.canvas.getCleanHTML();
-          if (cleanHtml) {
-            this.document.rawHtml = cleanHtml;
-          }
+          this.canvas.onStructureChanged();
+        } else {
+          this.emit('change', this.getJSON());
         }
-        this.emit('change', this.getJSON());
       },
-      onRemoveBlock: (id) => this.removeBlock(id)
+      onRemoveBlock: (id) => this.removeBlock(id),
+      onMoveElement: (dir) => this.canvas?.moveSelectedElement(dir),
+      onDuplicateElement: () => this.canvas?.duplicateSelectedElement(),
+      onRemoveElement: () => this.canvas?.removeSelectedElement(),
+      onSelectParent: () => this.canvas?.selectParentUnit(),
+      onSelectElementNode: (el) => this.canvas?.selectUnit(el, el)
     });
 
     // 6. Assemble DOM Hierarchy
@@ -327,22 +432,36 @@ export class ArchEmailEditor {
 
     this.rootElement.appendChild(bodyEl);
 
-    // Initial render pass
-    this.updateViews();
+    // Initial render pass and initial history snapshot
+    this.updateViews(true);
+    this.history.reset(this.getHTML());
+    this.syncToolbarState();
+  }
+
+  private recordHistory(): void {
+    const html = this.getHTML();
+    this.history.push(html);
+    this.syncToolbarState();
+  }
+
+  private syncToolbarState(): void {
+    const html = this.getHTML();
+    const bytes = new Blob([html]).size;
+    this.toolbar?.updateState(this.history.canUndo(), this.history.canRedo(), bytes);
   }
 
   /**
    * Refreshes the canvas preview and inspector panel with latest state.
    */
-  private updateViews(): void {
-    this.canvas?.update(this.document, this.selectedBlockId);
+  private updateViews(forceRewrite = false): void {
+    this.canvas?.update(this.document, this.selectedBlockId, forceRewrite);
     this.inspector?.update(this.document, this.selectedBlockId, this.selectedElement);
   }
 
   private selectBlock(id: string | null): void {
     this.selectedBlockId = id;
     this.selectedElement = null;
-    const block = id ? this.document.blocks.find(b => b.id === id) || null : null;
+    const block = id ? this.document.blocks.find((b) => b.id === id) || null : null;
     this.emit('select', block);
     this.inspector?.update(this.document, id, null);
   }
@@ -378,7 +497,13 @@ export class ArchEmailEditor {
           id,
           type: 'button',
           content: { label: 'Click Here', url: 'https://example.com' },
-          style: { backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '6px', textAlign: 'center', padding: '16px 20px' }
+          style: {
+            backgroundColor: '#2563eb',
+            color: '#ffffff',
+            borderRadius: '6px',
+            textAlign: 'center',
+            padding: '16px 20px'
+          }
         };
       case 'image':
         return {
@@ -394,11 +519,27 @@ export class ArchEmailEditor {
           content: {},
           style: { color: '#e2e8f0', padding: '16px 20px' }
         };
+      case 'spacer':
+        return {
+          id,
+          type: 'spacer',
+          content: {},
+          style: { height: '28px', padding: '0' }
+        };
+      case 'social':
+        return {
+          id,
+          type: 'social',
+          content: {},
+          style: { textAlign: 'center', padding: '12px 20px' }
+        };
       case 'html':
         return {
           id,
           type: 'html',
-          content: { html: '<div style="padding: 16px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; text-align: center; color: #64748b;">Custom HTML snippet</div>' },
+          content: {
+            html: '<div style="padding: 16px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; text-align: center; color: #64748b;">Custom HTML snippet</div>'
+          },
           style: { padding: '12px 20px' }
         };
     }

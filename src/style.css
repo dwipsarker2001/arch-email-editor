@@ -40,6 +40,7 @@
   background-color: var(--arch-bg-surface);
   border-bottom: 1px solid var(--arch-border);
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .arch-editor__title {
@@ -49,6 +50,40 @@
   align-items: center;
   gap: 8px;
   color: var(--arch-text-primary);
+}
+
+.arch-size-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background-color: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.arch-size-badge.is-warning {
+  background-color: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.arch-size-badge.is-danger {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.arch-toolbar-center {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.arch-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .arch-editor__actions {
@@ -73,9 +108,25 @@
   transition: all 0.15s ease;
 }
 
-.arch-btn:hover {
+.arch-btn:hover:not(:disabled) {
   background-color: #f1f5f9;
   border-color: #cbd5e1;
+}
+
+.arch-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.arch-btn--icon {
+  padding: 6px 9px;
+  font-weight: 700;
+}
+
+.arch-btn--viewport.is-active {
+  background-color: #eff6ff;
+  border-color: var(--arch-primary);
+  color: var(--arch-primary);
 }
 
 .arch-btn--primary {
@@ -84,7 +135,7 @@
   border-color: var(--arch-primary);
 }
 
-.arch-btn--primary:hover {
+.arch-btn--primary:hover:not(:disabled) {
   background-color: var(--arch-primary-hover);
   border-color: var(--arch-primary-hover);
 }
@@ -93,7 +144,7 @@
   color: var(--arch-danger);
 }
 
-.arch-btn--danger:hover {
+.arch-btn--danger:hover:not(:disabled) {
   background-color: #fef2f2;
   border-color: #fecaca;
 }
@@ -114,7 +165,7 @@
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   overflow-y: auto;
 }
 
@@ -131,7 +182,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 9px 12px;
   border: 1px solid var(--arch-border);
   border-radius: 6px;
   background-color: var(--arch-bg-surface);
@@ -172,6 +223,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .arch-canvas-iframe {
@@ -183,110 +235,88 @@
   background-color: #ffffff;
   box-shadow: none;
   display: block;
+  transition: width 0.2s ease;
 }
 
 .arch-canvas-container.drag-over {
   border: 2px dashed var(--arch-primary);
 }
 
-/* Canvas Blocks */
-.arch-canvas-block {
-  position: relative;
-  cursor: grab;
-  transition: outline 0.15s ease, opacity 0.15s ease;
-  outline: 2px solid transparent;
-  outline-offset: -2px;
-}
-
-.arch-canvas-block:active {
-  cursor: grabbing;
-}
-
-.arch-canvas-block.is-dragging {
-  opacity: 0.35;
-  outline: 2px dashed var(--arch-primary) !important;
-}
-
-.arch-canvas-block.drop-target-top {
-  position: relative;
-}
-
-.arch-canvas-block.drop-target-top::before {
-  content: '';
+/* Non-invasive Parent Overlay Layer & Floating Action Toolbar */
+.arch-canvas-overlay {
   position: absolute;
-  top: -2px;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background-color: var(--arch-primary);
-  border-radius: 2px;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
   z-index: 20;
 }
 
-.arch-canvas-block.drop-target-bottom {
-  position: relative;
-}
-
-.arch-canvas-block.drop-target-bottom::after {
-  content: '';
+.arch-floating-toolbar {
   position: absolute;
-  bottom: -2px;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background-color: var(--arch-primary);
-  border-radius: 2px;
-  z-index: 20;
-}
-
-.arch-canvas-block:hover {
-  outline: 2px dashed #93c5fd;
-}
-
-.arch-canvas-block.is-selected {
-  outline: 2px solid var(--arch-primary) !important;
-}
-
-.arch-block-toolbar {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  display: none;
-  gap: 4px;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(4px);
-  padding: 2px 4px;
-  border-radius: 4px;
-  z-index: 10;
-}
-
-.arch-toolbar-drag {
-  cursor: grab;
-  user-select: none;
-  font-size: 13px;
-  color: #94a3b8;
-  padding: 0 4px;
-  display: flex;
+  z-index: 30;
+  display: inline-flex;
   align-items: center;
-}
-
-.arch-canvas-block:hover .arch-block-toolbar,
-.arch-canvas-block.is-selected .arch-block-toolbar {
-  display: flex;
-}
-
-.arch-toolbar-btn {
-  background: none;
-  border: none;
+  background: #0f172a;
   color: #ffffff;
-  cursor: pointer;
-  padding: 2px 4px;
-  font-size: 11px;
-  border-radius: 2px;
+  border-radius: 6px;
+  padding: 3px 6px;
+  gap: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  font-family: var(--arch-font);
+  font-size: 12px;
+  pointer-events: auto;
+  user-select: none;
 }
 
-.arch-toolbar-btn:hover {
+.arch-float-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(37, 99, 235, 0.9);
+  color: #ffffff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 2px;
+}
+
+.arch-float-btn {
+  background: transparent;
+  border: none;
+  color: #f8fafc;
+  padding: 3px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.arch-float-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.2);
+}
+
+.arch-float-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.arch-float-btn--danger:hover:not(:disabled) {
+  background: #dc2626 !important;
+}
+
+.arch-float-drag {
+  cursor: grab;
+  padding: 2px 4px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.arch-float-drag:active {
+  cursor: grabbing;
 }
 
 .arch-canvas-empty {
@@ -305,7 +335,56 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+}
+
+/* Structural Breadcrumb */
+.arch-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  background: #f8fafc;
+  border: 1px solid var(--arch-border);
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.arch-breadcrumb__item {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--arch-text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.arch-breadcrumb__item:hover {
+  background: #e2e8f0;
+  color: var(--arch-text-primary);
+}
+
+.arch-breadcrumb__item.is-current {
+  color: var(--arch-primary);
+  font-weight: 700;
+}
+
+.arch-breadcrumb__sep {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.arch-mode-banner {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .arch-form-group {

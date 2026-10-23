@@ -1,25 +1,31 @@
 /**
- * Arch Email Editor - Contextual Inspector Component
+ * Arch Email Editor - Contextual Smart Inspector Component
  *
- * Renders the right sidebar property controls:
- * 1. Element Inspector (active when an email element is clicked in the canvas):
- *    - Image: Image URL, Alt text, alignment, width.
- *    - Button / Link: Button Label, Link URL, Button Color, Text Color, Border Radius.
- *    - Heading / Text: Text Content, Font Size, Text Color, Alignment.
- *    - Section / Table: Background Color, Padding.
- *    - Delete Element button: deletes the element from the email template.
- * 2. Block Inspector (for AST block compatibility).
- * 3. Document Settings (when nothing is selected):
- *    - Background Color, Content Width, Base Font Family.
- *
- * All inputs update the live DOM node synchronously with zero latency.
+ * Uses Smart Component Adapters (`ButtonAdapter`, `ImageAdapter`, `TextAdapter`,
+ * `DividerAdapter`, `SpacerAdapter`, `SocialAdapter`, `ColumnLayoutAdapter`) to
+ * customize any email element without breaking compound HTML or MSO VML.
  */
 
-import { EmailDocument, BlockNode, SelectedElementInfo } from '../types';
+import { EmailDocument, BlockNode, RowLayoutType, SelectedElementInfo, ViewportMode } from '../types';
+import {
+  ButtonAdapter,
+  ColumnLayoutAdapter,
+  DividerAdapter,
+  ImageAdapter,
+  SocialAdapter,
+  SpacerAdapter,
+  TextAdapter
+} from '../engine/adapters';
+import { setUnitVisibility } from '../engine/cssScope';
 
 export interface InspectorEvents {
   onChange: () => void;
   onRemoveBlock?: (id: string) => void;
+  onMoveElement?: (direction: 'up' | 'down') => void;
+  onDuplicateElement?: () => void;
+  onRemoveElement?: () => void;
+  onSelectParent?: () => void;
+  onSelectElementNode?: (el: HTMLElement) => void;
 }
 
 /**
@@ -48,6 +54,7 @@ function toHexColor(colorStr?: string, fallback = '#000000'): string {
 export class Inspector {
   private element: HTMLElement;
   private events: InspectorEvents;
+  private viewportMode: ViewportMode = 'desktop';
 
   constructor(events: InspectorEvents) {
     this.events = events;
@@ -57,6 +64,10 @@ export class Inspector {
 
   public getElement(): HTMLElement {
     return this.element;
+  }
+
+  public setViewportMode(mode: ViewportMode): void {
+    this.viewportMode = mode;
   }
 
   /**
@@ -74,7 +85,7 @@ export class Inspector {
     }
 
     const block = selectedBlockId
-      ? doc.blocks.find(b => b.id === selectedBlockId) || null
+      ? doc.blocks.find((b) => b.id === selectedBlockId) || null
       : null;
 
     if (block) {
@@ -89,20 +100,118 @@ export class Inspector {
    */
   private renderElementSettings(info: SelectedElementInfo): void {
     const typeTitle = info.type.toUpperCase();
+    const isHorizontal = info.axis === 'horizontal';
+    const upLabel = isHorizontal ? '◀ Left' : '▲ Up';
+    const downLabel = isHorizontal ? '▶ Right' : '▼ Down';
+
+    const breadcrumbHtml =
+      info.ancestry && info.ancestry.length > 0
+        ? `<div class="arch-breadcrumb">
+            ${info.ancestry
+              .map(
+                (item, idx) =>
+                  `<button type="button" class="arch-breadcrumb__item ${
+                    idx === info.ancestry!.length - 1 ? 'is-current' : ''
+                  }" data-ancestry-idx="${idx}">${item.label}</button>`
+              )
+              .join('<span class="arch-breadcrumb__sep">›</span>')}
+          </div>`
+        : '';
+
+    const modeBadge =
+      this.viewportMode === 'mobile'
+        ? `<div class="arch-mode-banner">📱 Editing Mobile (≤620px) Overrides</div>`
+        : '';
+
     this.element.innerHTML = `
+      ${breadcrumbHtml}
+      ${modeBadge}
       <div class="arch-editor__section-label">Element Properties (${typeTitle})</div>
+      <div class="arch-form-group">
+        <label class="arch-form-label">Structure & Placement</label>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button class="arch-btn" id="btn-select-parent" type="button" style="flex: 1;" title="Select enclosing Column or Row" ${!info.canSelectParent ? 'disabled' : ''}>
+            ↑ Parent
+          </button>
+          <button class="arch-btn" id="btn-move-up" type="button" style="flex: 1;" ${!info.canMoveUp ? 'disabled' : ''}>
+            ${upLabel}
+          </button>
+          <button class="arch-btn" id="btn-move-down" type="button" style="flex: 1;" ${!info.canMoveDown ? 'disabled' : ''}>
+            ${downLabel}
+          </button>
+          <button class="arch-btn" id="btn-duplicate-element" type="button" title="Duplicate Unit">
+            ⧉ Copy
+          </button>
+        </div>
+      </div>
       <div id="inspector-element-fields"></div>
-      <div class="arch-form-group" style="margin-top: 18px;">
+      <div class="arch-form-group" style="margin-top: 12px; border-top: 1px solid var(--arch-border); padding-top: 12px;">
+        <label class="arch-form-label">Responsive Visibility</label>
+        <div style="display: flex; gap: 12px; font-size: 12px;">
+          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+            <input type="checkbox" id="chk-vis-desktop" ${!(info.unit || info.element).classList.contains('arch-hide-desktop') ? 'checked' : ''} />
+            Desktop
+          </label>
+          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+            <input type="checkbox" id="chk-vis-mobile" ${!(info.unit || info.element).classList.contains('mobile_hide') ? 'checked' : ''} />
+            Mobile
+          </label>
+        </div>
+      </div>
+      <div class="arch-form-group" style="margin-top: 14px;">
         <button class="arch-btn arch-btn--danger" id="btn-delete-element" type="button" style="width: 100%;">
-          Delete Element
+          Delete ${info.unitRole === 'row' ? 'Row' : info.unitRole === 'column' ? 'Column' : 'Element'}
         </button>
       </div>
     `;
 
+    // Bind Breadcrumb clicks
+    if (info.ancestry) {
+      this.element.querySelectorAll<HTMLButtonElement>('[data-ancestry-idx]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.getAttribute('data-ancestry-idx') || '0', 10);
+          const item = info.ancestry![idx];
+          if (item && this.events.onSelectElementNode) {
+            this.events.onSelectElementNode(item.element);
+          }
+        });
+      });
+    }
+
+    this.element.querySelector('#btn-select-parent')?.addEventListener('click', () => {
+      this.events.onSelectParent?.();
+    });
+
+    this.element.querySelector('#btn-move-up')?.addEventListener('click', () => {
+      this.events.onMoveElement?.('up');
+    });
+
+    this.element.querySelector('#btn-move-down')?.addEventListener('click', () => {
+      this.events.onMoveElement?.('down');
+    });
+
+    this.element.querySelector('#btn-duplicate-element')?.addEventListener('click', () => {
+      this.events.onDuplicateElement?.();
+    });
+
+    const targetUnit = info.unit || info.element;
+    this.element.querySelector<HTMLInputElement>('#chk-vis-desktop')?.addEventListener('change', (e) => {
+      setUnitVisibility(targetUnit, 'desktop', (e.target as HTMLInputElement).checked);
+      this.events.onChange();
+    });
+    this.element.querySelector<HTMLInputElement>('#chk-vis-mobile')?.addEventListener('change', (e) => {
+      setUnitVisibility(targetUnit, 'mobile', (e.target as HTMLInputElement).checked);
+      this.events.onChange();
+    });
+
     const deleteBtn = this.element.querySelector('#btn-delete-element');
     deleteBtn?.addEventListener('click', () => {
-      info.element.remove();
-      this.events.onChange();
+      if (this.events.onRemoveElement) {
+        this.events.onRemoveElement();
+      } else {
+        targetUnit.remove();
+        this.events.onChange();
+      }
       this.element.innerHTML = `
         <div class="arch-editor__section-label">Element Deleted</div>
         <p style="font-size: 13px; color: var(--arch-text-secondary); margin-top: 8px;">
@@ -125,6 +234,15 @@ export class Inspector {
       case 'text':
         this.renderTextElementControls(fieldsContainer, info);
         break;
+      case 'divider':
+        this.renderDividerElementControls(fieldsContainer, info);
+        break;
+      case 'spacer':
+        this.renderSpacerElementControls(fieldsContainer, info);
+        break;
+      case 'social':
+        this.renderSocialElementControls(fieldsContainer, info);
+        break;
       default:
         this.renderSectionElementControls(fieldsContainer, info);
         break;
@@ -142,8 +260,12 @@ export class Inspector {
         <input type="text" class="arch-input" id="inp-img-alt" placeholder="Description of image" />
       </div>
       <div class="arch-form-group">
-        <label class="arch-form-label">Max Width</label>
-        <input type="text" class="arch-input" id="inp-img-width" placeholder="100% or 600px" />
+        <label class="arch-form-label">Click-Through Link URL</label>
+        <input type="text" class="arch-input" id="inp-img-link" placeholder="https://..." />
+      </div>
+      <div class="arch-form-group">
+        <label class="arch-form-label">Width (px or %)</label>
+        <input type="text" class="arch-input" id="inp-img-width" placeholder="180px or 100%" />
       </div>
       <div class="arch-form-group">
         <label class="arch-form-label">Alignment</label>
@@ -156,40 +278,37 @@ export class Inspector {
     `;
 
     const srcInp = container.querySelector<HTMLInputElement>('#inp-img-src')!;
-    srcInp.value = info.element.getAttribute('src') || '';
+    srcInp.value = ImageAdapter.getSrc(info.element, info.unit);
     srcInp.addEventListener('input', (e) => {
-      const val = (e.target as HTMLInputElement).value;
-      info.element.setAttribute('src', val);
+      ImageAdapter.setSrc(info.element, (e.target as HTMLInputElement).value, info.unit);
       this.events.onChange();
     });
 
     const altInp = container.querySelector<HTMLInputElement>('#inp-img-alt')!;
-    altInp.value = info.element.getAttribute('alt') || '';
+    altInp.value = ImageAdapter.getAlt(info.element, info.unit);
     altInp.addEventListener('input', (e) => {
-      const val = (e.target as HTMLInputElement).value;
-      info.element.setAttribute('alt', val);
+      ImageAdapter.setAlt(info.element, (e.target as HTMLInputElement).value, info.unit);
+      this.events.onChange();
+    });
+
+    const linkInp = container.querySelector<HTMLInputElement>('#inp-img-link')!;
+    linkInp.value = ImageAdapter.getLinkUrl(info.element, info.unit);
+    linkInp.addEventListener('input', (e) => {
+      ImageAdapter.setLinkUrl(info.element, (e.target as HTMLInputElement).value, info.unit);
       this.events.onChange();
     });
 
     const widthInp = container.querySelector<HTMLInputElement>('#inp-img-width')!;
-    widthInp.value = info.element.style.maxWidth || info.element.getAttribute('width') || '';
+    widthInp.value = ImageAdapter.getWidth(info.element, info.unit);
     widthInp.addEventListener('input', (e) => {
-      const val = (e.target as HTMLInputElement).value;
-      info.element.style.maxWidth = val;
-      if (val.endsWith('px')) {
-        info.element.setAttribute('width', val.replace('px', ''));
-      }
+      ImageAdapter.setWidth(info.element, (e.target as HTMLInputElement).value, info.unit);
       this.events.onChange();
     });
 
     const alignSel = container.querySelector<HTMLSelectElement>('#inp-img-align')!;
-    alignSel.value = info.textAlign || 'center';
+    alignSel.value = ImageAdapter.getAlignment(info.element, info.unit);
     alignSel.addEventListener('change', (e) => {
-      const val = (e.target as HTMLSelectElement).value;
-      if (info.element.parentElement) {
-        info.element.parentElement.style.textAlign = val;
-      }
-      info.element.style.textAlign = val;
+      ImageAdapter.setAlignment(info.element, (e.target as HTMLSelectElement).value as any, info.unit);
       this.events.onChange();
     });
   }
@@ -216,54 +335,64 @@ export class Inspector {
         <label class="arch-form-label">Border Radius</label>
         <input type="text" class="arch-input" id="inp-btn-radius" placeholder="6px" />
       </div>
+      <div class="arch-form-group">
+        <label class="arch-form-label">Alignment</label>
+        <select class="arch-select" id="inp-btn-align">
+          <option value="left">Left</option>
+          <option value="center">Center</option>
+          <option value="right">Right</option>
+        </select>
+      </div>
     `;
 
     const labelInp = container.querySelector<HTMLInputElement>('#inp-btn-label')!;
-    labelInp.value = info.element.textContent?.trim() || '';
+    labelInp.value = ButtonAdapter.getLabel(info.element, info.unit);
     labelInp.addEventListener('input', (e) => {
-      info.element.textContent = (e.target as HTMLInputElement).value;
+      ButtonAdapter.setLabel(info.element, (e.target as HTMLInputElement).value, info.unit);
       this.events.onChange();
     });
 
     const urlInp = container.querySelector<HTMLInputElement>('#inp-btn-url')!;
-    urlInp.value = info.element.getAttribute('href') || '';
+    urlInp.value = ButtonAdapter.getUrl(info.element, info.unit);
     urlInp.addEventListener('input', (e) => {
-      info.element.setAttribute('href', (e.target as HTMLInputElement).value);
+      ButtonAdapter.setUrl(info.element, (e.target as HTMLInputElement).value, info.unit);
       this.events.onChange();
     });
 
     const bgInp = container.querySelector<HTMLInputElement>('#inp-btn-bg')!;
-    bgInp.value = toHexColor(info.backgroundColor, '#2563eb');
+    bgInp.value = toHexColor(ButtonAdapter.getBackgroundColor(info.element, info.unit) || info.backgroundColor, '#2563eb');
     bgInp.addEventListener('input', (e) => {
-      const val = (e.target as HTMLInputElement).value;
-      info.element.style.backgroundColor = val;
-      const parentTd = info.element.closest('td');
-      if (parentTd) {
-        parentTd.setAttribute('bgcolor', val);
-        parentTd.style.backgroundColor = val;
-      }
+      ButtonAdapter.setBackgroundColor(info.element, (e.target as HTMLInputElement).value, info.unit);
       this.events.onChange();
     });
 
     const colorInp = container.querySelector<HTMLInputElement>('#inp-btn-color')!;
-    colorInp.value = toHexColor(info.color, '#ffffff');
+    colorInp.value = toHexColor(ButtonAdapter.getTextColor(info.element, info.unit) || info.color, '#ffffff');
     colorInp.addEventListener('input', (e) => {
-      info.element.style.color = (e.target as HTMLInputElement).value;
+      ButtonAdapter.setTextColor(info.element, (e.target as HTMLInputElement).value, info.unit);
       this.events.onChange();
     });
 
     const radiusInp = container.querySelector<HTMLInputElement>('#inp-btn-radius')!;
-    radiusInp.value = info.element.style.borderRadius || '6px';
+    radiusInp.value = ButtonAdapter.getBorderRadius(info.element, info.unit);
     radiusInp.addEventListener('input', (e) => {
-      info.element.style.borderRadius = (e.target as HTMLInputElement).value;
+      ButtonAdapter.setBorderRadius(info.element, (e.target as HTMLInputElement).value, info.unit);
+      this.events.onChange();
+    });
+
+    const alignSel = container.querySelector<HTMLSelectElement>('#inp-btn-align')!;
+    alignSel.value = ButtonAdapter.getAlignment(info.element, info.unit);
+    alignSel.addEventListener('change', (e) => {
+      ButtonAdapter.setAlignment(info.element, (e.target as HTMLSelectElement).value as any, info.unit);
       this.events.onChange();
     });
   }
 
   private renderTextElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const hasRich = TextAdapter.hasRichFormatting(info.element, info.unit);
     container.innerHTML = `
       <div class="arch-form-group">
-        <label class="arch-form-label">Text Content</label>
+        <label class="arch-form-label">Text Content ${hasRich ? '<span style="font-weight:400;font-size:11px;color:#2563eb;">(Edit directly on canvas to keep bold/italic/links)</span>' : ''}</label>
         <textarea class="arch-textarea" id="inp-text-copy" rows="4"></textarea>
       </div>
       <div class="arch-form-group">
@@ -287,48 +416,153 @@ export class Inspector {
     const copyInp = container.querySelector<HTMLTextAreaElement>('#inp-text-copy')!;
     copyInp.value = info.element.textContent || '';
     copyInp.addEventListener('input', (e) => {
-      info.element.textContent = (e.target as HTMLTextAreaElement).value;
+      TextAdapter.setText(info.element, (e.target as HTMLTextAreaElement).value, info.unit);
       this.events.onChange();
     });
 
     const sizeInp = container.querySelector<HTMLInputElement>('#inp-text-size')!;
     sizeInp.value = info.fontSize || '';
     sizeInp.addEventListener('input', (e) => {
-      info.element.style.fontSize = (e.target as HTMLInputElement).value;
+      TextAdapter.setFontSize(info.element, (e.target as HTMLInputElement).value, this.viewportMode, info.unit);
       this.events.onChange();
     });
 
     const colorInp = container.querySelector<HTMLInputElement>('#inp-text-color')!;
     colorInp.value = toHexColor(info.color, '#0f172a');
     colorInp.addEventListener('input', (e) => {
-      info.element.style.color = (e.target as HTMLInputElement).value;
+      TextAdapter.setColor(info.element, (e.target as HTMLInputElement).value, info.unit);
       this.events.onChange();
     });
 
     const alignSel = container.querySelector<HTMLSelectElement>('#inp-text-align')!;
     alignSel.value = info.textAlign || 'left';
     alignSel.addEventListener('change', (e) => {
-      info.element.style.textAlign = (e.target as HTMLSelectElement).value;
+      TextAdapter.setAlignment(info.element, (e.target as HTMLSelectElement).value as any, this.viewportMode, info.unit);
       this.events.onChange();
     });
   }
 
-  private renderSectionElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+  private renderDividerElementControls(container: HTMLElement, info: SelectedElementInfo): void {
     container.innerHTML = `
       <div class="arch-form-group">
-        <label class="arch-form-label">Section Background Color</label>
+        <label class="arch-form-label">Divider Line Color</label>
+        <input type="color" class="arch-input" id="inp-div-color" />
+      </div>
+      <div class="arch-form-group">
+        <label class="arch-form-label">Line Thickness (px)</label>
+        <input type="text" class="arch-input" id="inp-div-thickness" placeholder="1px" />
+      </div>
+    `;
+
+    const colorInp = container.querySelector<HTMLInputElement>('#inp-div-color')!;
+    colorInp.value = toHexColor(DividerAdapter.getColor(info.element, info.unit), '#cbd5e1');
+    colorInp.addEventListener('input', (e) => {
+      DividerAdapter.setColor(info.element, (e.target as HTMLInputElement).value, info.unit);
+      this.events.onChange();
+    });
+
+    const thickInp = container.querySelector<HTMLInputElement>('#inp-div-thickness')!;
+    thickInp.value = DividerAdapter.getThickness(info.element, info.unit);
+    thickInp.addEventListener('input', (e) => {
+      DividerAdapter.setThickness(info.element, (e.target as HTMLInputElement).value, info.unit);
+      this.events.onChange();
+    });
+  }
+
+  private renderSpacerElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    container.innerHTML = `
+      <div class="arch-form-group">
+        <label class="arch-form-label">Spacer Height (px)</label>
+        <input type="text" class="arch-input" id="inp-spacer-height" placeholder="28px" />
+      </div>
+    `;
+
+    const heightInp = container.querySelector<HTMLInputElement>('#inp-spacer-height')!;
+    heightInp.value = SpacerAdapter.getHeight(info.element, info.unit);
+    heightInp.addEventListener('input', (e) => {
+      SpacerAdapter.setHeight(info.element, (e.target as HTMLInputElement).value, info.unit);
+      this.events.onChange();
+    });
+  }
+
+  private renderSocialElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const unit = info.unit || info.element;
+    const items = SocialAdapter.getItems(unit);
+
+    container.innerHTML = `
+      <div class="arch-form-group">
+        <label class="arch-form-label">Social Icon Links (${items.length})</label>
+        <div id="social-items-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <button type="button" class="arch-btn" id="btn-add-social" style="margin-top:6px;">+ Add Social Icon</button>
+      </div>
+    `;
+
+    const listEl = container.querySelector<HTMLElement>('#social-items-list')!;
+    items.forEach((item, idx) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'border:1px solid var(--arch-border);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:4px;';
+      row.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:600;">
+          <span>${idx + 1}. ${item.alt || 'Icon'}</span>
+          <button type="button" class="arch-btn arch-btn--danger btn-del-social" style="padding:2px 6px;font-size:10px;">✕</button>
+        </div>
+        <input type="text" class="arch-input inp-social-href" placeholder="https://..." value="${item.href}" />
+      `;
+      row.querySelector<HTMLInputElement>('.inp-social-href')?.addEventListener('input', (e) => {
+        item.anchor.setAttribute('href', (e.target as HTMLInputElement).value);
+        this.events.onChange();
+      });
+      row.querySelector('.btn-del-social')?.addEventListener('click', () => {
+        item.anchor.remove();
+        this.events.onChange();
+        this.renderSocialElementControls(container, info);
+      });
+      listEl.appendChild(row);
+    });
+
+    container.querySelector('#btn-add-social')?.addEventListener('click', () => {
+      SocialAdapter.addIcon(unit);
+      this.events.onChange();
+      this.renderSocialElementControls(container, info);
+    });
+  }
+
+  private renderSectionElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const targetEl = info.unit || info.element;
+    // If targetEl is a `table.row`, background often lives on inner `.row-content` table as well
+    const contentTable = targetEl.querySelector<HTMLElement>('.row-content') || targetEl;
+
+    container.innerHTML = `
+      <div class="arch-form-group">
+        <label class="arch-form-label">Background Color</label>
         <input type="color" class="arch-input" id="inp-sec-bg" />
       </div>
       <div class="arch-form-group">
         <label class="arch-form-label">Padding</label>
         <input type="text" class="arch-input" id="inp-sec-padding" placeholder="16px 20px" />
       </div>
+      <div class="arch-form-group">
+        <label class="arch-form-label">Row Column Layout</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+          <button type="button" class="arch-btn" data-col-preset="1-col">1 Col (100%)</button>
+          <button type="button" class="arch-btn" data-col-preset="2-col-50-50">2 Col (50/50)</button>
+          <button type="button" class="arch-btn" data-col-preset="2-col-33-67">2 Col (33/67)</button>
+          <button type="button" class="arch-btn" data-col-preset="3-col">3 Col (33/33/33)</button>
+        </div>
+      </div>
     `;
 
     const bgInp = container.querySelector<HTMLInputElement>('#inp-sec-bg')!;
-    bgInp.value = toHexColor(info.backgroundColor, '#ffffff');
+    bgInp.value = toHexColor(contentTable.style.backgroundColor || info.backgroundColor, '#ffffff');
     bgInp.addEventListener('input', (e) => {
       const val = (e.target as HTMLInputElement).value;
+      contentTable.style.backgroundColor = val;
+      if (
+        contentTable.tagName.toLowerCase() === 'td' ||
+        contentTable.tagName.toLowerCase() === 'table'
+      ) {
+        contentTable.setAttribute('bgcolor', val);
+      }
       info.element.style.backgroundColor = val;
       if (info.element.tagName.toLowerCase() === 'td') {
         info.element.setAttribute('bgcolor', val);
@@ -337,10 +571,19 @@ export class Inspector {
     });
 
     const padInp = container.querySelector<HTMLInputElement>('#inp-sec-padding')!;
-    padInp.value = info.element.style.padding || '';
+    padInp.value = info.element.style.padding || targetEl.style.padding || '';
     padInp.addEventListener('input', (e) => {
-      info.element.style.padding = (e.target as HTMLInputElement).value;
+      const val = (e.target as HTMLInputElement).value;
+      info.element.style.padding = val;
       this.events.onChange();
+    });
+
+    container.querySelectorAll<HTMLButtonElement>('[data-col-preset]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const preset = btn.getAttribute('data-col-preset') as RowLayoutType;
+        ColumnLayoutAdapter.applyRowPreset(targetEl, preset);
+        this.events.onChange();
+      });
     });
   }
 
@@ -370,7 +613,7 @@ export class Inspector {
         </select>
       </div>
       <p style="font-size: 12px; color: var(--arch-text-secondary); margin-top: 14px; line-height: 1.5;">
-        💡 Click any element on the canvas to inspect and customize its individual properties.
+        💡 Click any element on the canvas to inspect, move, duplicate, or customize its properties. Use <strong>↑ Parent</strong> to select Columns or Rows.
       </p>
     `;
 
