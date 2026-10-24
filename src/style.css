@@ -159,7 +159,7 @@
 
 /* Right Panel (Blocks | Sections | Settings) */
 .arch-editor__right-panel {
-  width: 380px;
+  width: 420px;
   background-color: #ffffff;
   border-left: 1px solid #e5e7eb;
   display: flex;
@@ -321,18 +321,24 @@
 }
 
 .arch-tab-panel--settings {
+  width: 100% !important;
+  max-width: 100% !important;
   padding: 0 !important;
   gap: 0 !important;
+  box-sizing: border-box;
 }
 
 .arch-tab-panel.is-hidden {
   display: none !important;
 }
 
-.arch-tab-panel--settings .arch-editor__inspector {
-  width: 100%;
-  border-left: none;
-  padding: 0;
+.arch-tab-panel--settings .arch-editor__inspector,
+.arch-tab-panel--settings.arch-editor__inspector {
+  width: 100% !important;
+  max-width: 100% !important;
+  border-left: none !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
 }
 
 /* Content Blocks 3-Column Square Grid */
@@ -552,6 +558,7 @@
   border-radius: 4px;
   overflow: hidden;
   background: #ffffff;
+  flex-shrink: 0;
 }
 
 .arch-segmented-btn {
@@ -567,6 +574,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
 }
 
 .arch-segmented-btn:hover {
@@ -1214,14 +1222,15 @@ input:checked + .arch-toggle-slider:before {
 
 /* Right Inspector */
 .arch-editor__inspector {
-  width: 280px;
-  background-color: var(--arch-bg-surface);
-  border-left: 1px solid var(--arch-border);
-  padding: 16px;
+  width: 100% !important;
+  max-width: 100% !important;
+  background-color: #ffffff;
+  border-left: none;
+  padding: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  box-sizing: border-box;
 }
 
 /* Structural Breadcrumb */

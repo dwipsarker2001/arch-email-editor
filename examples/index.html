@@ -49,7 +49,12 @@
 
     // Helper for headless verification
     const params = new URLSearchParams(window.location.search);
-    if (params.get('select')) {
+    if (params.get('tab')) {
+      setTimeout(() => {
+        const tabBtn = document.querySelector(`[data-tab="${params.get('tab')}"]`);
+        if (tabBtn) tabBtn.click();
+      }, 300);
+    } else if (params.get('select')) {
       setTimeout(() => {
         const iframe = document.querySelector('iframe');
         if (iframe && (iframe.contentDocument || iframe.contentWindow.document)) {
