@@ -513,6 +513,9 @@
   cursor: pointer;
   color: #4b5563;
   transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .arch-segmented-btn:hover {
@@ -522,6 +525,186 @@
 .arch-segmented-btn.is-active {
   background: #ede9fe;
   color: #7747ff;
+}
+
+.arch-segmented-icon-btn {
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.15s ease;
+}
+
+.arch-segmented-icon-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.arch-segmented-icon-btn.is-active {
+  background: #ede9fe;
+  color: #7747ff;
+}
+
+/* RGE Stepper [ - ] [ value ] [ + ] */
+.arch-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  background: #ffffff;
+  overflow: hidden;
+  height: 32px;
+}
+
+.arch-stepper-btn {
+  width: 28px;
+  height: 100%;
+  background: #f9fafb;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.arch-stepper-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.arch-stepper-btn:active {
+  background: #e5e7eb;
+}
+
+.arch-stepper-val {
+  width: 44px;
+  height: 100%;
+  border: none;
+  border-left: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+  outline: none;
+  background: #ffffff;
+  padding: 0 4px;
+}
+
+/* Sub-section labels & headers inside properties */
+.arch-sub-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  margin: 12px 0 6px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.arch-form-label-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* URL Input with prefix */
+.arch-url-group {
+  display: flex;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.arch-url-prefix {
+  padding: 6px 10px;
+  background: #f9fafb;
+  border-right: 1px solid #e5e7eb;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.arch-url-input {
+  border: none;
+  outline: none;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #111827;
+  flex: 1;
+  background: transparent;
+}
+
+.arch-action-links {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: #7747ff;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.arch-action-link {
+  color: #7747ff;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.arch-action-link:hover {
+  text-decoration: underline;
+}
+
+/* Code Editor box for HTML block */
+.arch-code-editor {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  background: #1e293b;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  padding: 10px;
+  outline: none;
+  resize: vertical;
+  min-height: 120px;
+  box-sizing: border-box;
+}
+
+/* Item cards in Lists, Social, Menu, Icons */
+.arch-item-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.arch-item-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #374151;
 }
 
 /* Color Picker Swatch Control */

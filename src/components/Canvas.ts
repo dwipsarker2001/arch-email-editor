@@ -2204,25 +2204,35 @@ export class Canvas {
     if (!ifrDoc || !ifrDoc.body) return;
 
     const refUnit = targetElement || this.activeMoveableUnit;
+    let insertedEl: HTMLElement | null = null;
 
     if (refUnit && refUnit.parentElement && refUnit !== ifrDoc.body) {
       if (isColumnElement(refUnit)) {
         const slot = getColumnSlotContainer(refUnit);
         const snippet = buildContextAwareBlockHtml(type, slot.tagName.toLowerCase());
         slot.insertAdjacentHTML('beforeend', snippet);
+        insertedEl = slot.lastElementChild as HTMLElement;
       } else {
         const parentTag = refUnit.parentElement.tagName.toLowerCase();
         const snippet = buildContextAwareBlockHtml(type, parentTag);
         refUnit.insertAdjacentHTML('afterend', snippet);
+        insertedEl = refUnit.nextElementSibling as HTMLElement;
       }
     } else {
       const container = findPrimaryContentContainer(ifrDoc);
       const containerTag = container.tagName.toLowerCase();
       const snippet = buildContextAwareBlockHtml(type, containerTag);
       container.insertAdjacentHTML('beforeend', snippet);
+      insertedEl = container.lastElementChild as HTMLElement;
     }
 
     this.onStructureChanged();
+
+    if (insertedEl) {
+      const unit = resolveEffectiveMoveUnit(insertedEl) || insertedEl;
+      const targetChild = insertedEl.querySelector<HTMLElement>('a, img, h1, h2, h3, h4, p, hr, table, ul, ol') || insertedEl;
+      this.selectUnit(unit, targetChild);
+    }
   }
 
   /**
@@ -2241,18 +2251,23 @@ export class Canvas {
         ? resolveEffectiveMoveUnit(rawRow)
         : null;
 
+    let insertedRow: HTMLElement | null = null;
+
     if (effectiveRow && effectiveRow.parentElement && effectiveRow !== ifrDoc.body) {
       const parentTag = effectiveRow.parentElement.tagName.toLowerCase();
       const wrapInTr = parentTag === 'tbody' || parentTag === 'table';
       const html = buildRowLayoutHtml(layout, wrapInTr);
       effectiveRow.insertAdjacentHTML('afterend', html);
+      insertedRow = effectiveRow.nextElementSibling as HTMLElement;
     } else {
       const existingRows = ifrDoc.body.querySelectorAll<HTMLElement>('table.row, section');
       if (existingRows.length > 0) {
         const lastRow = resolveEffectiveMoveUnit(existingRows[existingRows.length - 1]);
         const parentTag = lastRow.parentElement?.tagName.toLowerCase() || 'td';
         const wrapInTr = parentTag === 'tbody' || parentTag === 'table';
-        lastRow.insertAdjacentHTML('afterend', buildRowLayoutHtml(layout, wrapInTr));
+        const html = buildRowLayoutHtml(layout, wrapInTr);
+        lastRow.insertAdjacentHTML('afterend', html);
+        insertedRow = lastRow.nextElementSibling as HTMLElement;
       } else {
         const container = findPrimaryContentContainer(ifrDoc);
         const rowContainer = isColumnElement(container)
@@ -2262,10 +2277,16 @@ export class Canvas {
         const wrapInTr = containerTag === 'tbody' || containerTag === 'table';
         const html = buildRowLayoutHtml(layout, wrapInTr);
         rowContainer.insertAdjacentHTML('beforeend', html);
+        insertedRow = rowContainer.lastElementChild as HTMLElement;
       }
     }
 
     this.onStructureChanged();
+
+    if (insertedRow) {
+      const unit = resolveEffectiveMoveUnit(insertedRow) || insertedRow;
+      this.selectUnit(unit, unit);
+    }
   }
 
   /**

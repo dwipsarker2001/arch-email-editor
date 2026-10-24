@@ -275,15 +275,17 @@ export class Inspector {
     if (!fieldsContainer) return;
 
     switch (info.type) {
-      case 'image':
-        this.renderImageElementControls(fieldsContainer, info);
+      case 'heading':
+        this.renderHeadingElementControls(fieldsContainer, info);
+        break;
+      case 'text':
+        this.renderTextElementControls(fieldsContainer, info);
         break;
       case 'button':
         this.renderButtonElementControls(fieldsContainer, info);
         break;
-      case 'heading':
-      case 'text':
-        this.renderTextElementControls(fieldsContainer, info);
+      case 'image':
+        this.renderImageElementControls(fieldsContainer, info);
         break;
       case 'divider':
         this.renderDividerElementControls(fieldsContainer, info);
@@ -294,242 +296,355 @@ export class Inspector {
       case 'social':
         this.renderSocialElementControls(fieldsContainer, info);
         break;
+      case 'list':
+        this.renderListElementControls(fieldsContainer, info);
+        break;
+      case 'table':
+        this.renderTableElementControls(fieldsContainer, info);
+        break;
+      case 'video':
+        this.renderVideoElementControls(fieldsContainer, info);
+        break;
+      case 'icons':
+        this.renderIconsElementControls(fieldsContainer, info);
+        break;
+      case 'menu':
+        this.renderMenuElementControls(fieldsContainer, info);
+        break;
+      case 'html':
+        this.renderHtmlElementControls(fieldsContainer, info);
+        break;
+      case 'sticker':
+        this.renderStickerGifElementControls(fieldsContainer, info, false);
+        break;
+      case 'gif':
+        this.renderStickerGifElementControls(fieldsContainer, info, true);
+        break;
       default:
         this.renderSectionElementControls(fieldsContainer, info);
         break;
     }
   }
 
-  private renderImageElementControls(container: HTMLElement, info: SelectedElementInfo): void {
-    container.innerHTML = `
-      <div class="arch-form-group">
-        <label class="arch-form-label">Image URL</label>
-        <input type="text" class="arch-input" id="inp-img-src" placeholder="https://..." />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Alt Text (Accessibility)</label>
-        <input type="text" class="arch-input" id="inp-img-alt" placeholder="Description of image" />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Click-Through Link URL</label>
-        <input type="text" class="arch-input" id="inp-img-link" placeholder="https://..." />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Width (px or %)</label>
-        <div class="arch-img-resize-row">
-          <input type="range" class="arch-range" id="inp-img-width-range" min="24" max="600" step="1" />
-          <input type="text" class="arch-input arch-img-width-input" id="inp-img-width" placeholder="180px or 100%" />
-        </div>
-        <div class="arch-btn-group" style="margin-top: 6px;">
-          <button type="button" class="arch-btn" data-width-preset="25%">25%</button>
-          <button type="button" class="arch-btn" data-width-preset="50%">50%</button>
-          <button type="button" class="arch-btn" data-width-preset="75%">75%</button>
-          <button type="button" class="arch-btn" data-width-preset="100%">100%</button>
-        </div>
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Alignment</label>
-        <select class="arch-select" id="inp-img-align">
-          <option value="left">Left</option>
-          <option value="center">Center</option>
-          <option value="right">Right</option>
-        </select>
+  /* -------------------------------------------------------------------------- */
+  /* Shared RGE Visual Component Helpers                                       */
+  /* -------------------------------------------------------------------------- */
+
+  private renderStepper(id: string, value: number, min = 0, max = 500, step = 1): string {
+    return `
+      <div class="arch-stepper" data-stepper-id="${id}">
+        <button type="button" class="arch-stepper-btn" data-step="-${step}">−</button>
+        <input type="text" class="arch-stepper-val" id="${id}" value="${value}" data-min="${min}" data-max="${max}" data-step="${step}" />
+        <button type="button" class="arch-stepper-btn" data-step="${step}">+</button>
       </div>
     `;
+  }
 
-    const srcInp = container.querySelector<HTMLInputElement>('#inp-img-src')!;
-    srcInp.value = ImageAdapter.getSrc(info.element, info.unit);
-    srcInp.addEventListener('input', (e) => {
-      ImageAdapter.setSrc(info.element, (e.target as HTMLInputElement).value, info.unit);
-      this.events.onChange();
-    });
+  private bindStepper(container: HTMLElement, id: string, onChange: (val: number) => void): void {
+    const root = container.querySelector<HTMLElement>(`[data-stepper-id="${id}"]`);
+    if (!root) return;
+    const inp = root.querySelector<HTMLInputElement>(`#${id}`);
+    if (!inp) return;
 
-    const altInp = container.querySelector<HTMLInputElement>('#inp-img-alt')!;
-    altInp.value = ImageAdapter.getAlt(info.element, info.unit);
-    altInp.addEventListener('input', (e) => {
-      ImageAdapter.setAlt(info.element, (e.target as HTMLInputElement).value, info.unit);
-      this.events.onChange();
-    });
+    const min = parseInt(inp.getAttribute('data-min') || '0', 10);
+    const max = parseInt(inp.getAttribute('data-max') || '500', 10);
 
-    const linkInp = container.querySelector<HTMLInputElement>('#inp-img-link')!;
-    linkInp.value = ImageAdapter.getLinkUrl(info.element, info.unit);
-    linkInp.addEventListener('input', (e) => {
-      ImageAdapter.setLinkUrl(info.element, (e.target as HTMLInputElement).value, info.unit);
-      this.events.onChange();
-    });
-
-    const widthInp = container.querySelector<HTMLInputElement>('#inp-img-width')!;
-    const widthRange = container.querySelector<HTMLInputElement>('#inp-img-width-range')!;
-    const initialWidth = ImageAdapter.getWidth(info.element, info.unit);
-    widthInp.value = initialWidth;
-    const numericInitial = parseInt(initialWidth, 10);
-    widthRange.value = String(!isNaN(numericInitial) && !initialWidth.includes('%') ? numericInitial : 300);
-
-    const applyWidth = (val: string) => {
-      widthInp.value = val;
-      const num = parseInt(val, 10);
-      if (!isNaN(num) && !val.includes('%')) {
-        widthRange.value = String(Math.min(600, Math.max(24, num)));
-      }
-      ImageAdapter.setWidth(info.element, val, info.unit);
-      this.events.onChange();
+    const updateVal = (newVal: number) => {
+      const clamped = Math.max(min, Math.min(max, newVal));
+      inp.value = String(clamped);
+      onChange(clamped);
     };
 
-    widthInp.addEventListener('input', (e) => {
-      applyWidth((e.target as HTMLInputElement).value);
-    });
-
-    widthRange.addEventListener('input', (e) => {
-      applyWidth(`${(e.target as HTMLInputElement).value}px`);
-    });
-
-    container.querySelectorAll<HTMLButtonElement>('[data-width-preset]').forEach((btn) => {
+    root.querySelectorAll<HTMLButtonElement>('.arch-stepper-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const preset = btn.dataset.widthPreset;
-        if (preset) applyWidth(preset);
+        const delta = parseInt(btn.getAttribute('data-step') || '1', 10);
+        const current = parseInt(inp.value, 10) || 0;
+        updateVal(current + delta);
       });
     });
 
-    const alignSel = container.querySelector<HTMLSelectElement>('#inp-img-align')!;
-    alignSel.value = ImageAdapter.getAlignment(info.element, info.unit);
-    alignSel.addEventListener('change', (e) => {
-      ImageAdapter.setAlignment(info.element, (e.target as HTMLSelectElement).value as any, info.unit);
-      this.events.onChange();
+    inp.addEventListener('change', () => {
+      const parsed = parseInt(inp.value, 10);
+      updateVal(isNaN(parsed) ? 0 : parsed);
     });
   }
 
-  private renderButtonElementControls(container: HTMLElement, info: SelectedElementInfo): void {
-    const activeNode = info.unit || info.element;
-    const isLinkTag = activeNode.tagName.toLowerCase() === 'a';
-    const labelTitle = isLinkTag ? 'Link / Button Label (<a>)' : 'Button Label';
+  private renderColorPicker(swatchId: string, hexId: string, value: string): string {
+    const hex = toHexColor(value, '#ffffff');
+    return `
+      <div class="arch-color-picker-control">
+        <input type="color" class="arch-color-swatch" id="${swatchId}" value="${hex}" />
+        <input type="text" class="arch-color-hex" id="${hexId}" value="${value || hex}" />
+      </div>
+    `;
+  }
+
+  private bindColorPicker(container: HTMLElement, swatchId: string, hexId: string, onChange: (color: string) => void): void {
+    const swatch = container.querySelector<HTMLInputElement>(`#${swatchId}`);
+    const hex = container.querySelector<HTMLInputElement>(`#${hexId}`);
+    if (!swatch || !hex) return;
+
+    swatch.addEventListener('input', (e) => {
+      const val = (e.target as HTMLInputElement).value;
+      hex.value = val;
+      onChange(val);
+    });
+
+    hex.addEventListener('change', (e) => {
+      const val = (e.target as HTMLInputElement).value;
+      swatch.value = toHexColor(val, '#ffffff');
+      onChange(val);
+    });
+  }
+
+  private renderAlignment(groupClass: string, current: string, hasJustify = false): string {
+    const opts = hasJustify ? ['left', 'center', 'right', 'justify'] : ['left', 'center', 'right'];
+    return `
+      <div class="arch-segmented-group ${groupClass}">
+        ${opts
+          .map((align) => {
+            const isActive = current === align ? 'is-active' : '';
+            const svgIcon =
+              align === 'left'
+                ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>`
+                : align === 'center'
+                ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>`
+                : align === 'right'
+                ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>`
+                : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`;
+            return `<button type="button" class="arch-segmented-icon-btn ${isActive}" data-align="${align}" title="Align ${align}">${svgIcon}</button>`;
+          })
+          .join('')}
+      </div>
+    `;
+  }
+
+  private bindAlignment(container: HTMLElement, groupClass: string, onChange: (val: string) => void): void {
+    const group = container.querySelector<HTMLElement>(`.${groupClass}`);
+    if (!group) return;
+    const btns = group.querySelectorAll<HTMLButtonElement>('[data-align]');
+    btns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const val = btn.getAttribute('data-align') || 'left';
+        btns.forEach((b) => b.classList.toggle('is-active', b === btn));
+        onChange(val);
+      });
+    });
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /* Block Control Renderers                                                    */
+  /* -------------------------------------------------------------------------- */
+
+  private renderHeadingElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const activeNode = info.element;
+    const unitNode = info.unit || activeNode;
+    const headingEl = (activeNode.tagName.match(/^H[1-6]$/i) ? activeNode : unitNode.querySelector('h1, h2, h3, h4, h5, h6') || activeNode) as HTMLElement;
+    const tag = (headingEl.tagName || 'H1').toUpperCase();
+    const currentTag = /^H[1-4]$/.test(tag) ? tag : 'H1';
+    const currentFont = headingEl.style.fontFamily || 'Global font';
+    const currentWeight = headingEl.style.fontWeight || 'bold';
+    const currentSize = parseInt(headingEl.style.fontSize || '32', 10) || 32;
+    const currentColor = toHexColor(headingEl.style.color || info.color, '#111827');
+    const currentAlign = headingEl.style.textAlign || info.textAlign || 'left';
+    const currentLineHeight = headingEl.style.lineHeight || '1.2';
+    const currentSpacing = parseInt(headingEl.style.letterSpacing || '0', 10) || 0;
 
     container.innerHTML = `
-      <div class="arch-form-group">
-        <label class="arch-form-label">${labelTitle}</label>
-        <input type="text" class="arch-input" id="inp-btn-label" />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Target Link URL (href)</label>
-        <input type="text" class="arch-input" id="inp-btn-url" placeholder="https://..." />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Text Color</label>
-        <input type="color" class="arch-input" id="inp-btn-color" />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Background Color</label>
-        <input type="color" class="arch-input" id="inp-btn-bg" />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Font Size</label>
-        <input type="text" class="arch-input" id="inp-btn-size" placeholder="16px" />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Text Decoration</label>
-        <select class="arch-select" id="inp-btn-deco">
-          <option value="none">None</option>
-          <option value="underline">Underline</option>
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Title</label>
+        <select class="arch-select" id="sel-head-tag" style="width: 140px;">
+          <option value="H1" ${currentTag === 'H1' ? 'selected' : ''}>H1</option>
+          <option value="H2" ${currentTag === 'H2' ? 'selected' : ''}>H2</option>
+          <option value="H3" ${currentTag === 'H3' ? 'selected' : ''}>H3</option>
+          <option value="H4" ${currentTag === 'H4' ? 'selected' : ''}>H4</option>
         </select>
       </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Border Radius</label>
-        <input type="text" class="arch-input" id="inp-btn-radius" placeholder="6px" />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Alignment</label>
-        <select class="arch-select" id="inp-btn-align">
-          <option value="left">Left</option>
-          <option value="center">Center</option>
-          <option value="right">Right</option>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Font family</label>
+        <select class="arch-select" id="sel-head-font" style="width: 140px;">
+          <option value="Global font" ${currentFont === 'Global font' ? 'selected' : ''}>Global font</option>
+          <option value="Arial, Helvetica, sans-serif">Arial</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Helvetica Neue', Helvetica, sans-serif">Helvetica</option>
+          <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+          <option value="Verdana, sans-serif">Verdana</option>
         </select>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Font weight</label>
+        <select class="arch-select" id="sel-head-weight" style="width: 140px;">
+          <option value="bold" ${currentWeight === 'bold' || currentWeight === '700' ? 'selected' : ''}>Bold</option>
+          <option value="600" ${currentWeight === '600' ? 'selected' : ''}>Semi Bold</option>
+          <option value="normal" ${currentWeight === 'normal' || currentWeight === '400' ? 'selected' : ''}>Regular</option>
+          <option value="300" ${currentWeight === '300' ? 'selected' : ''}>Light</option>
+        </select>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Font size</label>
+        ${this.renderStepper('stp-head-size', currentSize, 12, 96, 1)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Text color</label>
+        ${this.renderColorPicker('swatch-head-color', 'txt-head-color', currentColor)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Link color</label>
+        ${this.renderColorPicker('swatch-head-link-color', 'txt-head-link-color', '#7747ff')}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Align</label>
+        ${this.renderAlignment('grp-head-align', currentAlign, true)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Line height</label>
+        <select class="arch-select" id="sel-head-lh" style="width: 140px;">
+          <option value="1.1" ${currentLineHeight === '1.1' ? 'selected' : ''}>≡ 1.1</option>
+          <option value="1.2" ${currentLineHeight === '1.2' ? 'selected' : ''}>≡ 1.2</option>
+          <option value="1.3" ${currentLineHeight === '1.3' ? 'selected' : ''}>≡ 1.3</option>
+          <option value="1.4" ${currentLineHeight === '1.4' ? 'selected' : ''}>≡ 1.4</option>
+          <option value="1.5" ${currentLineHeight === '1.5' ? 'selected' : ''}>≡ 1.5</option>
+          <option value="2.0" ${currentLineHeight === '2.0' ? 'selected' : ''}>≡ 2.0</option>
+        </select>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Letter spacing</label>
+        ${this.renderStepper('stp-head-spacing', currentSpacing, -5, 20, 1)}
       </div>
     `;
 
-    const labelInp = container.querySelector<HTMLInputElement>('#inp-btn-label')!;
-    labelInp.value = ButtonAdapter.getLabel(info.element, info.unit);
-    labelInp.addEventListener('input', (e) => {
-      ButtonAdapter.setLabel(info.element, (e.target as HTMLInputElement).value, info.unit);
+    const tagSel = container.querySelector<HTMLSelectElement>('#sel-head-tag')!;
+    tagSel.addEventListener('change', () => {
+      const newTag = tagSel.value.toLowerCase();
+      const newHeading = document.createElement(newTag);
+      newHeading.innerHTML = headingEl.innerHTML;
+      newHeading.style.cssText = headingEl.style.cssText;
+      headingEl.replaceWith(newHeading);
       this.events.onChange();
     });
 
-    const urlInp = container.querySelector<HTMLInputElement>('#inp-btn-url')!;
-    urlInp.value = ButtonAdapter.getUrl(info.element, info.unit);
-    urlInp.addEventListener('input', (e) => {
-      ButtonAdapter.setUrl(info.element, (e.target as HTMLInputElement).value, info.unit);
+    const fontSel = container.querySelector<HTMLSelectElement>('#sel-head-font')!;
+    fontSel.addEventListener('change', () => {
+      const val = fontSel.value;
+      headingEl.style.fontFamily = val === 'Global font' ? '' : val;
       this.events.onChange();
     });
 
-    const bgInp = container.querySelector<HTMLInputElement>('#inp-btn-bg')!;
-    bgInp.value = toHexColor(ButtonAdapter.getBackgroundColor(info.element, info.unit) || info.backgroundColor, '#2563eb');
-    bgInp.addEventListener('input', (e) => {
-      ButtonAdapter.setBackgroundColor(info.element, (e.target as HTMLInputElement).value, info.unit);
+    const weightSel = container.querySelector<HTMLSelectElement>('#sel-head-weight')!;
+    weightSel.addEventListener('change', () => {
+      headingEl.style.fontWeight = weightSel.value;
       this.events.onChange();
     });
 
-    const colorInp = container.querySelector<HTMLInputElement>('#inp-btn-color')!;
-    colorInp.value = toHexColor(ButtonAdapter.getTextColor(info.element, info.unit) || info.color, '#ffffff');
-    colorInp.addEventListener('input', (e) => {
-      ButtonAdapter.setTextColor(info.element, (e.target as HTMLInputElement).value, info.unit);
+    this.bindStepper(container, 'stp-head-size', (val) => {
+      headingEl.style.fontSize = `${val}px`;
       this.events.onChange();
     });
 
-    const sizeInp = container.querySelector<HTMLInputElement>('#inp-btn-size')!;
-    sizeInp.value = activeNode.style.fontSize || info.fontSize || '';
-    sizeInp.addEventListener('input', (e) => {
-      TextAdapter.setFontSize(info.element, (e.target as HTMLInputElement).value, this.viewportMode, info.unit);
+    this.bindColorPicker(container, 'swatch-head-color', 'txt-head-color', (val) => {
+      headingEl.style.color = val;
       this.events.onChange();
     });
 
-    const decoSel = container.querySelector<HTMLSelectElement>('#inp-btn-deco')!;
-    const currentDeco = (activeNode.style.textDecoration || info.element.style.textDecoration || '').toLowerCase();
-    decoSel.value = currentDeco.includes('underline') ? 'underline' : 'none';
-    decoSel.addEventListener('change', (e) => {
-      const val = (e.target as HTMLSelectElement).value;
-      activeNode.style.textDecoration = val;
-      if (info.element !== activeNode) {
-        info.element.style.textDecoration = val;
-      }
+    this.bindAlignment(container, 'grp-head-align', (val) => {
+      headingEl.style.textAlign = val;
       this.events.onChange();
     });
 
-    const radiusInp = container.querySelector<HTMLInputElement>('#inp-btn-radius')!;
-    radiusInp.value = ButtonAdapter.getBorderRadius(info.element, info.unit);
-    radiusInp.addEventListener('input', (e) => {
-      ButtonAdapter.setBorderRadius(info.element, (e.target as HTMLInputElement).value, info.unit);
+    const lhSel = container.querySelector<HTMLSelectElement>('#sel-head-lh')!;
+    lhSel.addEventListener('change', () => {
+      headingEl.style.lineHeight = lhSel.value;
       this.events.onChange();
     });
 
-    const alignSel = container.querySelector<HTMLSelectElement>('#inp-btn-align')!;
-    alignSel.value = ButtonAdapter.getAlignment(info.element, info.unit);
-    alignSel.addEventListener('change', (e) => {
-      ButtonAdapter.setAlignment(info.element, (e.target as HTMLSelectElement).value as any, info.unit);
+    this.bindStepper(container, 'stp-head-spacing', (val) => {
+      headingEl.style.letterSpacing = `${val}px`;
       this.events.onChange();
     });
   }
 
   private renderTextElementControls(container: HTMLElement, info: SelectedElementInfo): void {
-    const hasRich = TextAdapter.hasRichFormatting(info.element, info.unit);
+    const activeNode = info.element;
+    const currentFont = activeNode.style.fontFamily || 'Global font';
+    const currentWeight = activeNode.style.fontWeight || 'normal';
+    const currentSize = parseInt(activeNode.style.fontSize || info.fontSize || '14', 10) || 14;
+    const currentColor = toHexColor(activeNode.style.color || info.color, '#4b5563');
+    const currentAlign = activeNode.style.textAlign || info.textAlign || 'left';
+    const currentLineHeight = activeNode.style.lineHeight || '1.5';
+    const currentSpacing = parseInt(activeNode.style.letterSpacing || '0', 10) || 0;
+
     container.innerHTML = `
       <div class="arch-form-group">
-        <label class="arch-form-label">Text Content ${hasRich ? '<span style="font-weight:400;font-size:11px;color:#2563eb;">(Edit directly on canvas to keep bold/italic/links)</span>' : ''}</label>
-        <textarea class="arch-textarea" id="inp-text-copy" rows="4"></textarea>
+        <label class="arch-form-label">Text Content</label>
+        <textarea class="arch-textarea" id="inp-text-copy" rows="3"></textarea>
       </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Font Size</label>
-        <input type="text" class="arch-input" id="inp-text-size" placeholder="16px" />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Text Color</label>
-        <input type="color" class="arch-input" id="inp-text-color" />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Text Alignment</label>
-        <select class="arch-select" id="inp-text-align">
-          <option value="left">Left</option>
-          <option value="center">Center</option>
-          <option value="right">Right</option>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Font family</label>
+        <select class="arch-select" id="sel-text-font" style="width: 140px;">
+          <option value="Global font" ${currentFont === 'Global font' ? 'selected' : ''}>Global font</option>
+          <option value="Arial, Helvetica, sans-serif">Arial</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Helvetica Neue', Helvetica, sans-serif">Helvetica</option>
+          <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+          <option value="Verdana, sans-serif">Verdana</option>
         </select>
       </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Font weight</label>
+        <select class="arch-select" id="sel-text-weight" style="width: 140px;">
+          <option value="normal" ${currentWeight === 'normal' || currentWeight === '400' ? 'selected' : ''}>Regular</option>
+          <option value="bold" ${currentWeight === 'bold' || currentWeight === '700' ? 'selected' : ''}>Bold</option>
+          <option value="600" ${currentWeight === '600' ? 'selected' : ''}>Semi Bold</option>
+          <option value="300" ${currentWeight === '300' ? 'selected' : ''}>Light</option>
+        </select>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Font size</label>
+        ${this.renderStepper('stp-text-size', currentSize, 10, 72, 1)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Text color</label>
+        ${this.renderColorPicker('swatch-text-color', 'txt-text-color', currentColor)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Link color</label>
+        ${this.renderColorPicker('swatch-text-link-color', 'txt-text-link-color', '#7747ff')}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Align</label>
+        ${this.renderAlignment('grp-text-align', currentAlign, true)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Line height</label>
+        <select class="arch-select" id="sel-text-lh" style="width: 140px;">
+          <option value="1.2" ${currentLineHeight === '1.2' ? 'selected' : ''}>≡ 1.2</option>
+          <option value="1.4" ${currentLineHeight === '1.4' ? 'selected' : ''}>≡ 1.4</option>
+          <option value="1.5" ${currentLineHeight === '1.5' ? 'selected' : ''}>≡ 1.5</option>
+          <option value="1.7" ${currentLineHeight === '1.7' ? 'selected' : ''}>≡ 1.7</option>
+          <option value="2.0" ${currentLineHeight === '2.0' ? 'selected' : ''}>≡ 2.0</option>
+        </select>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Letter spacing</label>
+        ${this.renderStepper('stp-text-spacing', currentSpacing, -5, 20, 1)}
+      </div>
+
       <div id="inspector-inner-links"></div>
     `;
 
@@ -540,24 +655,42 @@ export class Inspector {
       this.events.onChange();
     });
 
-    const sizeInp = container.querySelector<HTMLInputElement>('#inp-text-size')!;
-    sizeInp.value = info.fontSize || '';
-    sizeInp.addEventListener('input', (e) => {
-      TextAdapter.setFontSize(info.element, (e.target as HTMLInputElement).value, this.viewportMode, info.unit);
+    const fontSel = container.querySelector<HTMLSelectElement>('#sel-text-font')!;
+    fontSel.addEventListener('change', () => {
+      const val = fontSel.value;
+      activeNode.style.fontFamily = val === 'Global font' ? '' : val;
       this.events.onChange();
     });
 
-    const colorInp = container.querySelector<HTMLInputElement>('#inp-text-color')!;
-    colorInp.value = toHexColor(info.color, '#0f172a');
-    colorInp.addEventListener('input', (e) => {
-      TextAdapter.setColor(info.element, (e.target as HTMLInputElement).value, info.unit);
+    const weightSel = container.querySelector<HTMLSelectElement>('#sel-text-weight')!;
+    weightSel.addEventListener('change', () => {
+      activeNode.style.fontWeight = weightSel.value;
       this.events.onChange();
     });
 
-    const alignSel = container.querySelector<HTMLSelectElement>('#inp-text-align')!;
-    alignSel.value = info.textAlign || 'left';
-    alignSel.addEventListener('change', (e) => {
-      TextAdapter.setAlignment(info.element, (e.target as HTMLSelectElement).value as any, this.viewportMode, info.unit);
+    this.bindStepper(container, 'stp-text-size', (val) => {
+      TextAdapter.setFontSize(info.element, `${val}px`, this.viewportMode, info.unit);
+      this.events.onChange();
+    });
+
+    this.bindColorPicker(container, 'swatch-text-color', 'txt-text-color', (val) => {
+      TextAdapter.setColor(info.element, val, info.unit);
+      this.events.onChange();
+    });
+
+    this.bindAlignment(container, 'grp-text-align', (val) => {
+      TextAdapter.setAlignment(info.element, val as any, this.viewportMode, info.unit);
+      this.events.onChange();
+    });
+
+    const lhSel = container.querySelector<HTMLSelectElement>('#sel-text-lh')!;
+    lhSel.addEventListener('change', () => {
+      activeNode.style.lineHeight = lhSel.value;
+      this.events.onChange();
+    });
+
+    this.bindStepper(container, 'stp-text-spacing', (val) => {
+      activeNode.style.letterSpacing = `${val}px`;
       this.events.onChange();
     });
 
@@ -579,7 +712,7 @@ export class Inspector {
     if (anchors.length === 0) return;
 
     holder.innerHTML = `
-      <div class="arch-form-group" style="margin-top:10px;border-top:1px solid var(--arch-border);padding-top:10px;">
+      <div class="arch-form-group" style="margin-top:10px;border-top:1px solid #e5e7eb;padding-top:10px;">
         <label class="arch-form-label">Inner Links (&lt;a&gt;) (${anchors.length})</label>
         <div class="arch-inner-links-list" style="display:flex;flex-direction:column;gap:8px;"></div>
       </div>
@@ -588,8 +721,7 @@ export class Inspector {
     const listEl = holder.querySelector<HTMLElement>('.arch-inner-links-list')!;
     anchors.forEach((aEl, idx) => {
       const card = document.createElement('div');
-      card.style.cssText =
-        'border:1px solid var(--arch-border);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:5px;background:rgba(13,153,255,0.03);';
+      card.className = 'arch-item-card';
       const labelVal = ButtonAdapter.getLabel(aEl, aEl);
       const hrefVal = aEl.getAttribute('href') || '';
 
@@ -624,45 +756,377 @@ export class Inspector {
     });
   }
 
-  private renderDividerElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+  private renderButtonElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const activeNode = info.unit || info.element;
+    const buttonLabel = ButtonAdapter.getLabel(info.element, info.unit);
+    const buttonUrl = ButtonAdapter.getUrl(info.element, info.unit);
+    const bgColor = toHexColor(ButtonAdapter.getBackgroundColor(info.element, info.unit) || info.backgroundColor, '#7747ff');
+    const textColor = toHexColor(ButtonAdapter.getTextColor(info.element, info.unit) || info.color, '#ffffff');
+    const fontSize = parseInt(activeNode.style.fontSize || info.fontSize || '16', 10) || 16;
+    const borderRadius = parseInt(ButtonAdapter.getBorderRadius(info.element, info.unit) || '4', 10) || 4;
+    const align = ButtonAdapter.getAlignment(info.element, info.unit) || 'center';
+
     container.innerHTML = `
-      <div class="arch-form-group">
-        <label class="arch-form-label">Divider Line Color</label>
-        <input type="color" class="arch-input" id="inp-div-color" />
+      <div class="arch-sub-heading">ACTION</div>
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Link type</label>
+        <select class="arch-select" id="sel-btn-link-type" style="width: 140px;">
+          <option value="web">Open web page</option>
+          <option value="email">Send email</option>
+          <option value="phone">Call phone</option>
+          <option value="sms">Send SMS</option>
+        </select>
       </div>
+
+      <div class="arch-form-group" style="margin-top: 6px;">
+        <div class="arch-url-group">
+          <span class="arch-url-prefix">Url</span>
+          <input type="text" class="arch-url-input" id="inp-btn-url" placeholder="https://..." value="${buttonUrl}" />
+        </div>
+        <div class="arch-action-links">
+          <span class="arch-action-link" id="lnk-special">Special links</span>
+          <span class="arch-action-link" id="lnk-file">Link file</span>
+        </div>
+      </div>
+
+      <div class="arch-sub-heading">BUTTON OPTIONS</div>
       <div class="arch-form-group">
-        <label class="arch-form-label">Line Thickness (px)</label>
-        <input type="text" class="arch-input" id="inp-div-thickness" placeholder="1px" />
+        <label class="arch-form-label">Button Label</label>
+        <input type="text" class="arch-input" id="inp-btn-label" value="${buttonLabel}" />
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Auto width</label>
+        <label class="arch-toggle-switch">
+          <input type="checkbox" id="chk-btn-auto-width" checked />
+          <span class="arch-toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Font family</label>
+        <select class="arch-select" id="sel-btn-font" style="width: 140px;">
+          <option value="Global font">Global font</option>
+          <option value="Arial, Helvetica, sans-serif">Arial</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Helvetica Neue', Helvetica, sans-serif">Helvetica</option>
+          <option value="Verdana, sans-serif">Verdana</option>
+        </select>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Font weight</label>
+        <select class="arch-select" id="sel-btn-weight" style="width: 140px;">
+          <option value="bold">Bold</option>
+          <option value="600">Semi Bold</option>
+          <option value="normal" selected>Regular</option>
+          <option value="300">Light</option>
+        </select>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Font size</label>
+        ${this.renderStepper('stp-btn-size', fontSize, 10, 48, 1)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Background color</label>
+        ${this.renderColorPicker('inp-btn-bg', 'txt-btn-bg', bgColor)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Text color</label>
+        ${this.renderColorPicker('inp-btn-color', 'txt-btn-color', textColor)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Align</label>
+        ${this.renderAlignment('grp-btn-align', align, false)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Border radius</label>
+        ${this.renderStepper('stp-btn-radius', borderRadius, 0, 50, 1)}
       </div>
     `;
 
-    const colorInp = container.querySelector<HTMLInputElement>('#inp-div-color')!;
-    colorInp.value = toHexColor(DividerAdapter.getColor(info.element, info.unit), '#cbd5e1');
-    colorInp.addEventListener('input', (e) => {
-      DividerAdapter.setColor(info.element, (e.target as HTMLInputElement).value, info.unit);
+    const labelInp = container.querySelector<HTMLInputElement>('#inp-btn-label')!;
+    labelInp.addEventListener('input', (e) => {
+      ButtonAdapter.setLabel(info.element, (e.target as HTMLInputElement).value, info.unit);
       this.events.onChange();
     });
 
-    const thickInp = container.querySelector<HTMLInputElement>('#inp-div-thickness')!;
-    thickInp.value = DividerAdapter.getThickness(info.element, info.unit);
-    thickInp.addEventListener('input', (e) => {
-      DividerAdapter.setThickness(info.element, (e.target as HTMLInputElement).value, info.unit);
+    const urlInp = container.querySelector<HTMLInputElement>('#inp-btn-url')!;
+    urlInp.addEventListener('input', (e) => {
+      ButtonAdapter.setUrl(info.element, (e.target as HTMLInputElement).value, info.unit);
+      this.events.onChange();
+    });
+
+    this.bindColorPicker(container, 'inp-btn-bg', 'txt-btn-bg', (val) => {
+      ButtonAdapter.setBackgroundColor(info.element, val, info.unit);
+      this.events.onChange();
+    });
+
+    this.bindColorPicker(container, 'inp-btn-color', 'txt-btn-color', (val) => {
+      ButtonAdapter.setTextColor(info.element, val, info.unit);
+      this.events.onChange();
+    });
+
+    this.bindStepper(container, 'stp-btn-size', (val) => {
+      TextAdapter.setFontSize(info.element, `${val}px`, this.viewportMode, info.unit);
+      this.events.onChange();
+    });
+
+    this.bindStepper(container, 'stp-btn-radius', (val) => {
+      ButtonAdapter.setBorderRadius(info.element, `${val}px`, info.unit);
+      this.events.onChange();
+    });
+
+    this.bindAlignment(container, 'grp-btn-align', (val) => {
+      ButtonAdapter.setAlignment(info.element, val as any, info.unit);
+      this.events.onChange();
+    });
+  }
+
+  private renderImageElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const src = ImageAdapter.getSrc(info.element, info.unit);
+    const alt = ImageAdapter.getAlt(info.element, info.unit);
+    const linkUrl = ImageAdapter.getLinkUrl(info.element, info.unit);
+    const width = ImageAdapter.getWidth(info.element, info.unit);
+    const numWidth = parseInt(width, 10) || 300;
+    const align = ImageAdapter.getAlignment(info.element, info.unit) || 'center';
+    const filename = src.split('/').pop()?.split('?')[0] || 'image.png';
+
+    container.innerHTML = `
+      <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+        <button type="button" class="arch-btn arch-btn--primary" id="btn-img-replace" style="flex: 1; padding: 7px 12px; font-size: 12px; font-weight: 600;">Replace</button>
+        <button type="button" class="arch-btn" id="btn-img-effects" style="flex: 1; padding: 7px 12px; font-size: 12px; font-weight: 600;">Apply effects</button>
+      </div>
+
+      <div class="arch-form-group">
+        <div class="arch-url-group">
+          <span class="arch-url-prefix">Url</span>
+          <input type="text" class="arch-url-input" id="inp-img-src" value="${src}" placeholder="https://..." />
+        </div>
+        <div style="font-size: 11px; color: #6b7280; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          Image name: <strong>${filename}</strong>
+        </div>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Width</label>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <input type="text" class="arch-input" id="inp-img-width" value="${width}" style="width: 70px; text-align: center;" />
+          ${this.renderStepper('stp-img-width', numWidth, 24, 600, 10)}
+        </div>
+      </div>
+      <div class="arch-form-row--split" style="margin-top: -4px; margin-bottom: 8px;">
+        <label class="arch-form-label-sub">Presets</label>
+        <div class="arch-btn-group" style="display: flex; gap: 4px;">
+          <button type="button" class="arch-btn arch-btn--sm" data-width-preset="25%" style="padding: 2px 8px; font-size: 11px;">25%</button>
+          <button type="button" class="arch-btn arch-btn--sm" data-width-preset="50%" style="padding: 2px 8px; font-size: 11px;">50%</button>
+          <button type="button" class="arch-btn arch-btn--sm" data-width-preset="75%" style="padding: 2px 8px; font-size: 11px;">75%</button>
+          <button type="button" class="arch-btn arch-btn--sm" data-width-preset="100%" style="padding: 2px 8px; font-size: 11px;">100%</button>
+        </div>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Align</label>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <select class="arch-select" id="inp-img-align" style="width: 80px;">
+            <option value="left" ${align === 'left' ? 'selected' : ''}>Left</option>
+            <option value="center" ${align === 'center' ? 'selected' : ''}>Center</option>
+            <option value="right" ${align === 'right' ? 'selected' : ''}>Right</option>
+          </select>
+          ${this.renderAlignment('grp-img-align', align, false)}
+        </div>
+      </div>
+
+      <div class="arch-form-group">
+        <label class="arch-form-label">Alt text (Accessibility)</label>
+        <input type="text" class="arch-input" id="inp-img-alt" value="${alt}" placeholder="Describe image" />
+      </div>
+
+      <div class="arch-sub-heading">ACTION</div>
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Image link</label>
+        <select class="arch-select" id="sel-img-link-type" style="width: 140px;">
+          <option value="web">Open web page</option>
+          <option value="email">Send email</option>
+        </select>
+      </div>
+      <div class="arch-form-group" style="margin-top: 6px;">
+        <div class="arch-url-group">
+          <span class="arch-url-prefix">Url</span>
+          <input type="text" class="arch-url-input" id="inp-img-link" value="${linkUrl}" placeholder="https://..." />
+        </div>
+      </div>
+    `;
+
+    const srcInp = container.querySelector<HTMLInputElement>('#inp-img-src')!;
+    srcInp.addEventListener('input', (e) => {
+      ImageAdapter.setSrc(info.element, (e.target as HTMLInputElement).value, info.unit);
+      this.events.onChange();
+    });
+
+    const altInp = container.querySelector<HTMLInputElement>('#inp-img-alt')!;
+    altInp.addEventListener('input', (e) => {
+      ImageAdapter.setAlt(info.element, (e.target as HTMLInputElement).value, info.unit);
+      this.events.onChange();
+    });
+
+    const linkInp = container.querySelector<HTMLInputElement>('#inp-img-link')!;
+    linkInp.addEventListener('input', (e) => {
+      ImageAdapter.setLinkUrl(info.element, (e.target as HTMLInputElement).value, info.unit);
+      this.events.onChange();
+    });
+
+    const widthInp = container.querySelector<HTMLInputElement>('#inp-img-width')!;
+    widthInp.addEventListener('input', (e) => {
+      const val = (e.target as HTMLInputElement).value;
+      const num = parseInt(val, 10);
+      if (!isNaN(num)) {
+        const valInp = container.querySelector<HTMLInputElement>('#stp-img-width');
+        if (valInp) valInp.value = String(num);
+      }
+      ImageAdapter.setWidth(info.element, val, info.unit);
+      this.events.onChange();
+    });
+
+    this.bindStepper(container, 'stp-img-width', (val) => {
+      widthInp.value = `${val}px`;
+      ImageAdapter.setWidth(info.element, `${val}px`, info.unit);
+      this.events.onChange();
+    });
+
+    container.querySelectorAll<HTMLButtonElement>('[data-width-preset]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const preset = btn.getAttribute('data-width-preset');
+        if (preset) {
+          widthInp.value = preset;
+          ImageAdapter.setWidth(info.element, preset, info.unit);
+          this.events.onChange();
+        }
+      });
+    });
+
+    const alignSel = container.querySelector<HTMLSelectElement>('#inp-img-align')!;
+    alignSel.addEventListener('change', () => {
+      const val = alignSel.value;
+      container.querySelectorAll('.grp-img-align button').forEach((b) => {
+        b.classList.toggle('is-active', b.getAttribute('data-align') === val);
+      });
+      ImageAdapter.setAlignment(info.element, val as any, info.unit);
+      this.events.onChange();
+    });
+
+    this.bindAlignment(container, 'grp-img-align', (val) => {
+      alignSel.value = val;
+      ImageAdapter.setAlignment(info.element, val as any, info.unit);
+      this.events.onChange();
+    });
+  }
+
+  private renderDividerElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const color = toHexColor(DividerAdapter.getColor(info.element, info.unit), '#cbd5e1');
+    const thickness = parseInt(DividerAdapter.getThickness(info.element, info.unit) || '1', 10) || 1;
+
+    container.innerHTML = `
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Transparent</label>
+        <label class="arch-toggle-switch">
+          <input type="checkbox" id="chk-div-transparent" />
+          <span class="arch-toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Line style</label>
+        <select class="arch-select" id="sel-div-style" style="width: 140px;">
+          <option value="solid">Solid</option>
+          <option value="dashed">Dashed</option>
+          <option value="dotted">Dotted</option>
+        </select>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Thickness</label>
+        ${this.renderStepper('stp-div-thickness', thickness, 1, 20, 1)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Divider color</label>
+        ${this.renderColorPicker('swatch-div-color', 'txt-div-color', color)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Align</label>
+        ${this.renderAlignment('grp-div-align', 'center', false)}
+      </div>
+    `;
+
+    const transChk = container.querySelector<HTMLInputElement>('#chk-div-transparent')!;
+    transChk.addEventListener('change', () => {
+      DividerAdapter.setColor(info.element, transChk.checked ? 'transparent' : color, info.unit);
+      this.events.onChange();
+    });
+
+    const styleSel = container.querySelector<HTMLSelectElement>('#sel-div-style')!;
+    styleSel.addEventListener('change', () => {
+      info.element.style.borderTopStyle = styleSel.value;
+      this.events.onChange();
+    });
+
+    this.bindStepper(container, 'stp-div-thickness', (val) => {
+      DividerAdapter.setThickness(info.element, `${val}px`, info.unit);
+      this.events.onChange();
+    });
+
+    this.bindColorPicker(container, 'swatch-div-color', 'txt-div-color', (val) => {
+      DividerAdapter.setColor(info.element, val, info.unit);
+      this.events.onChange();
+    });
+
+    this.bindAlignment(container, 'grp-div-align', (val) => {
+      info.element.style.textAlign = val;
       this.events.onChange();
     });
   }
 
   private renderSpacerElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const height = parseInt(SpacerAdapter.getHeight(info.element, info.unit) || '28', 10) || 28;
+
     container.innerHTML = `
-      <div class="arch-form-group">
-        <label class="arch-form-label">Spacer Height (px)</label>
-        <input type="text" class="arch-input" id="inp-spacer-height" placeholder="28px" />
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Spacer height</label>
+        ${this.renderStepper('stp-spacer-height', height, 5, 200, 5)}
+      </div>
+
+      <div class="arch-form-group" style="margin-top: 10px;">
+        <input type="range" class="arch-range" id="rng-spacer-height" min="5" max="200" step="1" value="${height}" style="width: 100%;" />
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Dynamic height on mobile</label>
+        <label class="arch-toggle-switch">
+          <input type="checkbox" id="chk-spacer-dyn" />
+          <span class="arch-toggle-slider"></span>
+        </label>
       </div>
     `;
 
-    const heightInp = container.querySelector<HTMLInputElement>('#inp-spacer-height')!;
-    heightInp.value = SpacerAdapter.getHeight(info.element, info.unit);
-    heightInp.addEventListener('input', (e) => {
-      SpacerAdapter.setHeight(info.element, (e.target as HTMLInputElement).value, info.unit);
+    const rngInp = container.querySelector<HTMLInputElement>('#rng-spacer-height')!;
+    this.bindStepper(container, 'stp-spacer-height', (val) => {
+      rngInp.value = String(val);
+      SpacerAdapter.setHeight(info.element, `${val}px`, info.unit);
+      this.events.onChange();
+    });
+
+    rngInp.addEventListener('input', () => {
+      const val = parseInt(rngInp.value, 10);
+      const valInp = container.querySelector<HTMLInputElement>('#stp-spacer-height');
+      if (valInp) valInp.value = String(val);
+      SpacerAdapter.setHeight(info.element, `${val}px`, info.unit);
       this.events.onChange();
     });
   }
@@ -672,34 +1136,50 @@ export class Inspector {
     const items = SocialAdapter.getItems(unit);
 
     container.innerHTML = `
-      <div class="arch-form-group">
-        <label class="arch-form-label">Social Icon Links (${items.length})</label>
-        <div id="social-items-list" style="display:flex;flex-direction:column;gap:8px;"></div>
-        <button type="button" class="arch-btn" id="btn-add-social" style="margin-top:6px;">+ Add Social Icon</button>
+      <div class="arch-sub-heading">SOCIAL ICONS (${items.length})</div>
+      <div id="social-items-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+
+      <button type="button" class="arch-btn" id="btn-add-social" style="margin-top: 8px; width: 100%; font-size: 12px; font-weight: 600;">
+        + Add new icon
+      </button>
+
+      <div class="arch-form-row--split" style="margin-top: 12px;">
+        <label class="arch-form-label-sub">Icon size</label>
+        ${this.renderStepper('stp-soc-size', 32, 16, 64, 4)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Icon spacing</label>
+        ${this.renderStepper('stp-soc-space', 8, 2, 32, 2)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Align</label>
+        ${this.renderAlignment('grp-soc-align', 'center', false)}
       </div>
     `;
 
     const listEl = container.querySelector<HTMLElement>('#social-items-list')!;
     items.forEach((item, idx) => {
-      const row = document.createElement('div');
-      row.style.cssText = 'border:1px solid var(--arch-border);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:4px;';
-      row.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:600;">
+      const card = document.createElement('div');
+      card.className = 'arch-item-card';
+      card.innerHTML = `
+        <div class="arch-item-card-header">
           <span>${idx + 1}. ${item.alt || 'Icon'}</span>
-          <button type="button" class="arch-btn arch-btn--danger btn-del-social" style="padding:2px 6px;font-size:10px;">✕</button>
+          <button type="button" class="arch-btn arch-btn--danger btn-del-social" style="padding: 2px 6px; font-size: 10px;">✕</button>
         </div>
         <input type="text" class="arch-input inp-social-href" placeholder="https://..." value="${item.href}" />
       `;
-      row.querySelector<HTMLInputElement>('.inp-social-href')?.addEventListener('input', (e) => {
+      card.querySelector<HTMLInputElement>('.inp-social-href')?.addEventListener('input', (e) => {
         item.anchor.setAttribute('href', (e.target as HTMLInputElement).value);
         this.events.onChange();
       });
-      row.querySelector('.btn-del-social')?.addEventListener('click', () => {
+      card.querySelector('.btn-del-social')?.addEventListener('click', () => {
         item.anchor.remove();
         this.events.onChange();
         this.renderSocialElementControls(container, info);
       });
-      listEl.appendChild(row);
+      listEl.appendChild(card);
     });
 
     container.querySelector('#btn-add-social')?.addEventListener('click', () => {
@@ -707,58 +1187,503 @@ export class Inspector {
       this.events.onChange();
       this.renderSocialElementControls(container, info);
     });
+
+    this.bindStepper(container, 'stp-soc-size', (val) => {
+      unit.querySelectorAll('img').forEach((img) => {
+        img.style.width = `${val}px`;
+        img.setAttribute('width', String(val));
+      });
+      this.events.onChange();
+    });
+
+    this.bindAlignment(container, 'grp-soc-align', (val) => {
+      unit.style.textAlign = val;
+      this.events.onChange();
+    });
+  }
+
+  private renderListElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const target = info.unit || info.element;
+    const listEl = (target.querySelector('ul, ol') || (target.tagName.match(/^(UL|OL)$/i) ? target : null)) as HTMLElement;
+    const isOrdered = listEl ? listEl.tagName.toLowerCase() === 'ol' : false;
+    const currentSize = parseInt(target.style.fontSize || '14', 10) || 14;
+    const currentColor = toHexColor(target.style.color || '#374151', '#374151');
+
+    container.innerHTML = `
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">List type</label>
+        <div class="arch-segmented-group grp-list-type">
+          <button type="button" class="arch-segmented-btn ${!isOrdered ? 'is-active' : ''}" data-type="ul">• Bullet</button>
+          <button type="button" class="arch-segmented-btn ${isOrdered ? 'is-active' : ''}" data-type="ol">1. Number</button>
+        </div>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Font family</label>
+        <select class="arch-select" id="sel-list-font" style="width: 140px;">
+          <option value="Global font">Global font</option>
+          <option value="Arial, Helvetica, sans-serif">Arial</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Helvetica Neue', Helvetica, sans-serif">Helvetica</option>
+          <option value="Verdana, sans-serif">Verdana</option>
+        </select>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Font size</label>
+        ${this.renderStepper('stp-list-size', currentSize, 10, 48, 1)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Text color</label>
+        ${this.renderColorPicker('swatch-list-color', 'txt-list-color', currentColor)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Line height</label>
+        <select class="arch-select" id="sel-list-lh" style="width: 140px;">
+          <option value="1.2">≡ 1.2</option>
+          <option value="1.5" selected>≡ 1.5</option>
+          <option value="1.8">≡ 1.8</option>
+        </select>
+      </div>
+    `;
+
+    container.querySelectorAll<HTMLButtonElement>('.grp-list-type button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const newTag = btn.getAttribute('data-type') || 'ul';
+        container.querySelectorAll('.grp-list-type button').forEach((b) => b.classList.toggle('is-active', b === btn));
+        if (listEl && listEl.tagName.toLowerCase() !== newTag) {
+          const newList = document.createElement(newTag);
+          newList.innerHTML = listEl.innerHTML;
+          listEl.replaceWith(newList);
+          this.events.onChange();
+        }
+      });
+    });
+
+    this.bindStepper(container, 'stp-list-size', (val) => {
+      target.style.fontSize = `${val}px`;
+      this.events.onChange();
+    });
+
+    this.bindColorPicker(container, 'swatch-list-color', 'txt-list-color', (val) => {
+      target.style.color = val;
+      this.events.onChange();
+    });
+  }
+
+  private renderTableElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const target = info.unit || info.element;
+    const tableEl = (target.tagName.toLowerCase() === 'table' ? target : target.querySelector('table') || target) as HTMLTableElement;
+    const rows = tableEl.rows?.length || 3;
+    const cols = tableEl.rows?.[0]?.cells?.length || 3;
+
+    container.innerHTML = `
+      <div class="arch-sub-heading">TABLE DIMENSIONS</div>
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Rows</label>
+        ${this.renderStepper('stp-tbl-rows', rows, 1, 20, 1)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Columns</label>
+        ${this.renderStepper('stp-tbl-cols', cols, 1, 10, 1)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Header background</label>
+        ${this.renderColorPicker('swatch-tbl-hdr-bg', 'txt-tbl-hdr-bg', '#f3f4f6')}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Cell padding</label>
+        ${this.renderStepper('stp-tbl-pad', 8, 2, 32, 2)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Border color</label>
+        ${this.renderColorPicker('swatch-tbl-border', 'txt-tbl-border', '#e5e7eb')}
+      </div>
+    `;
+
+    this.bindColorPicker(container, 'swatch-tbl-hdr-bg', 'txt-tbl-hdr-bg', (val) => {
+      tableEl.querySelectorAll('th').forEach((th) => {
+        th.style.backgroundColor = val;
+      });
+      this.events.onChange();
+    });
+
+    this.bindStepper(container, 'stp-tbl-pad', (val) => {
+      tableEl.querySelectorAll('td, th').forEach((cell) => {
+        (cell as HTMLElement).style.padding = `${val}px`;
+      });
+      this.events.onChange();
+    });
+
+    this.bindColorPicker(container, 'swatch-tbl-border', 'txt-tbl-border', (val) => {
+      tableEl.style.borderColor = val;
+      tableEl.querySelectorAll('td, th').forEach((cell) => {
+        (cell as HTMLElement).style.borderColor = val;
+      });
+      this.events.onChange();
+    });
+  }
+
+  private renderVideoElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const target = info.unit || info.element;
+    const aEl = target.querySelector<HTMLAnchorElement>('a') || (target.tagName.toLowerCase() === 'a' ? (target as HTMLAnchorElement) : null);
+    const videoUrl = aEl?.getAttribute('href') || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+
+    container.innerHTML = `
+      <div class="arch-sub-heading">VIDEO URL</div>
+      <div class="arch-form-group">
+        <div class="arch-url-group">
+          <span class="arch-url-prefix">Url</span>
+          <input type="text" class="arch-url-input" id="inp-video-url" value="${videoUrl}" placeholder="https://www.youtube.com/..." />
+        </div>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Auto width</label>
+        <label class="arch-toggle-switch">
+          <input type="checkbox" id="chk-video-auto-width" checked />
+          <span class="arch-toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Play icon style</label>
+        <select class="arch-select" id="sel-video-play-icon" style="width: 140px;">
+          <option value="round-dark">Round Dark</option>
+          <option value="round-light">Round Light</option>
+          <option value="square-dark">Square Dark</option>
+          <option value="square-light">Square Light</option>
+        </select>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Align</label>
+        ${this.renderAlignment('grp-video-align', 'center', false)}
+      </div>
+    `;
+
+    const urlInp = container.querySelector<HTMLInputElement>('#inp-video-url')!;
+    urlInp.addEventListener('input', () => {
+      if (aEl) aEl.setAttribute('href', urlInp.value);
+      this.events.onChange();
+    });
+
+    this.bindAlignment(container, 'grp-video-align', (val) => {
+      target.style.textAlign = val;
+      this.events.onChange();
+    });
+  }
+
+  private renderIconsElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const target = info.unit || info.element;
+
+    container.innerHTML = `
+      <div class="arch-sub-heading">ICONS LIST</div>
+      <div id="icons-items-list" style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="arch-item-card">
+          <div class="arch-item-card-header">
+            <span>⭐ Star Icon</span>
+          </div>
+          <input type="text" class="arch-input inp-icon-label" value="Feature" placeholder="Text" />
+          <input type="text" class="arch-input inp-icon-url" value="https://" placeholder="https://..." />
+        </div>
+      </div>
+
+      <button type="button" class="arch-btn" id="btn-add-icon-item" style="margin-top: 8px; width: 100%; font-size: 12px; font-weight: 600;">
+        + Add new icon
+      </button>
+
+      <div class="arch-form-row--split" style="margin-top: 12px;">
+        <label class="arch-form-label-sub">Icon size</label>
+        ${this.renderStepper('stp-ico-size', 24, 16, 64, 4)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Icon spacing</label>
+        ${this.renderStepper('stp-ico-spacing', 10, 4, 30, 2)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Align</label>
+        ${this.renderAlignment('grp-ico-align', 'center', false)}
+      </div>
+    `;
+
+    this.bindStepper(container, 'stp-ico-size', (val) => {
+      target.querySelectorAll('svg, img').forEach((icon) => {
+        (icon as HTMLElement).style.width = `${val}px`;
+        (icon as HTMLElement).style.height = `${val}px`;
+      });
+      this.events.onChange();
+    });
+
+    this.bindAlignment(container, 'grp-ico-align', (val) => {
+      target.style.textAlign = val;
+      this.events.onChange();
+    });
+  }
+
+  private renderMenuElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const target = info.unit || info.element;
+    const links = Array.from(target.querySelectorAll<HTMLAnchorElement>('a'));
+
+    container.innerHTML = `
+      <div class="arch-sub-heading">MENU ITEMS (${links.length || 3})</div>
+      <div id="menu-items-list" style="display: flex; flex-direction: column; gap: 8px;">
+        ${(links.length > 0 ? links : [{ textContent: 'Home', href: '#' }, { textContent: 'About', href: '#' }, { textContent: 'Contact', href: '#' }])
+          .map(
+            (item, idx) => `
+            <div class="arch-item-card">
+              <div class="arch-item-card-header">
+                <span>Item #${idx + 1}</span>
+                <button type="button" class="arch-btn arch-btn--danger btn-del-menu" style="padding: 2px 6px; font-size: 10px;">✕</button>
+              </div>
+              <input type="text" class="arch-input inp-menu-text" value="${item.textContent || ''}" placeholder="Label" />
+              <input type="text" class="arch-input inp-menu-href" value="${(item as any).href || '#'}" placeholder="https://..." />
+            </div>
+          `
+          )
+          .join('')}
+      </div>
+
+      <button type="button" class="arch-btn" id="btn-add-menu-item" style="margin-top: 8px; width: 100%; font-size: 12px; font-weight: 600;">
+        + Add new item
+      </button>
+
+      <div class="arch-form-row--split" style="margin-top: 12px;">
+        <label class="arch-form-label-sub">Layout</label>
+        <div class="arch-segmented-group grp-menu-layout">
+          <button type="button" class="arch-segmented-btn is-active" data-layout="row">Horizontal</button>
+          <button type="button" class="arch-segmented-btn" data-layout="column">Vertical</button>
+        </div>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Font size</label>
+        ${this.renderStepper('stp-menu-size', 13, 10, 24, 1)}
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Text color</label>
+        ${this.renderColorPicker('swatch-menu-color', 'txt-menu-color', '#4b5563')}
+      </div>
+    `;
+
+    this.bindStepper(container, 'stp-menu-size', (val) => {
+      target.querySelectorAll('a').forEach((a) => {
+        a.style.fontSize = `${val}px`;
+      });
+      this.events.onChange();
+    });
+
+    this.bindColorPicker(container, 'swatch-menu-color', 'txt-menu-color', (val) => {
+      target.querySelectorAll('a').forEach((a) => {
+        a.style.color = val;
+      });
+      this.events.onChange();
+    });
+  }
+
+  private renderHtmlElementControls(container: HTMLElement, info: SelectedElementInfo): void {
+    const target = info.unit || info.element;
+    const htmlCode = target.innerHTML || '<!-- Custom HTML -->';
+
+    container.innerHTML = `
+      <div class="arch-sub-heading">HTML CODE</div>
+      <div class="arch-form-group">
+        <textarea class="arch-code-editor" id="inp-html-code" rows="8">${htmlCode}</textarea>
+      </div>
+      <div style="font-size: 11px; color: #6b7280; line-height: 1.4; background: #f9fafb; padding: 8px; border-radius: 4px; border: 1px solid #e5e7eb;">
+        💡 Raw HTML elements render directly inside the email table structure.
+      </div>
+    `;
+
+    const codeInp = container.querySelector<HTMLTextAreaElement>('#inp-html-code')!;
+    codeInp.addEventListener('input', () => {
+      target.innerHTML = codeInp.value;
+      this.events.onChange();
+    });
+  }
+
+  private renderStickerGifElementControls(container: HTMLElement, info: SelectedElementInfo, isGif: boolean): void {
+    const target = info.unit || info.element;
+    const img = target.querySelector<HTMLImageElement>('img') || (target.tagName.toLowerCase() === 'img' ? (target as HTMLImageElement) : null);
+    const src = img?.src || '';
+    const alt = img?.alt || '';
+
+    container.innerHTML = `
+      <div class="arch-sub-heading">${isGif ? 'GIF' : 'STICKER'} URL</div>
+      <div class="arch-form-group">
+        <div class="arch-url-group">
+          <span class="arch-url-prefix">Url</span>
+          <input type="text" class="arch-url-input" id="inp-sg-src" value="${src}" placeholder="https://..." />
+        </div>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Auto width</label>
+        <label class="arch-toggle-switch">
+          <input type="checkbox" id="chk-sg-auto-width" checked />
+          <span class="arch-toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="arch-form-row--split">
+        <label class="arch-form-label-sub">Align</label>
+        ${this.renderAlignment('grp-sg-align', 'center', false)}
+      </div>
+
+      <div class="arch-form-group">
+        <label class="arch-form-label">Alt text</label>
+        <input type="text" class="arch-input" id="inp-sg-alt" value="${alt}" placeholder="Description" />
+      </div>
+    `;
+
+    const srcInp = container.querySelector<HTMLInputElement>('#inp-sg-src')!;
+    srcInp.addEventListener('input', () => {
+      if (img) img.src = srcInp.value;
+      this.events.onChange();
+    });
+
+    this.bindAlignment(container, 'grp-sg-align', (val) => {
+      target.style.textAlign = val;
+      this.events.onChange();
+    });
   }
 
   private renderSectionElementControls(container: HTMLElement, info: SelectedElementInfo): void {
     const targetEl = info.unit || info.element;
-    // If targetEl is a `table.row`, background often lives on inner `.row-content` table as well
     const contentTable = targetEl.querySelector<HTMLElement>('.row-content') || targetEl;
+    const rowBg = toHexColor(targetEl.style.backgroundColor, '#ffffff');
+    const contentBg = toHexColor(contentTable.style.backgroundColor || info.backgroundColor, '#ffffff');
 
     container.innerHTML = `
-      <div class="arch-form-group">
-        <label class="arch-form-label">Background Color</label>
-        <input type="color" class="arch-input" id="inp-sec-bg" />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Padding</label>
-        <input type="text" class="arch-input" id="inp-sec-padding" placeholder="16px 20px" />
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Row Column Layout</label>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-          <button type="button" class="arch-btn" data-col-preset="1-col">1 Col (100%)</button>
-          <button type="button" class="arch-btn" data-col-preset="2-col-50-50">2 Col (50/50)</button>
-          <button type="button" class="arch-btn" data-col-preset="2-col-33-67">2 Col (33/67)</button>
-          <button type="button" class="arch-btn" data-col-preset="2-col-67-33">2 Col (67/33)</button>
-          <button type="button" class="arch-btn" data-col-preset="3-col">3 Col (33/33/33)</button>
-          <button type="button" class="arch-btn" data-col-preset="4-col">4 Col (25/25/25/25)</button>
+      <div class="arch-accordion">
+        <!-- Accordion 1: Backgrounds -->
+        <div class="arch-accordion-header" data-toggle="row-bg">
+          <span>BACKGROUNDS</span>
+          <span class="arch-accordion-arrow">▲</span>
+        </div>
+        <div class="arch-accordion-body" id="sec-row-bg">
+          <div class="arch-form-row--split">
+            <label class="arch-form-label-sub">Row background</label>
+            ${this.renderColorPicker('swatch-row-bg', 'txt-row-bg', rowBg)}
+          </div>
+          <div class="arch-form-row--split">
+            <label class="arch-form-label-sub">Content background</label>
+            ${this.renderColorPicker('swatch-row-cnt-bg', 'txt-row-cnt-bg', contentBg)}
+          </div>
+          <div class="arch-form-row--split">
+            <label class="arch-form-label-sub">Row background image</label>
+            <label class="arch-toggle-switch">
+              <input type="checkbox" id="chk-row-bg-img" />
+              <span class="arch-toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Accordion 2: Borders -->
+        <div class="arch-accordion-header" data-toggle="row-borders">
+          <span>BORDERS</span>
+          <span class="arch-accordion-arrow">▲</span>
+        </div>
+        <div class="arch-accordion-body" id="sec-row-borders">
+          <div class="arch-form-row--split">
+            <label class="arch-form-label-sub">Content area border</label>
+            <label class="arch-toggle-switch">
+              <input type="checkbox" id="chk-row-border" />
+              <span class="arch-toggle-slider"></span>
+            </label>
+          </div>
+          <div class="arch-form-row--split">
+            <label class="arch-form-label-sub">Border style</label>
+            <select class="arch-select" id="sel-row-border-style" style="width: 140px;">
+              <option value="solid">Solid</option>
+              <option value="dashed">Dashed</option>
+              <option value="dotted">Dotted</option>
+            </select>
+          </div>
+          <div class="arch-form-row--split">
+            <label class="arch-form-label-sub">Border width</label>
+            ${this.renderStepper('stp-row-border-w', 0, 0, 20, 1)}
+          </div>
+          <div class="arch-form-row--split">
+            <label class="arch-form-label-sub">Rounded corners</label>
+            ${this.renderStepper('stp-row-radius', 0, 0, 50, 1)}
+          </div>
+        </div>
+
+        <!-- Accordion 3: Layout -->
+        <div class="arch-accordion-header" data-toggle="row-layout">
+          <span>LAYOUT</span>
+          <span class="arch-accordion-arrow">▲</span>
+        </div>
+        <div class="arch-accordion-body" id="sec-row-layout">
+          <div class="arch-form-row--split">
+            <label class="arch-form-label-sub">Content Area Padding</label>
+            ${this.renderStepper('stp-row-pad', 10, 0, 60, 5)}
+          </div>
+          <div class="arch-form-row--split">
+            <label class="arch-form-label-sub">Vertical align</label>
+            <div class="arch-segmented-group grp-row-valign">
+              <button type="button" class="arch-segmented-btn is-active" data-valign="top">Top</button>
+              <button type="button" class="arch-segmented-btn" data-valign="middle">Center</button>
+              <button type="button" class="arch-segmented-btn" data-valign="bottom">Bottom</button>
+            </div>
+          </div>
+          <div class="arch-form-row--split">
+            <label class="arch-form-label-sub">Stack on mobile</label>
+            <div class="arch-segmented-group grp-row-stack">
+              <button type="button" class="arch-segmented-btn is-active" data-stack="on">ON</button>
+              <button type="button" class="arch-segmented-btn" data-stack="off">OFF</button>
+            </div>
+          </div>
+          <div class="arch-form-group" style="margin-top: 8px;">
+            <label class="arch-form-label">Column Layout Preset</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+              <button type="button" class="arch-btn arch-btn--sm" data-col-preset="1-col">1 Col (100%)</button>
+              <button type="button" class="arch-btn arch-btn--sm" data-col-preset="2-col-50-50">2 Col (50/50)</button>
+              <button type="button" class="arch-btn arch-btn--sm" data-col-preset="2-col-33-67">2 Col (33/67)</button>
+              <button type="button" class="arch-btn arch-btn--sm" data-col-preset="2-col-67-33">2 Col (67/33)</button>
+              <button type="button" class="arch-btn arch-btn--sm" data-col-preset="3-col">3 Col (Equal)</button>
+              <button type="button" class="arch-btn arch-btn--sm" data-col-preset="4-col">4 Col (Equal)</button>
+            </div>
+          </div>
         </div>
       </div>
     `;
 
-    const bgInp = container.querySelector<HTMLInputElement>('#inp-sec-bg')!;
-    bgInp.value = toHexColor(contentTable.style.backgroundColor || info.backgroundColor, '#ffffff');
-    bgInp.addEventListener('input', (e) => {
-      const val = (e.target as HTMLInputElement).value;
+    this.bindColorPicker(container, 'swatch-row-bg', 'txt-row-bg', (val) => {
+      targetEl.style.backgroundColor = val;
+      this.events.onChange();
+    });
+
+    this.bindColorPicker(container, 'swatch-row-cnt-bg', 'txt-row-cnt-bg', (val) => {
       contentTable.style.backgroundColor = val;
-      if (
-        contentTable.tagName.toLowerCase() === 'td' ||
-        contentTable.tagName.toLowerCase() === 'table'
-      ) {
+      if (contentTable.tagName.toLowerCase() === 'td' || contentTable.tagName.toLowerCase() === 'table') {
         contentTable.setAttribute('bgcolor', val);
-      }
-      info.element.style.backgroundColor = val;
-      if (info.element.tagName.toLowerCase() === 'td') {
-        info.element.setAttribute('bgcolor', val);
       }
       this.events.onChange();
     });
 
-    const padInp = container.querySelector<HTMLInputElement>('#inp-sec-padding')!;
-    padInp.value = info.element.style.padding || targetEl.style.padding || '';
-    padInp.addEventListener('input', (e) => {
-      const val = (e.target as HTMLInputElement).value;
-      info.element.style.padding = val;
+    this.bindStepper(container, 'stp-row-pad', (val) => {
+      contentTable.style.padding = `${val}px`;
+      this.events.onChange();
+    });
+
+    this.bindStepper(container, 'stp-row-border-w', (val) => {
+      contentTable.style.borderWidth = `${val}px`;
+      this.events.onChange();
+    });
+
+    this.bindStepper(container, 'stp-row-radius', (val) => {
+      contentTable.style.borderRadius = `${val}px`;
       this.events.onChange();
     });
 
@@ -767,6 +1692,19 @@ export class Inspector {
         const preset = btn.getAttribute('data-col-preset') as RowLayoutType;
         ColumnLayoutAdapter.applyRowPreset(targetEl, preset);
         this.events.onChange();
+      });
+    });
+
+    // Toggle accordions inside Row Properties
+    container.querySelectorAll<HTMLElement>('.arch-accordion-header[data-toggle]').forEach((header) => {
+      header.addEventListener('click', () => {
+        const targetId = header.getAttribute('data-toggle');
+        const body = container.querySelector<HTMLElement>(`#sec-${targetId}`);
+        const arrow = header.querySelector<HTMLElement>('.arch-accordion-arrow');
+        if (body) {
+          const isHidden = body.classList.toggle('is-hidden');
+          if (arrow) arrow.textContent = isHidden ? '▼' : '▲';
+        }
       });
     });
   }

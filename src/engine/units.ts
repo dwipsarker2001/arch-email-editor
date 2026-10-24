@@ -661,6 +661,64 @@ export function classifyElementType(
   if (isImageComponent(selectable) || isImageComponent(unit)) return 'image';
   if (isButtonComponent(selectable) || isButtonComponent(unit)) return 'button';
 
+  if (
+    selectable.classList.contains('list_block') ||
+    unit.classList.contains('list_block') ||
+    selectable.tagName.toLowerCase() === 'ul' ||
+    selectable.tagName.toLowerCase() === 'ol' ||
+    (unit.querySelector('ul, ol') && !unit.querySelector('table.row'))
+  ) {
+    return 'list';
+  }
+
+  if (
+    selectable.classList.contains('table_block') ||
+    unit.classList.contains('table_block') ||
+    selectable.classList.contains('arch-table') ||
+    unit.classList.contains('arch-table')
+  ) {
+    return 'table';
+  }
+
+  if (
+    selectable.classList.contains('video_block') ||
+    unit.classList.contains('video_block') ||
+    unit.querySelector('.video_block, iframe[src*="youtube"], iframe[src*="vimeo"]')
+  ) {
+    return 'video';
+  }
+
+  if (
+    selectable.classList.contains('icons_block') ||
+    unit.classList.contains('icons_block')
+  ) {
+    return 'icons';
+  }
+
+  if (
+    selectable.classList.contains('menu_block') ||
+    unit.classList.contains('menu_block') ||
+    selectable.tagName.toLowerCase() === 'nav' ||
+    unit.querySelector('nav')
+  ) {
+    return 'menu';
+  }
+
+  if (
+    selectable.classList.contains('html_block') ||
+    unit.classList.contains('html_block')
+  ) {
+    return 'html';
+  }
+
+  if (selectable.classList.contains('sticker_block') || unit.classList.contains('sticker_block')) {
+    return 'sticker';
+  }
+
+  if (selectable.classList.contains('gif_block') || unit.classList.contains('gif_block')) {
+    return 'gif';
+  }
+
   const sTag = selectable.tagName.toLowerCase();
   if (/^h[1-6]$/.test(sTag) || unit.querySelector('h1, h2, h3, h4, h5, h6')) {
     return 'heading';
