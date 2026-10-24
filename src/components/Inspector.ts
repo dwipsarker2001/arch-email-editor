@@ -19,7 +19,7 @@ import {
 import { setUnitVisibility } from '../engine/cssScope';
 
 export interface InspectorEvents {
-  onChange: () => void;
+  onChange: (isDocumentSetting?: boolean) => void;
   onRemoveBlock?: (id: string) => void;
   onMoveElement?: (direction: 'up' | 'down') => void;
   onDuplicateElement?: () => void;
@@ -680,7 +680,9 @@ export class Inspector {
           <button type="button" class="arch-btn" data-col-preset="1-col">1 Col (100%)</button>
           <button type="button" class="arch-btn" data-col-preset="2-col-50-50">2 Col (50/50)</button>
           <button type="button" class="arch-btn" data-col-preset="2-col-33-67">2 Col (33/67)</button>
+          <button type="button" class="arch-btn" data-col-preset="2-col-67-33">2 Col (67/33)</button>
           <button type="button" class="arch-btn" data-col-preset="3-col">3 Col (33/33/33)</button>
+          <button type="button" class="arch-btn" data-col-preset="4-col">4 Col (25/25/25/25)</button>
         </div>
       </div>
     `;
@@ -724,18 +726,33 @@ export class Inspector {
    * Renders global newsletter settings.
    */
   private renderDocumentSettings(doc: EmailDocument): void {
+    const contentAlign = doc.settings.contentAlign || 'center';
+    const contentBg = toHexColor(doc.settings.contentBackgroundColor, '#ffffff');
+    const preheader = doc.settings.preheader || '';
+
     this.element.innerHTML = `
       <div class="arch-editor__section-label">Email Settings</div>
       <div class="arch-form-group">
-        <label class="arch-form-label">Background Color</label>
-        <input type="color" class="arch-input" id="inp-doc-bg">
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Content Width</label>
+        <label class="arch-form-label">Content Area Width</label>
         <input type="text" class="arch-input" id="inp-doc-width" placeholder="600px">
       </div>
       <div class="arch-form-group">
-        <label class="arch-form-label">Font Family</label>
+        <label class="arch-form-label">Content Area Alignment</label>
+        <select class="arch-select" id="inp-doc-align">
+          <option value="center" ${contentAlign === 'center' ? 'selected' : ''}>Center</option>
+          <option value="left" ${contentAlign === 'left' ? 'selected' : ''}>Left</option>
+        </select>
+      </div>
+      <div class="arch-form-group">
+        <label class="arch-form-label">Background Color (Canvas)</label>
+        <input type="color" class="arch-input" id="inp-doc-bg">
+      </div>
+      <div class="arch-form-group">
+        <label class="arch-form-label">Content Area Background</label>
+        <input type="color" class="arch-input" id="inp-doc-content-bg">
+      </div>
+      <div class="arch-form-group">
+        <label class="arch-form-label">Default Font Family</label>
         <select class="arch-select" id="inp-doc-font">
           <option value="Arial, sans-serif">Arial</option>
           <option value="Helvetica, Arial, sans-serif">Helvetica</option>
@@ -745,30 +762,55 @@ export class Inspector {
           <option value="system-ui, -apple-system, sans-serif">System Sans</option>
         </select>
       </div>
+      <div class="arch-form-group">
+        <label class="arch-form-label">Preheader (Preview Text)</label>
+        <input type="text" class="arch-input" id="inp-doc-preheader" placeholder="Inbox summary snippet..." />
+      </div>
       <p style="font-size: 12px; color: var(--arch-text-secondary); margin-top: 14px; line-height: 1.5;">
         💡 Click any element on the canvas to inspect, move, duplicate, or customize its properties. Use <strong>↑ Parent</strong> to select Columns or Rows.
       </p>
     `;
 
-    const bgInp = this.element.querySelector<HTMLInputElement>('#inp-doc-bg')!;
-    bgInp.value = toHexColor(doc.settings.backgroundColor, '#f4f4f7');
-    bgInp.addEventListener('input', (e) => {
-      doc.settings.backgroundColor = (e.target as HTMLInputElement).value;
-      this.events.onChange();
-    });
-
     const widthInp = this.element.querySelector<HTMLInputElement>('#inp-doc-width')!;
     widthInp.value = doc.settings.contentWidth;
     widthInp.addEventListener('change', (e) => {
       doc.settings.contentWidth = (e.target as HTMLInputElement).value;
-      this.events.onChange();
+      this.events.onChange(true);
+    });
+
+    const alignSel = this.element.querySelector<HTMLSelectElement>('#inp-doc-align')!;
+    alignSel.value = contentAlign;
+    alignSel.addEventListener('change', (e) => {
+      doc.settings.contentAlign = (e.target as HTMLSelectElement).value as 'left' | 'center';
+      this.events.onChange(true);
+    });
+
+    const bgInp = this.element.querySelector<HTMLInputElement>('#inp-doc-bg')!;
+    bgInp.value = toHexColor(doc.settings.backgroundColor, '#f4f4f7');
+    bgInp.addEventListener('input', (e) => {
+      doc.settings.backgroundColor = (e.target as HTMLInputElement).value;
+      this.events.onChange(true);
+    });
+
+    const contentBgInp = this.element.querySelector<HTMLInputElement>('#inp-doc-content-bg')!;
+    contentBgInp.value = contentBg;
+    contentBgInp.addEventListener('input', (e) => {
+      doc.settings.contentBackgroundColor = (e.target as HTMLInputElement).value;
+      this.events.onChange(true);
     });
 
     const fontSel = this.element.querySelector<HTMLSelectElement>('#inp-doc-font')!;
     fontSel.value = doc.settings.fontFamily;
     fontSel.addEventListener('change', (e) => {
       doc.settings.fontFamily = (e.target as HTMLSelectElement).value;
-      this.events.onChange();
+      this.events.onChange(true);
+    });
+
+    const preheaderInp = this.element.querySelector<HTMLInputElement>('#inp-doc-preheader')!;
+    preheaderInp.value = preheader;
+    preheaderInp.addEventListener('input', (e) => {
+      doc.settings.preheader = (e.target as HTMLInputElement).value;
+      this.events.onChange(true);
     });
   }
 

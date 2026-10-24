@@ -47,9 +47,12 @@ export function normalizeDocument(doc?: any): EmailDocument {
     version: '1.0',
     settings: {
       contentWidth: typeof settings.contentWidth === 'string' ? settings.contentWidth : '600px',
+      contentAlign: settings.contentAlign === 'left' ? 'left' : 'center',
       backgroundColor: typeof settings.backgroundColor === 'string' ? settings.backgroundColor : '#f4f4f7',
+      contentBackgroundColor: typeof settings.contentBackgroundColor === 'string' ? settings.contentBackgroundColor : '#ffffff',
       fontFamily: typeof settings.fontFamily === 'string' ? settings.fontFamily : 'Arial, sans-serif',
-      textColor: typeof settings.textColor === 'string' ? settings.textColor : '#334155'
+      textColor: typeof settings.textColor === 'string' ? settings.textColor : '#334155',
+      preheader: typeof settings.preheader === 'string' ? settings.preheader : undefined
     },
     blocks: Array.isArray(doc.blocks) ? doc.blocks : []
   };
@@ -268,6 +271,125 @@ function renderBlock(block: BlockNode, fontFamily: string, contentWidth: string)
         </tr>`;
     }
 
+    case 'spacer': {
+      const h = parseInt(block.style.height || '24', 10);
+      return `
+        <tr>
+          <td height="${h}" style="font-size: 0px; line-height: 0px; height: ${h}px;">&nbsp;</td>
+        </tr>`;
+    }
+
+    case 'social': {
+      return `
+        <tr>
+          <td align="${align}" style="padding: ${padding}; text-align: ${align};">
+            <a href="https://instagram.com" target="_blank" style="display:inline-block;margin:0 6px;"><img src="https://cdn-icons-png.flaticon.com/512/174/174855.png" alt="Instagram" width="28" style="width:28px;height:auto;display:block;border:0;" /></a>
+            <a href="https://twitter.com" target="_blank" style="display:inline-block;margin:0 6px;"><img src="https://cdn-icons-png.flaticon.com/512/733/733579.png" alt="X" width="28" style="width:28px;height:auto;display:block;border:0;" /></a>
+            <a href="https://linkedin.com" target="_blank" style="display:inline-block;margin:0 6px;"><img src="https://cdn-icons-png.flaticon.com/512/174/174857.png" alt="LinkedIn" width="28" style="width:28px;height:auto;display:block;border:0;" /></a>
+          </td>
+        </tr>`;
+    }
+
+    case 'list': {
+      const color = block.style.color || '#334155';
+      return `
+        <tr>
+          <td align="${align}" style="padding: ${padding};">
+            <ul style="margin: 0; padding-left: 20px; font-family: ${fontFamily}; color: ${color}; line-height: 1.6;">
+              <li style="margin-bottom: 6px;">Feature point or key takeaway</li>
+              <li style="margin-bottom: 6px;">Second highlighted bullet</li>
+              <li>Final actionable recommendation</li>
+            </ul>
+          </td>
+        </tr>`;
+    }
+
+    case 'table': {
+      return `
+        <tr>
+          <td align="${align}" style="padding: ${padding};">
+            <table width="100%" border="0" cellpadding="8" cellspacing="0" style="border-collapse: collapse; font-family: ${fontFamily}; font-size: 14px; color: #334155;">
+              <thead>
+                <tr style="background-color: #f1f5f9; color: #0f172a; border-bottom: 2px solid #cbd5e1; font-weight: bold;">
+                  <th align="left" style="padding: 10px 12px;">Item</th>
+                  <th align="left" style="padding: 10px 12px;">Description</th>
+                  <th align="right" style="padding: 10px 12px;">Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 10px 12px;">Standard Plan</td>
+                  <td style="padding: 10px 12px;">Monthly subscription</td>
+                  <td align="right" style="padding: 10px 12px; font-weight: 600;">$29.00</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 10px 12px;">Pro Add-on</td>
+                  <td style="padding: 10px 12px;">Advanced analytics & export</td>
+                  <td align="right" style="padding: 10px 12px; font-weight: 600;">$15.00</td>
+                </tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>`;
+    }
+
+    case 'video': {
+      return `
+        <tr>
+          <td align="${align}" style="padding: ${padding}; text-align: ${align};">
+            <a href="https://youtube.com" target="_blank" style="display: block; position: relative; max-width: ${contentWidthNum}px; margin: 0 auto; text-decoration: none;">
+              <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80" alt="Watch Video" width="${contentWidthNum}" style="width: 100%; max-width: ${contentWidthNum}px; height: auto; display: block; border-radius: 8px; border: 0;" />
+              <div style="background-color: rgba(15, 23, 42, 0.85); color: #ffffff; padding: 10px 20px; border-radius: 999px; display: inline-block; font-family: ${fontFamily}; font-size: 14px; font-weight: 600; margin-top: -38px; position: relative; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">▶ Watch Video (3:20)</div>
+            </a>
+          </td>
+        </tr>`;
+    }
+
+    case 'icons': {
+      return `
+        <tr>
+          <td align="${align}" style="padding: ${padding}; text-align: ${align};">
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 auto; display: inline-table;">
+              <tr>
+                <td align="center" style="padding: 0 12px;">
+                  <img src="https://cdn-icons-png.flaticon.com/512/1077/1077035.png" alt="Secure" width="32" height="32" style="display:block;border:0;width:32px;height:32px;" />
+                  <p style="margin: 6px 0 0 0; font-family: ${fontFamily}; font-size: 12px; color: #475569; font-weight: 500;">Secure</p>
+                </td>
+                <td align="center" style="padding: 0 12px;">
+                  <img src="https://cdn-icons-png.flaticon.com/512/1077/1077042.png" alt="Fast" width="32" height="32" style="display:block;border:0;width:32px;height:32px;" />
+                  <p style="margin: 6px 0 0 0; font-family: ${fontFamily}; font-size: 12px; color: #475569; font-weight: 500;">Instant</p>
+                </td>
+                <td align="center" style="padding: 0 12px;">
+                  <img src="https://cdn-icons-png.flaticon.com/512/1077/1077063.png" alt="Support" width="32" height="32" style="display:block;border:0;width:32px;height:32px;" />
+                  <p style="margin: 6px 0 0 0; font-family: ${fontFamily}; font-size: 12px; color: #475569; font-weight: 500;">Support</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>`;
+    }
+
+    case 'menu': {
+      return `
+        <tr>
+          <td align="${align}" style="padding: ${padding}; text-align: ${align};">
+            <a href="https://example.com/home" style="display: inline-block; padding: 6px 14px; font-family: ${fontFamily}; font-size: 13px; font-weight: 600; color: #0f172a; text-decoration: none; letter-spacing: 0.5px;">HOME</a>
+            <a href="https://example.com/features" style="display: inline-block; padding: 6px 14px; font-family: ${fontFamily}; font-size: 13px; font-weight: 600; color: #0f172a; text-decoration: none; letter-spacing: 0.5px;">FEATURES</a>
+            <a href="https://example.com/pricing" style="display: inline-block; padding: 6px 14px; font-family: ${fontFamily}; font-size: 13px; font-weight: 600; color: #0f172a; text-decoration: none; letter-spacing: 0.5px;">PRICING</a>
+            <a href="https://example.com/contact" style="display: inline-block; padding: 6px 14px; font-family: ${fontFamily}; font-size: 13px; font-weight: 600; color: #0f172a; text-decoration: none; letter-spacing: 0.5px;">CONTACT</a>
+          </td>
+        </tr>`;
+    }
+
+    case 'gif': {
+      return `
+        <tr>
+          <td align="${align}" style="padding: ${padding}; text-align: ${align};">
+            <img src="https://media.giphy.com/media/26AHONQ79FdWZhAI0/giphy.gif" alt="Animated sticker" width="280" style="width: 280px; max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 8px; border: 0;" />
+          </td>
+        </tr>`;
+    }
+
     case 'html': {
       const customHtml = block.content.html || '';
       return `
@@ -290,7 +412,12 @@ export function compileBlocksToHtml(doc: EmailDocument): string {
   const contentWidth = doc.settings.contentWidth || '600px';
   const contentWidthNum = parseInt(contentWidth, 10);
   const bgColor = doc.settings.backgroundColor || '#f4f4f7';
+  const contentBgColor = doc.settings.contentBackgroundColor || '#ffffff';
+  const contentAlign = doc.settings.contentAlign || 'center';
   const fontFamily = doc.settings.fontFamily || 'Arial, sans-serif';
+  const preheaderSnippet = doc.settings.preheader
+    ? `\n  <div style="display:none;font-size:1px;color:#333333;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${escapeHtml(doc.settings.preheader)}</div>`
+    : '';
 
   const rows = doc.blocks.map(b => renderBlock(b, fontFamily, contentWidth)).join('\n');
 
@@ -317,19 +444,19 @@ export function compileBlocksToHtml(doc: EmailDocument): string {
     body { margin: 0; padding: 0; width: 100% !important; min-width: 100%; }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: ${bgColor}; font-family: ${fontFamily};">
+<body style="margin: 0; padding: 0; background-color: ${bgColor}; font-family: ${fontFamily};">${preheaderSnippet}
   <!-- Outer Background Container Table -->
   <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: ${bgColor};">
     <tr>
-      <td align="center" style="padding: 24px 10px;">
+      <td align="${contentAlign}" style="padding: 24px 10px;">
         <!--[if (gte mso 9)|(IE)]>
-        <table align="center" border="0" cellspacing="0" cellpadding="0" width="${contentWidthNum}">
+        <table align="${contentAlign}" border="0" cellspacing="0" cellpadding="0" width="${contentWidthNum}">
         <tr>
-        <td align="center" valign="top" width="${contentWidthNum}">
+        <td align="${contentAlign}" valign="top" width="${contentWidthNum}">
         <![endif]-->
         
-        <!-- Main Centered Email Container Table -->
-        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: ${contentWidthNum}px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <!-- Main Email Container Table -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: ${contentWidthNum}px; width: 100%; background-color: ${contentBgColor}; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: ${contentAlign === 'center' ? '0 auto' : '0'};">
           <tbody>
             ${rows}
           </tbody>

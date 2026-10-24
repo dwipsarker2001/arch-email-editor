@@ -406,8 +406,13 @@ export class ArchEmailEditor {
     this.rightPanel = new RightPanel({
       onAddBlock: (type) => this.addBlock(type),
       onAddRowLayout: (layout) => this.addRowLayout(layout),
-      onChange: () => {
-        if (this.canvas) {
+      onChange: (isDocumentSetting?: boolean) => {
+        if (isDocumentSetting) {
+          this.document.rawHtml = compileToEmailHtml({ ...this.document, rawHtml: undefined });
+          this.updateViews(true);
+          this.recordHistory();
+          this.emit('change', this.getJSON());
+        } else if (this.canvas) {
           this.canvas.onStructureChanged();
         } else {
           this.emit('change', this.getJSON());
@@ -540,6 +545,55 @@ export class ArchEmailEditor {
             html: '<div style="padding: 16px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; text-align: center; color: #64748b;">Custom HTML snippet</div>'
           },
           style: { padding: '12px 20px' }
+        };
+      case 'list':
+        return {
+          id,
+          type: 'list',
+          content: {},
+          style: { fontSize: '15px', color: '#334155', padding: '12px 20px', textAlign: 'left' }
+        };
+      case 'table':
+        return {
+          id,
+          type: 'table',
+          content: {},
+          style: { padding: '12px 20px' }
+        };
+      case 'video':
+        return {
+          id,
+          type: 'video',
+          content: {
+            url: 'https://youtube.com',
+            src: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
+            label: '▶ Watch Video (3:20)'
+          },
+          style: { textAlign: 'center', padding: '16px 20px' }
+        };
+      case 'icons':
+        return {
+          id,
+          type: 'icons',
+          content: {},
+          style: { textAlign: 'center', padding: '16px 20px' }
+        };
+      case 'menu':
+        return {
+          id,
+          type: 'menu',
+          content: {},
+          style: { textAlign: 'center', padding: '12px 20px' }
+        };
+      case 'gif':
+        return {
+          id,
+          type: 'gif',
+          content: {
+            src: 'https://media.giphy.com/media/26AHONQ79FdWZhAI0/giphy.gif',
+            alt: 'Animated sticker'
+          },
+          style: { textAlign: 'center', padding: '12px 20px' }
         };
     }
   }

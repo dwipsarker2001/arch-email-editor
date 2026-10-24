@@ -590,7 +590,8 @@ export const ColumnLayoutAdapter = {
       '2-col-50-50': [50, 50],
       '2-col-33-67': [33.33, 66.67],
       '2-col-67-33': [66.67, 33.33],
-      '3-col': [33.33, 33.33, 33.33]
+      '3-col': [33.33, 33.33, 33.33],
+      '4-col': [25, 25, 25, 25]
     };
     const targetWidths = widthsMap[preset];
     if (!targetWidths) return;
@@ -693,6 +694,18 @@ function getRawBlockInnerMarkup(type: BlockType): string {
       return `<div class="alignment" align="center" style="text-align: center;"><a href="https://instagram.com" target="_blank" style="display:inline-block;margin:0 6px;"><img src="https://cdn-icons-png.flaticon.com/512/174/174855.png" alt="Instagram" width="28" style="width:28px;height:auto;display:block;border:0;" /></a><a href="https://twitter.com" target="_blank" style="display:inline-block;margin:0 6px;"><img src="https://cdn-icons-png.flaticon.com/512/733/733579.png" alt="X" width="28" style="width:28px;height:auto;display:block;border:0;" /></a><a href="https://linkedin.com" target="_blank" style="display:inline-block;margin:0 6px;"><img src="https://cdn-icons-png.flaticon.com/512/174/174857.png" alt="LinkedIn" width="28" style="width:28px;height:auto;display:block;border:0;" /></a></div>`;
     case 'html':
       return `<div style="padding: 16px; background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; text-align: center; color: #64748b; font-size: 13px;">Custom HTML Section</div>`;
+    case 'list':
+      return `<ul style="margin: 0; padding-left: 20px; font-family: Arial, sans-serif; font-size: 15px; color: #334155; line-height: 1.6;"><li style="margin-bottom: 6px;">Feature point or key takeaway</li><li style="margin-bottom: 6px;">Second highlighted bullet</li><li>Final actionable recommendation</li></ul>`;
+    case 'table':
+      return `<table width="100%" border="0" cellpadding="8" cellspacing="0" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 14px; color: #334155;"><thead><tr style="background-color: #f1f5f9; color: #0f172a; border-bottom: 2px solid #cbd5e1; font-weight: bold;"><th align="left" style="padding: 10px 12px;">Item</th><th align="left" style="padding: 10px 12px;">Description</th><th align="right" style="padding: 10px 12px;">Price</th></tr></thead><tbody><tr style="border-bottom: 1px solid #e2e8f0;"><td style="padding: 10px 12px;">Standard Plan</td><td style="padding: 10px 12px;">Monthly subscription</td><td align="right" style="padding: 10px 12px; font-weight: 600;">$29.00</td></tr><tr style="border-bottom: 1px solid #e2e8f0;"><td style="padding: 10px 12px;">Pro Add-on</td><td style="padding: 10px 12px;">Advanced analytics & export</td><td align="right" style="padding: 10px 12px; font-weight: 600;">$15.00</td></tr></tbody></table>`;
+    case 'video':
+      return `<div class="alignment" align="center" style="text-align: center;"><a href="https://youtube.com" target="_blank" style="display: block; position: relative; max-width: 560px; margin: 0 auto; text-decoration: none;"><img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80" alt="Watch Video" width="560" style="width: 100%; max-width: 560px; height: auto; display: block; border-radius: 8px; border: 0;" /><div style="background-color: rgba(15, 23, 42, 0.85); color: #ffffff; padding: 10px 20px; border-radius: 999px; display: inline-block; font-family: Arial, sans-serif; font-size: 14px; font-weight: 600; margin-top: -38px; position: relative; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">▶ Watch Video (3:20)</div></a></div>`;
+    case 'icons':
+      return `<div class="alignment" align="center" style="text-align: center;"><table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 auto; display: inline-table;"><tr><td align="center" style="padding: 0 12px;"><img src="https://cdn-icons-png.flaticon.com/512/1077/1077035.png" alt="Secure" width="32" height="32" style="display:block;border:0;width:32px;height:32px;" /><p style="margin: 6px 0 0 0; font-family: Arial, sans-serif; font-size: 12px; color: #475569; font-weight: 500;">Secure</p></td><td align="center" style="padding: 0 12px;"><img src="https://cdn-icons-png.flaticon.com/512/1077/1077042.png" alt="Fast" width="32" height="32" style="display:block;border:0;width:32px;height:32px;" /><p style="margin: 6px 0 0 0; font-family: Arial, sans-serif; font-size: 12px; color: #475569; font-weight: 500;">Instant</p></td><td align="center" style="padding: 0 12px;"><img src="https://cdn-icons-png.flaticon.com/512/1077/1077063.png" alt="Support" width="32" height="32" style="display:block;border:0;width:32px;height:32px;" /><p style="margin: 6px 0 0 0; font-family: Arial, sans-serif; font-size: 12px; color: #475569; font-weight: 500;">Support</p></td></tr></table></div>`;
+    case 'menu':
+      return `<div class="menu-links" align="center" style="text-align: center; padding: 6px 0;"><a href="https://example.com/home" style="display: inline-block; padding: 6px 14px; font-family: Arial, sans-serif; font-size: 13px; font-weight: 600; color: #0f172a; text-decoration: none; letter-spacing: 0.5px;">HOME</a><a href="https://example.com/features" style="display: inline-block; padding: 6px 14px; font-family: Arial, sans-serif; font-size: 13px; font-weight: 600; color: #0f172a; text-decoration: none; letter-spacing: 0.5px;">FEATURES</a><a href="https://example.com/pricing" style="display: inline-block; padding: 6px 14px; font-family: Arial, sans-serif; font-size: 13px; font-weight: 600; color: #0f172a; text-decoration: none; letter-spacing: 0.5px;">PRICING</a><a href="https://example.com/contact" style="display: inline-block; padding: 6px 14px; font-family: Arial, sans-serif; font-size: 13px; font-weight: 600; color: #0f172a; text-decoration: none; letter-spacing: 0.5px;">CONTACT</a></div>`;
+    case 'gif':
+      return `<div class="alignment" align="center" style="text-align: center;"><img src="https://media.giphy.com/media/26AHONQ79FdWZhAI0/giphy.gif" alt="Animated sticker" width="280" style="width: 280px; max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 8px; border: 0;" /></div>`;
   }
 }
 
@@ -705,7 +718,8 @@ export function buildRowLayoutHtml(layout: RowLayoutType, wrapInTr: boolean): st
     '2-col-50-50': [50, 50],
     '2-col-33-67': [33.33, 66.67],
     '2-col-67-33': [66.67, 33.33],
-    '3-col': [33.33, 33.33, 33.33]
+    '3-col': [33.33, 33.33, 33.33],
+    '4-col': [25, 25, 25, 25]
   };
   const cols = widthsMap[layout] || [100];
 

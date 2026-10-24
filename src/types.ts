@@ -17,7 +17,13 @@ export type BlockType =
   | 'divider'
   | 'spacer'
   | 'social'
-  | 'html';
+  | 'html'
+  | 'list'
+  | 'table'
+  | 'video'
+  | 'icons'
+  | 'menu'
+  | 'gif';
 
 /**
  * Supported multi-column row layout presets.
@@ -27,7 +33,8 @@ export type RowLayoutType =
   | '2-col-50-50'
   | '2-col-33-67'
   | '2-col-67-33'
-  | '3-col';
+  | '3-col'
+  | '4-col';
 
 /**
  * Responsive preview & style customization viewport mode.
@@ -95,12 +102,18 @@ export interface BlockNode {
 export interface DocumentSettings {
   /** Max content width, standard for emails is 600px */
   contentWidth: string;
+  /** Content area alignment: 'left' | 'center' */
+  contentAlign?: 'left' | 'center';
   /** Outer canvas / email client background color */
   backgroundColor: string;
+  /** Content area background color */
+  contentBackgroundColor?: string;
   /** Base typography font stack */
   fontFamily: string;
   /** Base copy color */
   textColor: string;
+  /** Preheader text for email inboxes */
+  preheader?: string;
 }
 
 /**

@@ -114,13 +114,21 @@ export class RightPanel {
               <span class="arch-palette-icon">¶</span>
               <span>Text</span>
             </button>
-            <button class="arch-palette-item" type="button" draggable="true" data-block-type="button">
-              <span class="arch-palette-icon">🔘</span>
-              <span>Button</span>
+            <button class="arch-palette-item" type="button" draggable="true" data-block-type="list">
+              <span class="arch-palette-icon">☰</span>
+              <span>List</span>
             </button>
             <button class="arch-palette-item" type="button" draggable="true" data-block-type="image">
               <span class="arch-palette-icon">🖼</span>
               <span>Image</span>
+            </button>
+            <button class="arch-palette-item" type="button" draggable="true" data-block-type="button">
+              <span class="arch-palette-icon">🔘</span>
+              <span>Button</span>
+            </button>
+            <button class="arch-palette-item" type="button" draggable="true" data-block-type="table">
+              <span class="arch-palette-icon">▦</span>
+              <span>Table</span>
             </button>
             <button class="arch-palette-item" type="button" draggable="true" data-block-type="divider">
               <span class="arch-palette-icon">―</span>
@@ -137,6 +145,22 @@ export class RightPanel {
             <button class="arch-palette-item" type="button" draggable="true" data-block-type="html">
               <span class="arch-palette-icon">&lt;/&gt;</span>
               <span>HTML</span>
+            </button>
+            <button class="arch-palette-item" type="button" draggable="true" data-block-type="video">
+              <span class="arch-palette-icon">▶</span>
+              <span>Video</span>
+            </button>
+            <button class="arch-palette-item" type="button" draggable="true" data-block-type="icons">
+              <span class="arch-palette-icon">★</span>
+              <span>Icons</span>
+            </button>
+            <button class="arch-palette-item" type="button" draggable="true" data-block-type="menu">
+              <span class="arch-palette-icon">≡</span>
+              <span>Menu</span>
+            </button>
+            <button class="arch-palette-item" type="button" draggable="true" data-block-type="gif">
+              <span class="arch-palette-icon">👾</span>
+              <span>GIF</span>
             </button>
           </div>
         </div>
@@ -178,6 +202,13 @@ export class RightPanel {
               <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
                 <span style="font-weight: 600;">3 Columns</span>
                 <span style="font-size: 11px; color: var(--arch-text-secondary);">33% / 33% / 33% equal split</span>
+              </div>
+            </button>
+            <button class="arch-palette-item arch-palette-item--row" type="button" draggable="true" data-row-layout="4-col">
+              <span class="arch-palette-icon" style="font-size: 16px;">▧</span>
+              <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
+                <span style="font-weight: 600;">4 Columns</span>
+                <span style="font-size: 11px; color: var(--arch-text-secondary);">25% / 25% / 25% / 25% equal split</span>
               </div>
             </button>
           </div>

@@ -231,4 +231,102 @@ describe('ArchEmailEditor Core Engine', () => {
 
     editor.destroy();
   });
+
+  it('renders all 14 RGE content blocks and all 6 section layouts in RightPanel', () => {
+    const editor = ArchEmailEditor.create(container);
+
+    const expectedBlocks = [
+      'heading', 'text', 'list', 'image', 'button', 'table',
+      'divider', 'spacer', 'social', 'html', 'video', 'icons', 'menu', 'gif'
+    ];
+    expectedBlocks.forEach((type) => {
+      const btn = container.querySelector(`[data-block-type="${type}"]`);
+      expect(btn, `Missing content block button: ${type}`).toBeTruthy();
+    });
+
+    const expectedSections = [
+      '1-col', '2-col-50-50', '2-col-33-67', '2-col-67-33', '3-col', '4-col'
+    ];
+    expectedSections.forEach((layout) => {
+      const btn = container.querySelector(`[data-row-layout="${layout}"]`);
+      expect(btn, `Missing section layout button: ${layout}`).toBeTruthy();
+    });
+
+    editor.destroy();
+  });
+
+  it('instantiates and inserts all block types without errors', () => {
+    const editor = ArchEmailEditor.create(container);
+    const newTypes = ['list', 'table', 'video', 'icons', 'menu', 'gif'] as const;
+
+    newTypes.forEach((type) => {
+      const btn = container.querySelector(`[data-block-type="${type}"]`) as HTMLButtonElement;
+      expect(btn).toBeTruthy();
+      btn.click();
+
+      const doc = editor.getJSON();
+      const lastBlock = doc.blocks[doc.blocks.length - 1];
+      expect(lastBlock.type).toBe(type);
+    });
+
+    const html = editor.getHTML();
+    expect(html).toContain('Feature point');
+    expect(html).toContain('Standard Plan');
+    expect(html).toContain('Watch Video');
+    expect(html).toContain('Secure');
+    expect(html).toContain('HOME');
+    expect(html).toContain('giphy.gif');
+
+    editor.destroy();
+  });
+
+  it('customizes and compiles email document settings matching RGE Studio', () => {
+    const editor = ArchEmailEditor.create(container);
+
+    // Switch to Settings tab
+    const settingsTab = container.querySelector('[data-tab="settings"]') as HTMLButtonElement;
+    settingsTab.click();
+
+    const widthInp = container.querySelector('#inp-doc-width') as HTMLInputElement;
+    const alignSel = container.querySelector('#inp-doc-align') as HTMLSelectElement;
+    const bgInp = container.querySelector('#inp-doc-bg') as HTMLInputElement;
+    const contentBgInp = container.querySelector('#inp-doc-content-bg') as HTMLInputElement;
+    const preheaderInp = container.querySelector('#inp-doc-preheader') as HTMLInputElement;
+
+    expect(widthInp).toBeTruthy();
+    expect(alignSel).toBeTruthy();
+    expect(bgInp).toBeTruthy();
+    expect(contentBgInp).toBeTruthy();
+    expect(preheaderInp).toBeTruthy();
+
+    // Update settings
+    widthInp.value = '640px';
+    widthInp.dispatchEvent(new Event('change'));
+
+    alignSel.value = 'left';
+    alignSel.dispatchEvent(new Event('change'));
+
+    bgInp.value = '#112233';
+    bgInp.dispatchEvent(new Event('input'));
+
+    contentBgInp.value = '#ffffff';
+    contentBgInp.dispatchEvent(new Event('input'));
+
+    preheaderInp.value = 'Preview snippet for subscribers';
+    preheaderInp.dispatchEvent(new Event('input'));
+
+    const doc = editor.getJSON();
+    expect(doc.settings.contentWidth).toBe('640px');
+    expect(doc.settings.contentAlign).toBe('left');
+    expect(doc.settings.backgroundColor).toBe('#112233');
+    expect(doc.settings.contentBackgroundColor).toBe('#ffffff');
+    expect(doc.settings.preheader).toBe('Preview snippet for subscribers');
+
+    const compiledHtml = editor.getHTML();
+    expect(compiledHtml).toContain('Preview snippet for subscribers');
+    expect(compiledHtml).toContain('640px');
+    expect(compiledHtml).toContain('#112233');
+
+    editor.destroy();
+  });
 });
