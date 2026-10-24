@@ -198,29 +198,33 @@
 }
 
 .arch-right-tabs {
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f3f4f6;
-  padding: 4px 6px 0 6px;
-  gap: 2px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid #dcdfe4;
+  background: #eceef1;
+  padding: 0;
+  gap: 0;
   flex-shrink: 0;
-  height: 44px;
+  height: 46px;
 }
 
 .arch-right-panel-toggle {
-  width: 26px;
-  height: 26px;
+  position: absolute;
+  left: -14px;
+  top: 9px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: #7747ff;
   color: #ffffff;
-  border: none;
+  border: 2px solid #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  margin-right: 4px;
-  flex-shrink: 0;
+  z-index: 50;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
   transition: transform 0.2s ease, background-color 0.15s ease;
 }
 
@@ -229,18 +233,19 @@
 }
 
 .arch-right-tab {
-  flex: 1;
+  height: 100%;
   background: transparent;
   border: none;
-  padding: 8px 6px;
+  border-right: 1px solid #e2e5e9;
+  padding: 0 8px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #64748b;
   cursor: pointer;
   text-align: center;
-  border-radius: 6px 6px 0 0;
+  border-radius: 0;
   transition: all 0.15s ease;
   display: flex;
   align-items: center;
@@ -248,15 +253,20 @@
   gap: 6px;
 }
 
+.arch-right-tab:last-child {
+  border-right: none;
+}
+
 .arch-right-tab:hover {
   color: #1e293b;
-  background: #e2e8f0;
+  background: #e4e7eb;
 }
 
 .arch-right-tab.is-active {
-  color: #1e293b;
+  color: #111827;
   background: #ffffff;
-  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.04);
+  font-weight: 700;
+  box-shadow: none;
 }
 
 .arch-right-tab.is-active .arch-tab-icon {
@@ -276,6 +286,31 @@
   background: #ffffff;
 }
 
+.arch-right-tab-content::-webkit-scrollbar,
+.arch-tab-panel::-webkit-scrollbar,
+.arch-editor__inspector::-webkit-scrollbar {
+  width: 6px;
+}
+
+.arch-right-tab-content::-webkit-scrollbar-track,
+.arch-tab-panel::-webkit-scrollbar-track,
+.arch-editor__inspector::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.arch-right-tab-content::-webkit-scrollbar-thumb,
+.arch-tab-panel::-webkit-scrollbar-thumb,
+.arch-editor__inspector::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.arch-right-tab-content::-webkit-scrollbar-thumb:hover,
+.arch-tab-panel::-webkit-scrollbar-thumb:hover,
+.arch-editor__inspector::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
 .arch-tab-panel {
   flex: 1;
   overflow-y: auto;
@@ -283,6 +318,11 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.arch-tab-panel--settings {
+  padding: 0 !important;
+  gap: 0 !important;
 }
 
 .arch-tab-panel.is-hidden {
@@ -468,20 +508,31 @@
   display: none !important;
 }
 
-/* Form Rows inside Accordion */
+/* Form Rows inside Accordion & Inspector */
 .arch-form-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.arch-form-row--split {
+.arch-form-row--split,
+.arch-rge-row {
+  display: flex;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  padding: 4px 0;
-  min-height: 36px;
-  border-bottom: 1px solid #f9fafb;
+  padding: 13px 18px;
+  min-height: 52px;
+  border-bottom: 1px solid #f2f3f5;
+  box-sizing: border-box;
+}
+
+.arch-rge-label,
+.arch-form-label-sub {
+  font-size: 13px;
+  color: #4b5563;
+  font-weight: 400;
+  user-select: none;
 }
 
 .arch-slider-badge {
@@ -497,7 +548,7 @@
 /* Segmented Group */
 .arch-segmented-group {
   display: inline-flex;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
   overflow: hidden;
   background: #ffffff;
@@ -529,21 +580,26 @@
 
 .arch-segmented-icon-btn {
   width: 32px;
-  height: 30px;
+  height: 32px;
   padding: 0;
   border: none;
-  background: transparent;
+  border-right: 1px solid #e5e7eb;
+  background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #64748b;
-  transition: all 0.15s ease;
+  color: #9ca3af;
+  transition: all 0.12s ease;
+}
+
+.arch-segmented-icon-btn:last-child {
+  border-right: none;
 }
 
 .arch-segmented-icon-btn:hover {
-  background: #f1f5f9;
-  color: #1e293b;
+  background: #f9fafb;
+  color: #4b5563;
 }
 
 .arch-segmented-icon-btn.is-active {
@@ -555,7 +611,7 @@
 .arch-stepper {
   display: inline-flex;
   align-items: center;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
   background: #ffffff;
   overflow: hidden;
@@ -565,21 +621,29 @@
 .arch-stepper-btn {
   width: 28px;
   height: 100%;
-  background: #f9fafb;
+  background: #ffffff;
   border: none;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 400;
   color: #4b5563;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   user-select: none;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.arch-stepper-btn--minus {
+  border-right: 1px solid #e5e7eb;
+}
+
+.arch-stepper-btn--plus {
+  border-left: 1px solid #e5e7eb;
 }
 
 .arch-stepper-btn:hover {
-  background: #f3f4f6;
+  background: #f9fafb;
   color: #111827;
 }
 
@@ -588,18 +652,23 @@
 }
 
 .arch-stepper-val {
-  width: 44px;
+  width: 36px;
   height: 100%;
   border: none;
-  border-left: 1px solid #e5e7eb;
-  border-right: 1px solid #e5e7eb;
+  outline: none;
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #111827;
-  outline: none;
   background: #ffffff;
-  padding: 0 4px;
+  padding: 0;
+  -moz-appearance: textfield;
+}
+
+.arch-stepper-val::-webkit-inner-spin-button,
+.arch-stepper-val::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Sub-section labels & headers inside properties */
@@ -609,45 +678,67 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #6b7280;
-  margin: 12px 0 6px 0;
+  margin: 14px 18px 4px 18px;
   padding-bottom: 4px;
-  border-bottom: 1px solid #f3f4f6;
 }
 
-.arch-form-label-sub {
+/* Select Control */
+.arch-select,
+.arch-rge-select {
+  height: 32px;
+  width: 145px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 26px 0 10px;
   font-size: 12px;
-  font-weight: 500;
-  color: #374151;
+  color: #111827;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: calc(100% - 8px) center;
+  appearance: none;
+  outline: none;
+  cursor: pointer;
+}
+
+.arch-select:focus,
+.arch-rge-select:focus {
+  border-color: #7747ff;
 }
 
 /* URL Input with prefix */
 .arch-url-group {
   display: flex;
   align-items: center;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
   background: #ffffff;
   overflow: hidden;
+  height: 32px;
 }
 
 .arch-url-prefix {
-  padding: 6px 10px;
+  padding: 0 10px;
+  height: 100%;
   background: #f9fafb;
   border-right: 1px solid #e5e7eb;
   font-size: 11px;
   font-weight: 600;
   color: #6b7280;
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
 }
 
 .arch-url-input {
   border: none;
   outline: none;
-  padding: 6px 10px;
+  padding: 0 10px;
   font-size: 12px;
   color: #111827;
   flex: 1;
   background: transparent;
+  height: 100%;
 }
 
 .arch-action-links {
@@ -667,6 +758,37 @@
 
 .arch-action-link:hover {
   text-decoration: underline;
+}
+
+/* Visual Padding Preview Diagram */
+.arch-padding-preview {
+  width: 58px;
+  height: 44px;
+  border: 1.5px dashed #7747ff;
+  background: #faf5ff;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.arch-padding-preview__inner {
+  width: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.arch-padding-preview__line {
+  height: 2px;
+  background: #cbd5e1;
+  border-radius: 1px;
+  width: 100%;
+}
+
+.arch-padding-preview__line--short {
+  width: 65%;
 }
 
 /* Code Editor box for HTML block */
@@ -709,32 +831,40 @@
 
 /* Color Picker Swatch Control */
 .arch-color-picker-control {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  border: 1px solid #e5e7eb;
+  height: 32px;
+  width: 105px;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
-  padding: 3px 6px;
+  padding: 2px 8px;
   background: #ffffff;
+  box-sizing: border-box;
+  position: relative;
+  cursor: pointer;
 }
 
 .arch-color-swatch {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   padding: 0;
-  border: 1px solid #cbd5e1;
-  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .arch-color-hex {
   border: none;
   outline: none;
   font-size: 12px;
-  font-family: monospace;
-  width: 68px;
-  color: #374151;
+  font-family: inherit;
+  font-weight: 500;
+  width: 65px;
+  margin-left: 8px;
+  color: #111827;
   background: transparent;
+  text-transform: uppercase;
 }
 
 /* Toggle Switch */
@@ -786,32 +916,34 @@ input:checked + .arch-toggle-slider:before {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
+  height: 48px;
+  padding: 0 18px;
   background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #eef0f3;
+  box-sizing: border-box;
 }
 
 .arch-prop-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: #111827;
 }
 
 .arch-prop-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .arch-icon-btn {
-  width: 26px;
-  height: 26px;
-  border: 1px solid #e5e7eb;
+  width: 28px;
+  height: 28px;
+  border: none;
   border-radius: 4px;
-  background: #ffffff;
-  color: #4b5563;
+  background: transparent;
+  color: #6b7280;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -822,28 +954,32 @@ input:checked + .arch-toggle-slider:before {
 .arch-icon-btn:hover {
   background: #f3f4f6;
   color: #111827;
-  border-color: #d1d5db;
 }
 
 .arch-ai-bar {
-  padding: 10px 14px 4px 14px;
+  padding: 14px 18px 8px 18px;
 }
 
 .arch-ai-btn {
   width: 100%;
+  height: 36px;
   background: #7747ff;
   color: #ffffff;
   border: none;
-  border-radius: 4px;
-  padding: 8px 14px;
-  font-size: 12px;
+  border-radius: 6px;
+  padding: 0 14px;
+  font-size: 13px;
   font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   cursor: pointer;
   transition: background-color 0.15s ease;
+}
+
+.arch-ai-btn:hover {
+  background: #6336e0;
 }
 
 .arch-ai-btn:hover {
@@ -901,12 +1037,12 @@ input:checked + .arch-toggle-slider:before {
   z-index: 30;
   display: inline-flex;
   align-items: center;
-  background: #0d99ff;
+  background: #7747ff;
   color: #ffffff;
   border-radius: 5px;
   padding: 2px 5px;
   gap: 2px;
-  box-shadow: 0 3px 10px rgba(13, 153, 255, 0.35), 0 1px 3px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 3px 10px rgba(119, 71, 255, 0.35), 0 1px 3px rgba(0, 0, 0, 0.18);
   font-family: var(--arch-font);
   font-size: 11px;
   pointer-events: auto;

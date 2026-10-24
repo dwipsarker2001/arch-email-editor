@@ -1035,15 +1035,15 @@ export class Canvas {
       }
       .arch-editing-text::selection,
       .arch-editing-text *::selection {
-        background-color: #0d99ff !important;
+        background-color: #7747ff !important;
         color: #ffffff !important;
       }
       .arch-selected-element {
-        outline: 2px solid #0d99ff !important;
+        outline: 2px solid #7747ff !important;
         outline-offset: -2px;
       }
       .arch-hover-element:not(.arch-selected-element) {
-        outline: 1.5px solid rgba(13, 153, 255, 0.75) !important;
+        outline: 1.5px solid rgba(119, 71, 255, 0.75) !important;
         outline-offset: -1.5px;
       }
       .arch-dragging-source {
@@ -1063,13 +1063,13 @@ export class Canvas {
         opacity: 0.9 !important;
         z-index: 10 !important;
         pointer-events: none !important;
-        box-shadow: 0 8px 20px rgba(13, 153, 255, 0.22) !important;
+        box-shadow: 0 8px 20px rgba(119, 71, 255, 0.22) !important;
       }
       .arch-drop-line-top {
-        box-shadow: inset 0 3px 0 0 #0d99ff !important;
+        box-shadow: inset 0 3px 0 0 #7747ff !important;
       }
       .arch-drop-line-bottom {
-        box-shadow: inset 0 -3px 0 0 #0d99ff !important;
+        box-shadow: inset 0 -3px 0 0 #7747ff !important;
       }
     `;
     (doc.head || doc.documentElement).appendChild(styleEl);

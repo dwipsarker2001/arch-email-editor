@@ -46,6 +46,21 @@
 
     // Expose editor globally on window for easy developer & console access
     window.editor = editor;
+
+    // Helper for headless verification
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('select')) {
+      setTimeout(() => {
+        const iframe = document.querySelector('iframe');
+        if (iframe && (iframe.contentDocument || iframe.contentWindow.document)) {
+          const doc = iframe.contentDocument || iframe.contentWindow.document;
+          const el = doc.querySelector(params.get('select'));
+          if (el) {
+            el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+          }
+        }
+      }, 500);
+    }
   </script>
 </body>
 </html>
