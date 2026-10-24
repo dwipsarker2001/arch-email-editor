@@ -761,17 +761,22 @@ export function getUnitAncestry(unit: HTMLElement, selectedLeaf?: HTMLElement | 
     }
   }
 
-  // Disambiguate identical column labels in nested hierarchies (e.g. nested tables)
-  const colItems = items.filter((it) => it.role === 'column');
-  if (colItems.length >= 2) {
-    colItems.forEach((col, idx) => {
-      if (col.label === 'Column') {
-        col.label = idx === 0 ? 'Column (Outer)' : `Column (Inner)`;
+  // Deduplicate consecutive identical structural roles where a wrapper table cell inside a column was also flagged as a column
+  const cleanItems: BreadcrumbItem[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const cur = items[i];
+    const prev = cleanItems[cleanItems.length - 1];
+    if (prev && prev.role === cur.role && (prev.role === 'column' || prev.role === 'row')) {
+      // Keep the one closer to the selected leaf or with specific label
+      if (cur.label.includes('(') || cur.label.match(/\d/)) {
+        cleanItems[cleanItems.length - 1] = cur;
       }
-    });
+      continue;
+    }
+    cleanItems.push(cur);
   }
 
-  return items;
+  return cleanItems;
 }
 
 /**

@@ -430,11 +430,15 @@ export class Canvas {
     if (this.floatingToolbar) {
       this.positionFloatingToolbar(state.unit, this.floatingToolbar);
     }
-    if (this.dimensionsBadge) {
-      const rect = state.img.getBoundingClientRect();
-      const h = rect.height > 0 ? Math.round(rect.height) : Math.round(nextWidth);
-      this.dimensionsBadge.textContent = `${nextWidth} × ${h}`;
+    if (!this.dimensionsBadge) {
+      const dim = document.createElement('div');
+      dim.className = 'arch-dimensions-pill';
+      this.overlayLayer.appendChild(dim);
+      this.dimensionsBadge = dim;
     }
+    const rect = state.img.getBoundingClientRect();
+    const h = rect.height > 0 ? Math.round(rect.height) : Math.round(nextWidth);
+    this.dimensionsBadge.textContent = `${nextWidth} × ${h}`;
   }
 
   /**
@@ -1840,7 +1844,7 @@ export class Canvas {
       const targetImg = isDirectImageSelected ? ImageAdapter.findImage(targetEl, unit) : null;
 
       const rect = (unit.tagName.toLowerCase() === 'img' && targetImg ? targetImg : unit).getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
+      if (rect.width >= 48 && rect.height >= 32) {
         const dim = document.createElement('div');
         dim.className = 'arch-dimensions-pill';
         dim.textContent = `${Math.round(rect.width)} × ${Math.round(rect.height)}`;
@@ -1934,8 +1938,8 @@ export class Canvas {
       const dimWidth = this.dimensionsBadge.offsetWidth || 48;
       // If toolbar was flipped below the element, position dimensions badge below toolbar or above element
       const dimTop = fitsAbove
-        ? offsetY + targetRect.bottom + 4
-        : top + toolbarHeight + 4;
+        ? offsetY + targetRect.bottom + 8
+        : top + toolbarHeight + 8;
       const rawDimLeft = offsetX + targetRect.left + targetRect.width / 2;
       const dimLeft = Math.min(
         Math.max(dimWidth / 2 + 4, rawDimLeft),
