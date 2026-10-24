@@ -569,11 +569,11 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     expect(movedIntoSlot).toBe(true);
     expect(row11Border.contains(row2Block)).toBe(true);
 
-    // 5. Figma Layers Tree in left sidebar lists all Rows, Columns, and Blocks and syncs selection on click
-    const layerRows = container.querySelectorAll('.arch-layer-row');
-    expect(layerRows.length).toBeGreaterThan(3);
-    (layerRows[0] as HTMLElement).click();
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBeTruthy();
+    // 5. Right panel has 3 tabs: Blocks | Sections | Settings
+    const rightPanelTabs = Array.from(container.querySelectorAll('.arch-right-tab')).map((t) =>
+      (t.textContent || '').trim()
+    );
+    expect(rightPanelTabs).toEqual(['Blocks', 'Sections', 'Settings']);
 
     // 6. Exported HTML must not leak draggable="true"
     const exported = editor.getHTML();

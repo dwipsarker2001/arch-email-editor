@@ -149,12 +149,87 @@
   border-color: #fecaca;
 }
 
-/* Main Body Layout: Palette + Canvas + Inspector */
+/* Main Body Layout: Canvas (left/full) + Right Panel (Blocks | Sections | Settings) */
 .arch-editor__body {
   display: flex;
   flex: 1;
   overflow: hidden;
   position: relative;
+}
+
+/* Right Panel (Blocks | Sections | Settings) */
+.arch-editor__right-panel {
+  width: 320px;
+  background-color: var(--arch-bg-surface);
+  border-left: 1px solid var(--arch-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.arch-right-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--arch-border);
+  background: #f8fafc;
+  padding: 8px 8px 0 8px;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.arch-right-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--arch-text-secondary);
+  cursor: pointer;
+  text-align: center;
+  border-radius: 6px 6px 0 0;
+  transition: all 0.15s ease;
+}
+
+.arch-right-tab:hover {
+  color: var(--arch-text-primary);
+  background: #f1f5f9;
+}
+
+.arch-right-tab.is-active {
+  color: #0d99ff;
+  border-bottom-color: #0d99ff;
+  background: #ffffff;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.arch-right-tab-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.arch-tab-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.arch-tab-panel.is-hidden {
+  display: none !important;
+}
+
+.arch-tab-panel--settings .arch-editor__inspector {
+  width: 100%;
+  border-left: none;
+  padding: 0;
 }
 
 /* Left Sidebar (Figma Layers Tree + Assets Palette) */

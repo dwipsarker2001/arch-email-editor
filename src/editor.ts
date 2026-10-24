@@ -30,9 +30,9 @@ import {
   normalizeDocument
 } from './compiler';
 import { Toolbar } from './components/Toolbar';
-import { Palette } from './components/Palette';
 import { Canvas } from './components/Canvas';
 import { Inspector } from './components/Inspector';
+import { RightPanel } from './components/RightPanel';
 import { ImportModal } from './components/ImportModal';
 import { ExportModal } from './components/ExportModal';
 import { HistoryManager } from './engine/history';
@@ -57,11 +57,14 @@ export class ArchEmailEditor {
 
   // Modular UI Components
   private toolbar: Toolbar | null = null;
-  private palette: Palette | null = null;
   private canvas: Canvas | null = null;
-  private inspector: Inspector | null = null;
+  private rightPanel: RightPanel | null = null;
   private importModal: ImportModal | null = null;
   private exportModal: ExportModal | null = null;
+
+  public get inspector(): Inspector | null {
+    return this.rightPanel?.getInspector() || null;
+  }
 
   /**
    * Initializes a new email editor instance.
@@ -212,9 +215,9 @@ export class ArchEmailEditor {
    */
   public setViewportMode(mode: ViewportMode): void {
     this.canvas?.setViewportMode(mode);
-    this.inspector?.setViewportMode(mode);
+    this.rightPanel?.setViewportMode(mode);
     if (this.selectedElement) {
-      this.inspector?.update(this.document, this.selectedBlockId, this.selectedElement);
+      this.rightPanel?.update(this.document, this.selectedBlockId, this.selectedElement);
     }
   }
 
@@ -382,23 +385,10 @@ export class ArchEmailEditor {
       }
     });
 
-    // 3. Initialize Palette (Figma Layers Tree + Assets)
-    this.palette = new Palette({
-      onAddBlock: (type) => this.addBlock(type),
-      onAddRowLayout: (layout) => this.addRowLayout(layout),
-      onSelectLayer: (el) => this.canvas?.selectUnitFromTree(el),
-      onHoverLayer: (el) => this.canvas?.highlightUnitFromTree(el),
-      onMoveLayer: (el, dir) => this.canvas?.moveSelectedElement(dir, el),
-      onRemoveLayer: (el) => this.canvas?.removeSelectedElement(el)
-    });
-
-    // 4. Initialize Canvas
+    // 3. Initialize Canvas (takes full width on left)
     this.canvas = new Canvas({
       onSelectBlock: (id) => this.selectBlock(id),
       onSelectElement: (info) => this.selectElement(info),
-      onLayersChange: (layers, selectedUnit) => {
-        this.palette?.updateLayers(layers, selectedUnit);
-      },
       onContentChange: (cleanHtml) => {
         this.document.rawHtml = cleanHtml;
         this.recordHistory();
@@ -411,8 +401,10 @@ export class ArchEmailEditor {
       onRemoveBlock: (id) => this.removeBlock(id)
     });
 
-    // 5. Initialize Inspector
-    this.inspector = new Inspector({
+    // 4. Initialize Unified Right Panel (Blocks | Sections | Settings)
+    this.rightPanel = new RightPanel({
+      onAddBlock: (type) => this.addBlock(type),
+      onAddRowLayout: (layout) => this.addRowLayout(layout),
       onChange: () => {
         if (this.canvas) {
           this.canvas.onStructureChanged();
@@ -428,14 +420,13 @@ export class ArchEmailEditor {
       onSelectElementNode: (el) => this.canvas?.selectUnit(el, el)
     });
 
-    // 6. Assemble DOM Hierarchy
+    // 5. Assemble DOM Hierarchy: Canvas (left/main) + Right Panel (right)
     this.rootElement.appendChild(this.toolbar.getElement());
 
     const bodyEl = document.createElement('div');
     bodyEl.className = 'arch-editor__body';
-    bodyEl.appendChild(this.palette.getElement());
     bodyEl.appendChild(this.canvas.getElement());
-    bodyEl.appendChild(this.inspector.getElement());
+    bodyEl.appendChild(this.rightPanel.getElement());
 
     this.rootElement.appendChild(bodyEl);
 
@@ -462,7 +453,7 @@ export class ArchEmailEditor {
    */
   private updateViews(forceRewrite = false): void {
     this.canvas?.update(this.document, this.selectedBlockId, forceRewrite);
-    this.inspector?.update(this.document, this.selectedBlockId, this.selectedElement);
+    this.rightPanel?.update(this.document, this.selectedBlockId, this.selectedElement);
   }
 
   private selectBlock(id: string | null): void {
@@ -470,13 +461,13 @@ export class ArchEmailEditor {
     this.selectedElement = null;
     const block = id ? this.document.blocks.find((b) => b.id === id) || null : null;
     this.emit('select', block);
-    this.inspector?.update(this.document, id, null);
+    this.rightPanel?.update(this.document, id, null);
   }
 
   private selectElement(info: SelectedElementInfo | null): void {
     this.selectedElement = info;
     this.selectedBlockId = null;
-    this.inspector?.update(this.document, null, info);
+    this.rightPanel?.update(this.document, null, info);
   }
 
   /**
@@ -557,9 +548,8 @@ export class ArchEmailEditor {
    */
   public destroy(): void {
     this.toolbar?.destroy();
-    this.palette?.destroy();
     this.canvas?.destroy();
-    this.inspector?.destroy();
+    this.rightPanel?.destroy();
     this.importModal?.close();
     this.exportModal?.close();
 
