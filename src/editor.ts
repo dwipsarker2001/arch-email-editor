@@ -423,7 +423,13 @@ export class ArchEmailEditor {
       onDuplicateElement: () => this.canvas?.duplicateSelectedElement(),
       onRemoveElement: () => this.canvas?.removeSelectedElement(),
       onSelectParent: () => this.canvas?.selectParentUnit(),
-      onSelectElementNode: (el) => this.canvas?.selectUnit(el, el)
+      onSelectElementNode: (el) => this.canvas?.selectUnit(el, el),
+      onDeselect: () => {
+        this.selectedElement = null;
+        this.selectedBlockId = null;
+        this.canvas?.clearSelection();
+        this.rightPanel?.update(this.document, null, null);
+      }
     });
 
     // 5. Assemble DOM Hierarchy: Canvas (left/main) + Right Panel (right)

@@ -159,51 +159,113 @@
 
 /* Right Panel (Blocks | Sections | Settings) */
 .arch-editor__right-panel {
-  width: 320px;
-  background-color: var(--arch-bg-surface);
-  border-left: 1px solid var(--arch-border);
+  width: 380px;
+  background-color: #ffffff;
+  border-left: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   position: relative;
   z-index: 10;
   flex-shrink: 0;
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.arch-editor__right-panel.is-collapsed {
+  width: 0 !important;
+  border-left: 1px solid transparent;
+}
+
+.arch-editor__right-panel.is-collapsed .arch-right-tab-content,
+.arch-editor__right-panel.is-collapsed .arch-right-tab {
+  display: none !important;
+}
+
+.arch-editor__right-panel.is-collapsed .arch-right-tabs {
+  width: 0;
+  padding: 0;
+  overflow: visible;
+  border: none;
+  background: transparent;
+}
+
+.arch-editor__right-panel.is-collapsed .arch-right-panel-toggle {
+  position: absolute;
+  left: -36px;
+  top: 10px;
+  z-index: 50;
+  transform: rotate(180deg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .arch-right-tabs {
   display: flex;
-  border-bottom: 1px solid var(--arch-border);
-  background: #f8fafc;
-  padding: 8px 8px 0 8px;
-  gap: 4px;
+  align-items: center;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f3f4f6;
+  padding: 4px 6px 0 6px;
+  gap: 2px;
   flex-shrink: 0;
+  height: 44px;
+}
+
+.arch-right-panel-toggle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #7747ff;
+  color: #ffffff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-right: 4px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease, background-color 0.15s ease;
+}
+
+.arch-right-panel-toggle:hover {
+  background: #6336e0;
 }
 
 .arch-right-tab {
   flex: 1;
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
-  padding: 8px 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--arch-text-secondary);
+  padding: 8px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
   cursor: pointer;
   text-align: center;
   border-radius: 6px 6px 0 0;
   transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .arch-right-tab:hover {
-  color: var(--arch-text-primary);
-  background: #f1f5f9;
+  color: #1e293b;
+  background: #e2e8f0;
 }
 
 .arch-right-tab.is-active {
-  color: #0d99ff;
-  border-bottom-color: #0d99ff;
+  color: #1e293b;
   background: #ffffff;
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.arch-right-tab.is-active .arch-tab-icon {
+  color: #7747ff;
+}
+
+.arch-tab-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
 }
 
 .arch-right-tab-content {
@@ -211,15 +273,16 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  background: #ffffff;
 }
 
 .arch-tab-panel {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .arch-tab-panel.is-hidden {
@@ -232,11 +295,11 @@
   padding: 0;
 }
 
-/* Content Blocks & Section Elements (inside Right Panel) */
+/* Content Blocks 3-Column Square Grid */
 .arch-assets-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 
 .arch-editor__section-label {
@@ -250,34 +313,358 @@
 
 .arch-palette-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--arch-border);
+  height: 84px;
+  padding: 8px 4px;
+  border: 1px solid #e5e7eb;
   border-radius: 6px;
-  background-color: var(--arch-bg-surface);
+  background-color: #ffffff;
   cursor: grab;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--arch-text-primary);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4b5563;
   user-select: none;
-  transition: all 0.15s ease;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
-.arch-palette-icon {
-  font-weight: 700;
-  color: #0d99ff;
+.arch-block-svg {
+  color: #374151;
+  transition: transform 0.15s ease, color 0.15s ease;
 }
 
 .arch-palette-item:hover {
-  border-color: #0d99ff;
-  background-color: #f0f9ff;
-  color: #0369a1;
-  transform: translateY(-1px);
+  border-color: #7747ff;
+  background-color: #faf5ff;
+  color: #7747ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(119, 71, 255, 0.1);
+}
+
+.arch-palette-item:hover .arch-block-svg {
+  color: #7747ff;
+  transform: scale(1.08);
 }
 
 .arch-palette-item:active {
   cursor: grabbing;
+  transform: translateY(0);
+}
+
+/* Multi-Column Rows Silhouette Cards */
+.arch-rows-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.arch-row-card {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background-color: #ffffff;
+  padding: 10px 14px;
+  cursor: grab;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.arch-row-card:hover {
+  border-color: #7747ff;
+  background-color: #faf5ff;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(119, 71, 255, 0.1);
+}
+
+.arch-row-card:active {
+  cursor: grabbing;
+}
+
+.arch-row-silhouette {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 20px;
+}
+
+.arch-col-bar {
+  background: #71717a;
+  height: 100%;
+  border-radius: 3px;
+  transition: background-color 0.15s ease;
+}
+
+.arch-row-card:hover .arch-col-bar {
+  background: #6366f1;
+}
+
+/* Prebuilt Sections Placeholder */
+.arch-sections-placeholder {
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 36px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: #f8fafc;
+  margin-top: 8px;
+}
+
+.arch-sections-placeholder-icon {
+  color: #94a3b8;
+}
+
+/* Accordions (Settings & Block Options) */
+.arch-accordion {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid #e5e7eb;
+}
+
+.arch-accordion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #374151;
+  cursor: pointer;
+  user-select: none;
+}
+
+.arch-accordion-header:hover {
+  background: #f3f4f6;
+}
+
+.arch-accordion-arrow {
+  font-size: 9px;
+  color: #6b7280;
+  transition: transform 0.2s ease;
+}
+
+.arch-accordion-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.arch-accordion-body.is-hidden {
+  display: none !important;
+}
+
+/* Form Rows inside Accordion */
+.arch-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.arch-form-row--split {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  min-height: 36px;
+  border-bottom: 1px solid #f9fafb;
+}
+
+.arch-slider-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7747ff;
+}
+
+.arch-range {
+  accent-color: #7747ff;
+}
+
+/* Segmented Group */
+.arch-segmented-group {
+  display: inline-flex;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.arch-segmented-btn {
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #4b5563;
+  transition: all 0.15s ease;
+}
+
+.arch-segmented-btn:hover {
+  background: #f3f4f6;
+}
+
+.arch-segmented-btn.is-active {
+  background: #ede9fe;
+  color: #7747ff;
+}
+
+/* Color Picker Swatch Control */
+.arch-color-picker-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 3px 6px;
+  background: #ffffff;
+}
+
+.arch-color-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.arch-color-hex {
+  border: none;
+  outline: none;
+  font-size: 12px;
+  font-family: monospace;
+  width: 68px;
+  color: #374151;
+  background: transparent;
+}
+
+/* Toggle Switch */
+.arch-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+
+.arch-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.arch-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #cbd5e1;
+  border-radius: 20px;
+  transition: .2s;
+}
+
+.arch-toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: .2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+input:checked + .arch-toggle-slider {
+  background-color: #7747ff;
+}
+
+input:checked + .arch-toggle-slider:before {
+  transform: translateX(16px);
+}
+
+/* Element Properties Header & AI Button */
+.arch-prop-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.arch-prop-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #111827;
+}
+
+.arch-prop-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.arch-icon-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.arch-icon-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.arch-ai-bar {
+  padding: 10px 14px 4px 14px;
+}
+
+.arch-ai-btn {
+  width: 100%;
+  background: #7747ff;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.arch-ai-btn:hover {
+  background: #6336e0;
 }
 
 /* Center Canvas - Full width touching sidebars */

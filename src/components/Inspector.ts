@@ -26,6 +26,7 @@ export interface InspectorEvents {
   onRemoveElement?: () => void;
   onSelectParent?: () => void;
   onSelectElementNode?: (el: HTMLElement) => void;
+  onDeselect?: () => void;
 }
 
 /**
@@ -126,46 +127,115 @@ export class Inspector {
         : '';
 
     this.element.innerHTML = `
-      ${breadcrumbHtml}
-      ${modeBadge}
-      <div class="arch-editor__section-label">Element Properties (${typeTitle})</div>
-      <div class="arch-form-group">
+      <div class="arch-prop-header">
+        <div class="arch-prop-title">${typeTitle} PROPERTIES</div>
+        <div class="arch-prop-actions">
+          <button type="button" class="arch-icon-btn" id="btn-prop-comment" title="Add Comment">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </button>
+          <button type="button" class="arch-icon-btn" id="btn-prop-delete" title="Delete Element">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+          <button type="button" class="arch-icon-btn" id="btn-prop-duplicate" title="Duplicate Unit">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button type="button" class="arch-icon-btn" id="btn-prop-close" title="Close Properties">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="arch-ai-bar">
+        <button type="button" class="arch-ai-btn" id="btn-write-ai">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
+          Write with AI
+        </button>
+      </div>
+
+      <div style="padding: 10px 14px 0 14px;">
+        ${breadcrumbHtml}
+        ${modeBadge}
+      </div>
+
+      <div class="arch-form-group" style="padding: 10px 14px 6px 14px;">
         <label class="arch-form-label">Structure & Placement</label>
         <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-          <button class="arch-btn" id="btn-select-parent" type="button" style="flex: 1;" title="Select enclosing Column or Row" ${!info.canSelectParent ? 'disabled' : ''}>
+          <button class="arch-btn arch-btn--sm" id="btn-select-parent" type="button" style="flex: 1;" title="Select enclosing Column or Row" ${!info.canSelectParent ? 'disabled' : ''}>
             ↑ Parent
           </button>
-          <button class="arch-btn" id="btn-move-up" type="button" style="flex: 1;" ${!info.canMoveUp ? 'disabled' : ''}>
+          <button class="arch-btn arch-btn--sm" id="btn-move-up" type="button" style="flex: 1;" ${!info.canMoveUp ? 'disabled' : ''}>
             ${upLabel}
           </button>
-          <button class="arch-btn" id="btn-move-down" type="button" style="flex: 1;" ${!info.canMoveDown ? 'disabled' : ''}>
+          <button class="arch-btn arch-btn--sm" id="btn-move-down" type="button" style="flex: 1;" ${!info.canMoveDown ? 'disabled' : ''}>
             ${downLabel}
           </button>
-          <button class="arch-btn" id="btn-duplicate-element" type="button" title="Duplicate Unit">
+          <button class="arch-btn arch-btn--sm" id="btn-duplicate-element" type="button" title="Duplicate Unit">
             ⧉ Copy
           </button>
         </div>
       </div>
+
       <div id="inspector-element-fields"></div>
-      <div class="arch-form-group" style="margin-top: 12px; border-top: 1px solid var(--arch-border); padding-top: 12px;">
-        <label class="arch-form-label">Responsive Visibility</label>
-        <div style="display: flex; gap: 12px; font-size: 12px;">
-          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-            <input type="checkbox" id="chk-vis-desktop" ${!(info.unit || info.element).classList.contains('arch-hide-desktop') ? 'checked' : ''} />
-            Desktop
-          </label>
-          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-            <input type="checkbox" id="chk-vis-mobile" ${!(info.unit || info.element).classList.contains('mobile_hide') ? 'checked' : ''} />
-            Mobile
-          </label>
+
+      <div class="arch-accordion-header" style="margin-top: 10px;">
+        <span>BLOCK OPTIONS</span>
+        <span class="arch-accordion-arrow">▲</span>
+      </div>
+      <div class="arch-accordion-body" style="padding: 12px 14px;">
+        <div class="arch-form-group">
+          <label class="arch-form-label">Responsive Visibility</label>
+          <div style="display: flex; gap: 16px; font-size: 12px; margin-top: 4px;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <input type="checkbox" id="chk-vis-desktop" ${!(info.unit || info.element).classList.contains('arch-hide-desktop') ? 'checked' : ''} />
+              Desktop
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <input type="checkbox" id="chk-vis-mobile" ${!(info.unit || info.element).classList.contains('mobile_hide') ? 'checked' : ''} />
+              Mobile
+            </label>
+          </div>
+        </div>
+        <div class="arch-form-group" style="margin-top: 10px;">
+          <button class="arch-btn arch-btn--danger" id="btn-delete-element" type="button" style="width: 100%;">
+            Delete ${info.unitRole === 'row' ? 'Row' : info.unitRole === 'column' ? 'Column' : 'Element'}
+          </button>
         </div>
       </div>
-      <div class="arch-form-group" style="margin-top: 14px;">
-        <button class="arch-btn arch-btn--danger" id="btn-delete-element" type="button" style="width: 100%;">
-          Delete ${info.unitRole === 'row' ? 'Row' : info.unitRole === 'column' ? 'Column' : 'Element'}
-        </button>
-      </div>
     `;
+
+    // Bind Header Action clicks
+    this.element.querySelector('#btn-prop-close')?.addEventListener('click', () => {
+      if (this.events.onDeselect) {
+        this.events.onDeselect();
+      }
+    });
+
+    const targetUnit = info.unit || info.element;
+    const handleDelete = () => {
+      if (this.events.onRemoveElement) {
+        this.events.onRemoveElement();
+      } else {
+        targetUnit.remove();
+        this.events.onChange();
+      }
+      this.element.innerHTML = `
+        <div class="arch-prop-header">
+          <div class="arch-prop-title">Element Deleted</div>
+        </div>
+        <p style="font-size: 13px; color: var(--arch-text-secondary); padding: 14px;">
+          Element was removed from the email template.
+        </p>
+      `;
+    };
+
+    this.element.querySelector('#btn-prop-delete')?.addEventListener('click', handleDelete);
+    this.element.querySelector('#btn-delete-element')?.addEventListener('click', handleDelete);
+
+    const handleDuplicate = () => {
+      this.events.onDuplicateElement?.();
+    };
+    this.element.querySelector('#btn-prop-duplicate')?.addEventListener('click', handleDuplicate);
+    this.element.querySelector('#btn-duplicate-element')?.addEventListener('click', handleDuplicate);
 
     // Bind Breadcrumb clicks
     if (info.ancestry) {
@@ -192,11 +262,6 @@ export class Inspector {
       this.events.onMoveElement?.('down');
     });
 
-    this.element.querySelector('#btn-duplicate-element')?.addEventListener('click', () => {
-      this.events.onDuplicateElement?.();
-    });
-
-    const targetUnit = info.unit || info.element;
     this.element.querySelector<HTMLInputElement>('#chk-vis-desktop')?.addEventListener('change', (e) => {
       setUnitVisibility(targetUnit, 'desktop', (e.target as HTMLInputElement).checked);
       this.events.onChange();
@@ -204,22 +269,6 @@ export class Inspector {
     this.element.querySelector<HTMLInputElement>('#chk-vis-mobile')?.addEventListener('change', (e) => {
       setUnitVisibility(targetUnit, 'mobile', (e.target as HTMLInputElement).checked);
       this.events.onChange();
-    });
-
-    const deleteBtn = this.element.querySelector('#btn-delete-element');
-    deleteBtn?.addEventListener('click', () => {
-      if (this.events.onRemoveElement) {
-        this.events.onRemoveElement();
-      } else {
-        targetUnit.remove();
-        this.events.onChange();
-      }
-      this.element.innerHTML = `
-        <div class="arch-editor__section-label">Element Deleted</div>
-        <p style="font-size: 13px; color: var(--arch-text-secondary); margin-top: 8px;">
-          Element was removed from the email template.
-        </p>
-      `;
     });
 
     const fieldsContainer = this.element.querySelector<HTMLElement>('#inspector-element-fields');
@@ -728,77 +777,195 @@ export class Inspector {
   private renderDocumentSettings(doc: EmailDocument): void {
     const contentAlign = doc.settings.contentAlign || 'center';
     const contentBg = toHexColor(doc.settings.contentBackgroundColor, '#ffffff');
+    const docBg = toHexColor(doc.settings.backgroundColor, '#f4f4f7');
     const preheader = doc.settings.preheader || '';
+    const widthNum = parseInt(doc.settings.contentWidth, 10) || 600;
 
     this.element.innerHTML = `
-      <div class="arch-editor__section-label">Email Settings</div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Content Area Width</label>
-        <input type="text" class="arch-input" id="inp-doc-width" placeholder="600px">
+      <div class="arch-accordion">
+        <div class="arch-accordion-header" data-toggle="design-settings">
+          <span>DESIGN SETTINGS</span>
+          <span class="arch-accordion-arrow">▲</span>
+        </div>
+        <div class="arch-accordion-body" id="sec-design-settings">
+          <!-- Content Area Width Slider -->
+          <div class="arch-form-row">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 4px;">
+              <label class="arch-form-label" style="margin: 0;">Content area width</label>
+              <span class="arch-slider-badge" id="val-doc-width">${doc.settings.contentWidth}</span>
+            </div>
+            <input type="range" class="arch-range" id="inp-doc-width-range" min="480" max="900" step="10" value="${widthNum}" />
+            <input type="text" class="arch-input" id="inp-doc-width" value="${doc.settings.contentWidth}" style="display: none;" />
+          </div>
+
+          <!-- Content Area Alignment -->
+          <div class="arch-form-row arch-form-row--split">
+            <label class="arch-form-label" style="margin: 0;">Content area alignment</label>
+            <div class="arch-segmented-group" id="grp-doc-align">
+              <button type="button" class="arch-segmented-btn ${contentAlign === 'left' ? 'is-active' : ''}" data-align="left">LEFT</button>
+              <button type="button" class="arch-segmented-btn ${contentAlign === 'center' ? 'is-active' : ''}" data-align="center">CENTER</button>
+            </div>
+            <select class="arch-select" id="inp-doc-align" style="display: none;">
+              <option value="left" ${contentAlign === 'left' ? 'selected' : ''}>Left</option>
+              <option value="center" ${contentAlign === 'center' ? 'selected' : ''}>Center</option>
+            </select>
+          </div>
+
+          <!-- Background Color -->
+          <div class="arch-form-row arch-form-row--split">
+            <label class="arch-form-label" style="margin: 0;">Background color</label>
+            <div class="arch-color-picker-control">
+              <input type="color" class="arch-color-swatch" id="inp-doc-bg" value="${docBg}">
+              <input type="text" class="arch-color-hex" id="txt-doc-bg" value="${docBg}">
+            </div>
+          </div>
+
+          <!-- Content Area Background Color -->
+          <div class="arch-form-row arch-form-row--split">
+            <label class="arch-form-label" style="margin: 0;">Content area background color</label>
+            <div class="arch-color-picker-control">
+              <input type="color" class="arch-color-swatch" id="inp-doc-content-bg" value="${contentBg}">
+              <input type="text" class="arch-color-hex" id="txt-doc-content-bg" value="${contentBg}">
+            </div>
+          </div>
+
+          <!-- Background Image Switch -->
+          <div class="arch-form-row arch-form-row--split">
+            <label class="arch-form-label" style="margin: 0;">Background image</label>
+            <label class="arch-toggle-switch">
+              <input type="checkbox" id="chk-doc-bg-img">
+              <span class="arch-toggle-slider"></span>
+            </label>
+          </div>
+
+          <!-- Default Font -->
+          <div class="arch-form-row arch-form-row--split">
+            <label class="arch-form-label" style="margin: 0;">Default font</label>
+            <select class="arch-select" id="inp-doc-font" style="max-width: 160px;">
+              <option value="Arial, sans-serif">Arial</option>
+              <option value="Helvetica, Arial, sans-serif">Helvetica</option>
+              <option value="Georgia, serif">Georgia</option>
+              <option value="'Times New Roman', Times, serif">Times New Roman</option>
+              <option value="Verdana, sans-serif">Verdana</option>
+              <option value="system-ui, -apple-system, sans-serif">System Sans</option>
+            </select>
+          </div>
+
+          <!-- Link Color -->
+          <div class="arch-form-row arch-form-row--split">
+            <label class="arch-form-label" style="margin: 0;">Link color</label>
+            <div class="arch-color-picker-control">
+              <input type="color" class="arch-color-swatch" id="inp-doc-link-color" value="#7747ff">
+              <input type="text" class="arch-color-hex" id="txt-doc-link-color" value="#7747ff">
+            </div>
+          </div>
+        </div>
+
+        <!-- Accordion 2: METADATA -->
+        <div class="arch-accordion-header" data-toggle="metadata">
+          <span>METADATA</span>
+          <span class="arch-accordion-arrow">▲</span>
+        </div>
+        <div class="arch-accordion-body" id="sec-metadata">
+          <div class="arch-form-row">
+            <label class="arch-form-label" style="margin-bottom: 6px;">Preheader (Preview Text)</label>
+            <input type="text" class="arch-input" id="inp-doc-preheader" placeholder="Inbox summary snippet..." value="${preheader}" />
+          </div>
+          <div class="arch-form-row arch-form-row--split" style="margin-top: 10px;">
+            <label class="arch-form-label" style="margin: 0;">Language</label>
+            <select class="arch-select" id="sel-doc-lang" style="max-width: 160px;">
+              <option value="en">English (en)</option>
+              <option value="es">Spanish (es)</option>
+              <option value="fr">French (fr)</option>
+              <option value="de">German (de)</option>
+            </select>
+          </div>
+        </div>
       </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Content Area Alignment</label>
-        <select class="arch-select" id="inp-doc-align">
-          <option value="center" ${contentAlign === 'center' ? 'selected' : ''}>Center</option>
-          <option value="left" ${contentAlign === 'left' ? 'selected' : ''}>Left</option>
-        </select>
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Background Color (Canvas)</label>
-        <input type="color" class="arch-input" id="inp-doc-bg">
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Content Area Background</label>
-        <input type="color" class="arch-input" id="inp-doc-content-bg">
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Default Font Family</label>
-        <select class="arch-select" id="inp-doc-font">
-          <option value="Arial, sans-serif">Arial</option>
-          <option value="Helvetica, Arial, sans-serif">Helvetica</option>
-          <option value="Georgia, serif">Georgia</option>
-          <option value="'Times New Roman', Times, serif">Times New Roman</option>
-          <option value="Verdana, sans-serif">Verdana</option>
-          <option value="system-ui, -apple-system, sans-serif">System Sans</option>
-        </select>
-      </div>
-      <div class="arch-form-group">
-        <label class="arch-form-label">Preheader (Preview Text)</label>
-        <input type="text" class="arch-input" id="inp-doc-preheader" placeholder="Inbox summary snippet..." />
-      </div>
-      <p style="font-size: 12px; color: var(--arch-text-secondary); margin-top: 14px; line-height: 1.5;">
-        💡 Click any element on the canvas to inspect, move, duplicate, or customize its properties. Use <strong>↑ Parent</strong> to select Columns or Rows.
-      </p>
     `;
 
+    // 1. Content Area Width Slider + Text Input Sync
+    const rangeInp = this.element.querySelector<HTMLInputElement>('#inp-doc-width-range')!;
+    const badge = this.element.querySelector<HTMLElement>('#val-doc-width')!;
     const widthInp = this.element.querySelector<HTMLInputElement>('#inp-doc-width')!;
-    widthInp.value = doc.settings.contentWidth;
+
+    rangeInp.addEventListener('input', (e) => {
+      const val = `${(e.target as HTMLInputElement).value}px`;
+      badge.textContent = val;
+      widthInp.value = val;
+      doc.settings.contentWidth = val;
+      this.events.onChange(true);
+    });
+
     widthInp.addEventListener('change', (e) => {
-      doc.settings.contentWidth = (e.target as HTMLInputElement).value;
+      const val = (e.target as HTMLInputElement).value;
+      const parsed = parseInt(val, 10);
+      if (!isNaN(parsed)) {
+        rangeInp.value = String(parsed);
+      }
+      badge.textContent = val;
+      doc.settings.contentWidth = val;
       this.events.onChange(true);
     });
 
+    // 2. Alignment Toggle Group Sync
     const alignSel = this.element.querySelector<HTMLSelectElement>('#inp-doc-align')!;
-    alignSel.value = contentAlign;
+    const alignBtns = this.element.querySelectorAll<HTMLButtonElement>('.arch-segmented-btn[data-align]');
+
+    alignBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const val = btn.getAttribute('data-align') as 'left' | 'center';
+        alignBtns.forEach((b) => b.classList.toggle('is-active', b === btn));
+        alignSel.value = val;
+        doc.settings.contentAlign = val;
+        this.events.onChange(true);
+      });
+    });
+
     alignSel.addEventListener('change', (e) => {
-      doc.settings.contentAlign = (e.target as HTMLSelectElement).value as 'left' | 'center';
+      const val = (e.target as HTMLSelectElement).value as 'left' | 'center';
+      alignBtns.forEach((b) => b.classList.toggle('is-active', b.getAttribute('data-align') === val));
+      doc.settings.contentAlign = val;
       this.events.onChange(true);
     });
 
+    // 3. Background Color Sync (Swatch + Hex Input)
     const bgInp = this.element.querySelector<HTMLInputElement>('#inp-doc-bg')!;
-    bgInp.value = toHexColor(doc.settings.backgroundColor, '#f4f4f7');
+    const bgTxt = this.element.querySelector<HTMLInputElement>('#txt-doc-bg')!;
+
     bgInp.addEventListener('input', (e) => {
-      doc.settings.backgroundColor = (e.target as HTMLInputElement).value;
+      const val = (e.target as HTMLInputElement).value;
+      bgTxt.value = val;
+      doc.settings.backgroundColor = val;
       this.events.onChange(true);
     });
 
+    bgTxt.addEventListener('change', (e) => {
+      const val = (e.target as HTMLInputElement).value;
+      bgInp.value = toHexColor(val, '#f4f4f7');
+      doc.settings.backgroundColor = val;
+      this.events.onChange(true);
+    });
+
+    // 4. Content Area Background Color Sync (Swatch + Hex Input)
     const contentBgInp = this.element.querySelector<HTMLInputElement>('#inp-doc-content-bg')!;
-    contentBgInp.value = contentBg;
+    const contentBgTxt = this.element.querySelector<HTMLInputElement>('#txt-doc-content-bg')!;
+
     contentBgInp.addEventListener('input', (e) => {
-      doc.settings.contentBackgroundColor = (e.target as HTMLInputElement).value;
+      const val = (e.target as HTMLInputElement).value;
+      contentBgTxt.value = val;
+      doc.settings.contentBackgroundColor = val;
       this.events.onChange(true);
     });
 
+    contentBgTxt.addEventListener('change', (e) => {
+      const val = (e.target as HTMLInputElement).value;
+      contentBgInp.value = toHexColor(val, '#ffffff');
+      doc.settings.contentBackgroundColor = val;
+      this.events.onChange(true);
+    });
+
+    // 5. Default Font Family
     const fontSel = this.element.querySelector<HTMLSelectElement>('#inp-doc-font')!;
     fontSel.value = doc.settings.fontFamily;
     fontSel.addEventListener('change', (e) => {
@@ -806,11 +973,25 @@ export class Inspector {
       this.events.onChange(true);
     });
 
+    // 6. Preheader Input
     const preheaderInp = this.element.querySelector<HTMLInputElement>('#inp-doc-preheader')!;
     preheaderInp.value = preheader;
     preheaderInp.addEventListener('input', (e) => {
       doc.settings.preheader = (e.target as HTMLInputElement).value;
       this.events.onChange(true);
+    });
+
+    // 7. Accordion Collapsible Toggles
+    this.element.querySelectorAll<HTMLElement>('.arch-accordion-header[data-toggle]').forEach((header) => {
+      header.addEventListener('click', () => {
+        const targetId = header.getAttribute('data-toggle');
+        const body = this.element.querySelector<HTMLElement>(`#sec-${targetId}`);
+        const arrow = header.querySelector<HTMLElement>('.arch-accordion-arrow');
+        if (body) {
+          const isHidden = body.classList.toggle('is-hidden');
+          if (arrow) arrow.textContent = isHidden ? '▼' : '▲';
+        }
+      });
     });
   }
 
