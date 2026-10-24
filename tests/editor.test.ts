@@ -329,4 +329,26 @@ describe('ArchEmailEditor Core Engine', () => {
 
     editor.destroy();
   });
+
+  it('shows floating rich text toolbar only for text elements and dismisses on body click', () => {
+    const editor = ArchEmailEditor.create(container);
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+
+    // 1. Select a paragraph -> floating rich text toolbar appears
+    const p = ifrDoc.querySelector('p') as HTMLElement;
+    expect(p).toBeTruthy();
+    p.click();
+
+    const toolbar = container.querySelector('.arch-rge-text-toolbar');
+    expect(toolbar).toBeTruthy();
+
+    // 2. Click the outer body area -> deselects and hides floating toolbar
+    ifrDoc.body.click();
+    const toolbarAfterBodyClick = container.querySelector('.arch-rge-text-toolbar');
+    expect(toolbarAfterBodyClick).toBeNull();
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBeNull();
+
+    editor.destroy();
+  });
 });

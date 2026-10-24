@@ -39,6 +39,7 @@ import {
   getUnitAncestry,
   isColumnElement,
   isEditableTextHost,
+  isOuterWrapperTable,
   isRowElement,
   resolveUnit
 } from '../engine/units';
@@ -235,7 +236,13 @@ export class Canvas {
     });
 
     this.element.addEventListener('click', (e) => {
-      if (e.target === this.element || e.target === this.containerElement) {
+      const target = e.target as HTMLElement | null;
+      if (
+        target === this.element ||
+        target === this.containerElement ||
+        target === this.overlayLayer
+      ) {
+        this.exitTextEditMode();
         this.clearSelection();
         this.events.onSelectElement(null);
         this.events.onSelectBlock(null);
@@ -1228,9 +1235,6 @@ export class Canvas {
         if (unit && unit !== doc.body) {
           unit.classList.add('arch-hover-element');
           this.hoveredUnit = unit;
-          if (!this.activeMoveableUnit) {
-            this.renderFloatingToolbar(unit, target);
-          }
         }
       },
       { signal }
@@ -1516,8 +1520,35 @@ export class Canvas {
       return;
     }
 
+    const tag = target.tagName.toLowerCase();
+    const ifrDoc = this.iframe.contentDocument;
+
+    // Deselect if user clicked on the body, html, outer wrapper table, or canvas background
+    if (
+      tag === 'body' ||
+      tag === 'html' ||
+      target === ifrDoc?.body ||
+      isOuterWrapperTable(target)
+    ) {
+      this.exitTextEditMode();
+      this.clearSelection();
+      this.events.onSelectElement(null);
+      this.events.onSelectBlock(null);
+      this.emitLayersUpdate();
+      return;
+    }
+
     const selectable = (target.closest('img, a, h1, h2, h3, h4, h5, h6, p, li, hr, td, div, section') ||
       target) as HTMLElement;
+
+    if (isOuterWrapperTable(selectable)) {
+      this.exitTextEditMode();
+      this.clearSelection();
+      this.events.onSelectElement(null);
+      this.events.onSelectBlock(null);
+      this.emitLayersUpdate();
+      return;
+    }
 
     // Programmatic synthetic test clicks (`detail === 0 && !isTrusted`) or `Cmd/Ctrl + Click` deep-selects the leaf block
     if ((!e.isTrusted && e.detail === 0) || e.metaKey || e.ctrlKey) {
@@ -1528,7 +1559,14 @@ export class Canvas {
     }
 
     const chain = getContainerChain(selectable);
-    if (chain.length === 0) return;
+    if (chain.length === 0) {
+      this.exitTextEditMode();
+      this.clearSelection();
+      this.events.onSelectElement(null);
+      this.events.onSelectBlock(null);
+      this.emitLayersUpdate();
+      return;
+    }
 
     // 1. If clicking inside the currently selected container, keep ONLY that container selected (NEVER enter edit mode on single click)
     if (this.activeMoveableUnit && chain.includes(this.activeMoveableUnit)) {
@@ -1832,8 +1870,28 @@ export class Canvas {
     this.overlayLayer.appendChild(bottomActions);
     this.bottomActions = bottomActions;
 
-    // 3. Floating Rich Text Toolbar (for editable text / headings / buttons)
-    if (editableHost && ifrDoc) {
+    // 3. Floating Rich Text Toolbar (ONLY for editable text / headings / buttons / paragraphs / lists)
+    const targetEl = innerTarget || this.selectedElement || unit;
+    const elemType = classifyElementType(targetEl, unit);
+    const unitRole = classifyUnitRole(unit);
+    const isContainer =
+      unitRole === 'row' ||
+      unitRole === 'column' ||
+      unitRole === 'body' ||
+      isRowElement(unit) ||
+      isColumnElement(unit) ||
+      isOuterWrapperTable(unit);
+
+    const isTextElement =
+      this.isEditingText ||
+      elemType === 'text' ||
+      elemType === 'heading' ||
+      elemType === 'button' ||
+      elemType === 'list' ||
+      /^(p|h[1-6]|a|li|button|span|strong|em)$/i.test(targetEl.tagName) ||
+      targetEl.getAttribute('contenteditable') === 'true';
+
+    if (isTextElement && !isContainer && editableHost && ifrDoc) {
       const textToolbar = document.createElement('div');
       textToolbar.className = 'arch-rge-text-toolbar';
       textToolbar.innerHTML = `
