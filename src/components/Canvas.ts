@@ -79,6 +79,9 @@ export class Canvas {
   private iframe: HTMLIFrameElement;
   private overlayLayer: HTMLElement;
   private floatingToolbar: HTMLElement | null = null;
+  private moveHandle: HTMLElement | null = null;
+  private bottomActions: HTMLElement | null = null;
+  private textToolbar: HTMLElement | null = null;
   private dimensionsBadge: HTMLElement | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private dropIndicatorEl: HTMLElement | null = null;
@@ -1734,74 +1737,35 @@ export class Canvas {
   }
 
   /**
-   * Renders the Figma Frame Pill & Dimensions Badge in the parent overlay layer (zero nodes inside iframe DOM).
+   * Renders the RGE Studio selection overlay:
+   * 1. Purple circular drag handle (✥) centered on the right border
+   * 2. Bottom action bar ([💬] [🗑] [⧉]) attached to the bottom edge
+   * 3. Floating rich-text formatting toolbar hovering above editable text elements
+   * 4. Image resize corner handles when an image is selected
    */
   private renderFloatingToolbar(unit: HTMLElement, innerTarget?: HTMLElement): void {
     this.removeFloatingToolbar();
 
-    const effectiveMoveTarget = resolveEffectiveMoveUnit(unit);
-    const canUp = canMoveUnit(unit, 'up');
-    const canDown = canMoveUnit(unit, 'down');
-    const parentUnit = getParentStructuralUnit(unit);
-    const axis = detectAxis(effectiveMoveTarget);
-    const desc = describeUnitForLayer(unit);
     const editableHost = findEditableTextHost(innerTarget || this.selectedElement || unit, unit);
-    const badgeLabel = this.isEditingText ? `✎ ${desc.label} (Editing Text)` : desc.label;
+    const ifrDoc = this.iframe.contentDocument;
 
-    const upIcon = axis === 'horizontal' ? '◀' : '▲';
-    const downIcon = axis === 'horizontal' ? '▶' : '▼';
-    const upTitle = axis === 'horizontal' ? 'Swap Column Left' : 'Move Up';
-    const downTitle = axis === 'horizontal' ? 'Swap Column Right' : 'Move Down';
-
-    const toolbar = document.createElement('div');
-    toolbar.className = 'arch-floating-toolbar';
-    toolbar.innerHTML = `
-      <span class="arch-float-drag" draggable="true" title="Drag Frame (${desc.label}) • Double-click on canvas to drill inside">⠿ ${badgeLabel}</span>
-      ${
-        editableHost && !this.isEditingText
-          ? `<button type="button" class="arch-float-btn btn-float-edit-text" title="Edit / Select Text Inside (or Double-Click)">✎</button>`
-          : ''
-      }
-      <button type="button" class="arch-float-btn btn-float-parent" title="Select Parent Frame (Esc)" ${!parentUnit ? 'disabled' : ''}>↑</button>
-      <button type="button" class="arch-float-btn btn-float-up" title="${upTitle}" ${!canUp ? 'disabled' : ''}>${upIcon}</button>
-      <button type="button" class="arch-float-btn btn-float-down" title="${downTitle}" ${!canDown ? 'disabled' : ''}>${downIcon}</button>
-      <button type="button" class="arch-float-btn btn-float-dup" title="Duplicate Frame">⧉</button>
-      <button type="button" class="arch-float-btn arch-float-btn--danger btn-float-del" title="Delete Frame">✕</button>
+    // 1. RGE Move Handle (Right Edge Purple Circle ✥)
+    const moveHandle = document.createElement('div');
+    moveHandle.className = 'arch-rge-move-handle';
+    moveHandle.setAttribute('draggable', 'true');
+    moveHandle.title = 'Drag to reorder';
+    moveHandle.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="5 9 2 12 5 15"></polyline>
+        <polyline points="9 5 12 2 15 5"></polyline>
+        <polyline points="15 19 12 22 9 19"></polyline>
+        <polyline points="19 9 22 12 19 15"></polyline>
+        <line x1="2" y1="12" x2="22" y2="12"></line>
+        <line x1="12" y1="2" x2="12" y2="22"></line>
+      </svg>
     `;
 
-    toolbar.querySelector('.btn-float-edit-text')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.enterTextEditMode(innerTarget || this.selectedElement || unit, unit);
-    });
-
-    toolbar.querySelector('.btn-float-parent')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.selectParentUnit(unit);
-    });
-
-    toolbar.querySelector('.btn-float-up')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.moveSelectedElement('up', unit);
-    });
-
-    toolbar.querySelector('.btn-float-down')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.moveSelectedElement('down', unit);
-    });
-
-    toolbar.querySelector('.btn-float-dup')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.duplicateSelectedElement(unit);
-    });
-
-    toolbar.querySelector('.btn-float-del')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.removeSelectedElement(unit);
-    });
-
-    // Support both Pointer-Event dragging and HTML5 dragstart on the `⠿` Frame Pill
-    const dragHandle = toolbar.querySelector<HTMLElement>('.arch-float-drag');
-    dragHandle?.addEventListener('mousedown', (e) => {
+    moveHandle.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
@@ -1814,7 +1778,7 @@ export class Canvas {
       };
     });
 
-    dragHandle?.addEventListener('dragstart', (e) => {
+    moveHandle.addEventListener('dragstart', (e) => {
       if (e.dataTransfer) {
         e.dataTransfer.setData('text/plain', 'arch-move-unit');
         e.dataTransfer.effectAllowed = 'move';
@@ -1825,32 +1789,160 @@ export class Canvas {
       });
     });
 
-    dragHandle?.addEventListener('dragend', () => {
+    moveHandle.addEventListener('dragend', () => {
       this.draggedUnit = null;
       this.overlayLayer.style.pointerEvents = 'none';
       this.clearDropIndicators();
     });
 
-    this.overlayLayer.appendChild(toolbar);
-    this.floatingToolbar = toolbar;
+    this.overlayLayer.appendChild(moveHandle);
+    this.moveHandle = moveHandle;
 
-    // If this unit is actively selected, also render the Figma Dimensions Badge (`W × H`)
-    // and 4 corner resize handles ONLY when the `<img>` leaf itself is selected (never while a parent Row/Column/td is selected!)
+    // 2. RGE Bottom Action Bar (Comment, Delete, Duplicate Attached to Bottom Edge)
+    const bottomActions = document.createElement('div');
+    bottomActions.className = 'arch-rge-bottom-actions';
+    bottomActions.innerHTML = `
+      <button type="button" class="arch-rge-action-btn btn-rge-comment" title="Add comment">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
+      <button type="button" class="arch-rge-action-btn btn-rge-del" title="Delete element">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>
+      <button type="button" class="arch-rge-action-btn btn-rge-dup" title="Duplicate element">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+    `;
+
+    bottomActions.querySelector('.btn-rge-del')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.removeSelectedElement(unit);
+    });
+
+    bottomActions.querySelector('.btn-rge-dup')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.duplicateSelectedElement(unit);
+    });
+
+    bottomActions.querySelector('.btn-rge-comment')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const commentBtn = document.querySelector<HTMLButtonElement>('#btn-prop-comment');
+      commentBtn?.click();
+    });
+
+    this.overlayLayer.appendChild(bottomActions);
+    this.bottomActions = bottomActions;
+
+    // 3. Floating Rich Text Toolbar (for editable text / headings / buttons)
+    if (editableHost && ifrDoc) {
+      const textToolbar = document.createElement('div');
+      textToolbar.className = 'arch-rge-text-toolbar';
+      textToolbar.innerHTML = `
+        <div class="arch-rge-toolbar-row">
+          <button type="button" class="arch-toolbar-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button type="button" class="arch-toolbar-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button type="button" class="arch-toolbar-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+          <button type="button" class="arch-toolbar-btn" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+          <span class="arch-toolbar-divider"></span>
+          <button type="button" class="arch-toolbar-btn arch-toolbar-btn--color" id="btn-tb-text-color" title="Text Color">
+            <span style="font-weight: 700; font-size: 11px;">A</span>
+            <span class="arch-toolbar-color-indicator" id="tb-color-bar" style="background: #101112;"></span>
+          </button>
+          <button type="button" class="arch-toolbar-btn arch-toolbar-btn--color" id="btn-tb-hilite-color" title="Highlight Color">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 2 4 4-12 12H6v-4L18 2z"/></svg>
+            <span class="arch-toolbar-color-indicator" id="tb-hilite-bar" style="background: #facc15;"></span>
+          </button>
+          <span class="arch-toolbar-divider"></span>
+          <button type="button" class="arch-toolbar-btn" data-cmd="superscript" title="Superscript">X²</button>
+          <button type="button" class="arch-toolbar-btn" data-cmd="subscript" title="Subscript">X₂</button>
+          <button type="button" class="arch-toolbar-btn" id="btn-tb-special-char" title="Special characters">Ω</button>
+          <span class="arch-toolbar-divider"></span>
+          <button type="button" class="arch-toolbar-btn" id="btn-tb-align" title="Text Alignment">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+            <span style="font-size: 8px; margin-left: 1px;">▾</span>
+          </button>
+          <button type="button" class="arch-toolbar-btn" data-cmd="undo" title="Undo">↺</button>
+          <button type="button" class="arch-toolbar-btn" id="btn-tb-emoji" title="Insert Emoji">😊</button>
+          <button type="button" class="arch-toolbar-btn" id="btn-tb-expand" title="Expand">⛶</button>
+        </div>
+        <div class="arch-rge-toolbar-row arch-rge-toolbar-row--sub">
+          <button type="button" class="arch-toolbar-btn" id="btn-tb-link" title="Insert Link">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </button>
+          <button type="button" class="arch-toolbar-btn" data-cmd="unlink" title="Remove Link">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18.84 12.25 1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="m5.16 11.75-1.72 1.71a5 5 0 0 0 7.07 7.07l1.71-1.71"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+          </button>
+          <button type="button" class="arch-toolbar-text-btn" id="btn-tb-special-links">
+            Special links <span style="font-size: 9px; margin-left: 2px;">▾</span>
+          </button>
+          <button type="button" class="arch-toolbar-text-btn" id="btn-tb-merge-tags">
+            Merge tags <span style="font-size: 9px; margin-left: 2px;">▾</span>
+          </button>
+        </div>
+      `;
+
+      // Bind formatting actions
+      textToolbar.querySelectorAll<HTMLButtonElement>('[data-cmd]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const cmd = btn.getAttribute('data-cmd');
+          if (cmd && ifrDoc) {
+            ifrDoc.execCommand(cmd, false);
+            this.onStructureChanged();
+          }
+        });
+      });
+
+      textToolbar.querySelector('#btn-tb-link')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const url = prompt('Enter destination URL:', 'https://');
+        if (url && ifrDoc) {
+          ifrDoc.execCommand('createLink', false, url);
+          this.onStructureChanged();
+        }
+      });
+
+      textToolbar.querySelector('#btn-tb-text-color')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const color = prompt('Enter hex text color:', '#7747ff');
+        if (color && ifrDoc) {
+          ifrDoc.execCommand('foreColor', false, color);
+          const bar = textToolbar.querySelector<HTMLElement>('#tb-color-bar');
+          if (bar) bar.style.background = color;
+          this.onStructureChanged();
+        }
+      });
+
+      textToolbar.querySelector('#btn-tb-hilite-color')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const color = prompt('Enter highlight color:', '#fef08a');
+        if (color && ifrDoc) {
+          ifrDoc.execCommand('hiliteColor', false, color);
+          const bar = textToolbar.querySelector<HTMLElement>('#tb-hilite-bar');
+          if (bar) bar.style.background = color;
+          this.onStructureChanged();
+        }
+      });
+
+      textToolbar.querySelector('#btn-tb-align')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cur = editableHost.style.textAlign || 'left';
+        const next = cur === 'left' ? 'center' : cur === 'center' ? 'right' : 'left';
+        editableHost.style.textAlign = next;
+        this.onStructureChanged();
+      });
+
+      this.overlayLayer.appendChild(textToolbar);
+      this.textToolbar = textToolbar;
+      this.floatingToolbar = textToolbar;
+    }
+
+    // 4. Image Resize Handles (corner handles for images)
     if (this.activeMoveableUnit === unit) {
       const targetEl = innerTarget || this.selectedElement || unit;
       const isDirectImageSelected =
         unit.tagName.toLowerCase() === 'img' ||
         (targetEl.tagName.toLowerCase() === 'img' && targetEl !== unit);
       const targetImg = isDirectImageSelected ? ImageAdapter.findImage(targetEl, unit) : null;
-
-      const rect = (unit.tagName.toLowerCase() === 'img' && targetImg ? targetImg : unit).getBoundingClientRect();
-      if (rect.width >= 48 && rect.height >= 32) {
-        const dim = document.createElement('div');
-        dim.className = 'arch-dimensions-pill';
-        dim.textContent = `${Math.round(rect.width)} × ${Math.round(rect.height)}`;
-        this.overlayLayer.appendChild(dim);
-        this.dimensionsBadge = dim;
-      }
 
       if (targetImg) {
         const corners: Array<{ corner: 'nw' | 'ne' | 'sw' | 'se'; dir: 1 | -1 }> = [
@@ -1894,13 +1986,13 @@ export class Canvas {
       }
     }
 
-    this.positionFloatingToolbar(unit, toolbar);
+    this.positionFloatingToolbar(unit);
   }
 
   /**
-   * Positions the Figma Frame Pill, Dimensions Badge, and Image Resize Handles relative to `unit` inside the iframe.
+   * Positions the RGE Move Handle, Bottom Actions, and Floating Text Toolbar relative to `unit` inside the iframe.
    */
-  private positionFloatingToolbar(unit: HTMLElement, toolbar: HTMLElement): void {
+  private positionFloatingToolbar(unit: HTMLElement, toolbar?: HTMLElement): void {
     const unitRect = unit.getBoundingClientRect();
     const iframeRect = this.iframe.getBoundingClientRect();
     const containerRect = this.containerElement.getBoundingClientRect();
@@ -1908,24 +2000,37 @@ export class Canvas {
     const offsetX = iframeRect.left - containerRect.left;
     const offsetY = iframeRect.top - containerRect.top;
 
-    const toolbarWidth = toolbar.offsetWidth || 260;
-    const toolbarHeight = toolbar.offsetHeight || 28;
+    // 1. Right edge move handle (vertically centered on right border)
+    if (this.moveHandle) {
+      const handleTop = offsetY + unitRect.top + unitRect.height / 2;
+      const handleLeft = offsetX + unitRect.right;
+      this.moveHandle.style.top = `${handleTop}px`;
+      this.moveHandle.style.left = `${handleLeft}px`;
+    }
 
-    // Viewport-aware horizontal positioning:
-    // Clamp `left` within container bounds so right-aligned elements (social icons, right columns) never push toolbar off-screen
-    const maxLeft = Math.max(4, containerRect.width - toolbarWidth - 8);
-    const left = Math.min(Math.max(4, offsetX + unitRect.left), maxLeft);
+    // 2. Bottom-left action bar (attached directly below the bottom edge)
+    if (this.bottomActions) {
+      const actionsTop = offsetY + unitRect.bottom;
+      const actionsLeft = offsetX + unitRect.left;
+      this.bottomActions.style.top = `${actionsTop}px`;
+      this.bottomActions.style.left = `${actionsLeft}px`;
+    }
 
-    // Viewport-aware vertical positioning:
-    // If element is close to the top edge (< toolbarHeight + 6), flip toolbar below element so it never clips or overlaps
-    const fitsAbove = offsetY + unitRect.top >= toolbarHeight + 6;
-    const top = fitsAbove
-      ? Math.max(4, offsetY + unitRect.top - toolbarHeight - 2)
-      : Math.min(containerRect.height - toolbarHeight - 4, offsetY + unitRect.bottom + 6);
+    // 3. Floating rich-text toolbar
+    const tb = this.textToolbar || toolbar;
+    if (tb) {
+      const tbWidth = tb.offsetWidth || 340;
+      const tbHeight = tb.offsetHeight || 60;
+      const fitsAbove = offsetY + unitRect.top >= tbHeight + 8;
+      const top = fitsAbove
+        ? Math.max(4, offsetY + unitRect.top - tbHeight - 6)
+        : Math.min(containerRect.height - tbHeight - 4, offsetY + unitRect.bottom + 32);
+      const left = Math.max(4, Math.min(offsetX + unitRect.left, containerRect.width - tbWidth - 4));
+      tb.style.top = `${top}px`;
+      tb.style.left = `${left}px`;
+    }
 
-    toolbar.style.top = `${top}px`;
-    toolbar.style.left = `${left}px`;
-
+    // 4. Image resize handles
     const targetEl = this.selectedElement || unit;
     const targetImg =
       this.resizeHandles.length > 0 ? ImageAdapter.findImage(targetEl, unit) : null;
@@ -1933,21 +2038,6 @@ export class Canvas {
       targetImg && targetImg.getBoundingClientRect().width > 0
         ? targetImg.getBoundingClientRect()
         : unitRect;
-
-    if (this.dimensionsBadge) {
-      const dimWidth = this.dimensionsBadge.offsetWidth || 48;
-      // If toolbar was flipped below the element, position dimensions badge below toolbar or above element
-      const dimTop = fitsAbove
-        ? offsetY + targetRect.bottom + 8
-        : top + toolbarHeight + 8;
-      const rawDimLeft = offsetX + targetRect.left + targetRect.width / 2;
-      const dimLeft = Math.min(
-        Math.max(dimWidth / 2 + 4, rawDimLeft),
-        containerRect.width - dimWidth / 2 - 4
-      );
-      this.dimensionsBadge.style.top = `${dimTop}px`;
-      this.dimensionsBadge.style.left = `${dimLeft}px`;
-    }
 
     for (const handle of this.resizeHandles) {
       const corner = handle.dataset.corner;
@@ -1965,6 +2055,18 @@ export class Canvas {
   }
 
   private removeFloatingToolbar(): void {
+    if (this.moveHandle) {
+      this.moveHandle.remove();
+      this.moveHandle = null;
+    }
+    if (this.bottomActions) {
+      this.bottomActions.remove();
+      this.bottomActions = null;
+    }
+    if (this.textToolbar) {
+      this.textToolbar.remove();
+      this.textToolbar = null;
+    }
     if (this.floatingToolbar) {
       this.floatingToolbar.remove();
       this.floatingToolbar = null;

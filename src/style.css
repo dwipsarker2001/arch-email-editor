@@ -1040,6 +1040,167 @@ input:checked + .arch-toggle-slider:before {
   z-index: 20;
 }
 
+/* RGE Move Handle (Centered on right border of selected block) */
+.arch-rge-move-handle {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #7747ff;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  z-index: 45;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+  transform: translate(-50%, -50%);
+  padding: 0;
+  pointer-events: auto;
+  user-select: none;
+  transition: transform 0.15s ease, background 0.12s ease;
+}
+
+.arch-rge-move-handle:hover {
+  background: #6336e0;
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.arch-rge-move-handle:active {
+  cursor: grabbing;
+}
+
+/* RGE Bottom Action Bar (Attached to bottom edge of selected block) */
+.arch-rge-bottom-actions {
+  position: absolute;
+  display: flex;
+  background: #7747ff;
+  border-radius: 0 0 4px 4px;
+  overflow: hidden;
+  z-index: 45;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  pointer-events: auto;
+}
+
+.arch-rge-action-btn {
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.12s ease;
+}
+
+.arch-rge-action-btn:last-child {
+  border-right: none;
+}
+
+.arch-rge-action-btn:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.arch-rge-action-btn:active {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* RGE Floating Rich-Text Formatting Toolbar */
+.arch-rge-text-toolbar {
+  position: absolute;
+  background: #22242a;
+  color: #f8fafc;
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: auto;
+  user-select: none;
+  font-family: var(--arch-font);
+  font-size: 12px;
+}
+
+.arch-rge-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.arch-rge-toolbar-row--sub {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 3px;
+  margin-top: 1px;
+}
+
+.arch-toolbar-btn {
+  height: 24px;
+  min-width: 24px;
+  padding: 0 5px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #e2e8f0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: background 0.12s, color 0.12s;
+}
+
+.arch-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.arch-toolbar-btn--color {
+  flex-direction: column;
+  gap: 1px;
+  padding: 1px 4px;
+}
+
+.arch-toolbar-text-btn {
+  height: 22px;
+  padding: 0 6px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #cbd5e1;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.arch-toolbar-text-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.arch-toolbar-divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  margin: 0 2px;
+}
+
+.arch-toolbar-color-indicator {
+  display: block;
+  height: 2px;
+  width: 12px;
+  border-radius: 1px;
+}
+
 .arch-floating-toolbar {
   position: absolute;
   z-index: 30;
