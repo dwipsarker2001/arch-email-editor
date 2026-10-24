@@ -3,205 +3,49 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vanilla HTML Demo - Arch Email Editor</title>
+  <title>Arch Email Editor</title>
   <link rel="stylesheet" href="../dist/arch-email-editor.css" />
   <style>
-    body {
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
       margin: 0;
-      padding: 24px;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #0f172a;
-      color: #f8fafc;
-    }
-    .header {
-      margin-bottom: 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .header h1 {
-      margin: 0;
-      font-size: 22px;
-      font-weight: 700;
-    }
-    .header p {
-      margin: 4px 0 0 0;
-      color: #94a3b8;
-      font-size: 14px;
-    }
-    .demo-nav {
-      display: flex;
-      gap: 12px;
-    }
-    .demo-nav a {
-      color: #38bdf8;
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: 500;
-      padding: 6px 12px;
-      border: 1px solid #334155;
-      border-radius: 6px;
-    }
-    .demo-nav a:hover {
-      background-color: #1e293b;
-    }
-    .editor-wrapper {
-      background-color: #ffffff;
-      border-radius: 8px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-      height: 720px;
-    }
-    .external-bar {
-      margin-top: 20px;
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      background-color: #1e293b;
-      padding: 16px;
-      border-radius: 8px;
-    }
-    .preview-box {
-      margin-top: 20px;
-      background-color: #ffffff;
-      color: #000000;
-      border-radius: 8px;
-      overflow: hidden;
-      display: none;
-    }
-    .preview-box iframe {
+      padding: 0;
       width: 100%;
-      height: 500px;
-      border: none;
+      height: 100%;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f8fafc;
     }
-    button {
-      padding: 8px 16px;
-      border-radius: 6px;
-      border: none;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 13px;
-      background-color: #2563eb;
-      color: #ffffff;
+    #editor-container {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
     }
-    button:hover {
-      background-color: #1d4ed8;
+    .arch-editor {
+      width: 100%;
+      height: 100%;
+      border-radius: 0;
+      border: none;
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div>
-      <h1>📬 Arch Email Editor — Vanilla HTML Demo</h1>
-      <p>Demonstrates direct usage via standard <code>&lt;script&gt;</code> tag and <code>&lt;link&gt;</code> stylesheet (Like CKEditor).</p>
-    </div>
-    <div class="demo-nav">
-      <a href="react-demo.html">React Demo ⚛️</a>
-      <a href="vue-demo.html">Vue Demo 🟢</a>
-    </div>
-  </div>
-
-  <div class="editor-wrapper">
-    <div id="editor-container" style="width: 100%; height: 100%;"></div>
-  </div>
-
-  <div class="external-bar">
-    <button id="btn-sample-template" type="button" style="background-color: #059669;">📰 Load 2-Column Template Sample</button>
-    <button id="btn-show-html" type="button">👁️ Render Live Email Preview</button>
-    <button id="btn-get-json" type="button" style="background-color: #475569;">📋 Log JSON to Console</button>
-    <span style="color: #94a3b8; font-size: 13px;">External API integration: <code>editor.getHTML()</code> & <code>editor.getJSON()</code></span>
-  </div>
-
-  <div class="preview-box" id="preview-box">
-    <div style="padding: 10px 16px; background-color: #f1f5f9; border-bottom: 1px solid #cbd5e1; font-weight: 600; font-size: 13px; display: flex; justify-content: space-between;">
-      <span>Email Client Preview (Rendered from compiled table HTML)</span>
-      <button style="background: none; border: none; color: #64748b; cursor: pointer;" onclick="document.getElementById('preview-box').style.display='none'">✕ Close</button>
-    </div>
-    <iframe id="preview-iframe"></iframe>
-  </div>
+  <div id="editor-container"></div>
 
   <!-- Include ArchEmailEditor UMD Bundle -->
   <script src="../dist/arch-email-editor.umd.js"></script>
-
   <script>
-    // Initialize editor instance directly from window.ArchEmailEditor
     const Editor = window.ArchEmailEditor.create ? window.ArchEmailEditor : window.ArchEmailEditor.ArchEmailEditor;
     const editor = Editor.create('#editor-container', {
       onChange: (doc) => {
-        console.log('Document updated in real-time:', doc);
+        // Document updated in real-time
       }
     });
 
-    document.getElementById('btn-sample-template').addEventListener('click', () => {
-      const sample = `<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    @media only screen and (max-width: 600px) {
-      .responsive-col { width: 100% !important; display: block !important; }
-    }
-  </style>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: Arial, sans-serif;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 24px 0;">
-    <tr>
-      <td align="center">
-        <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-          <!-- Header Banner -->
-          <tr>
-            <td style="background-color: #1e293b; padding: 28px 24px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">🚀 Tech Pulse Weekly</h1>
-              <p style="color: #94a3b8; margin: 8px 0 0 0; font-size: 14px;">Curated developer news and engineering insights</p>
-            </td>
-          </tr>
-          <!-- 2-Column Content Grid -->
-          <tr>
-            <td style="padding: 24px 20px;">
-              <table width="100%" border="0" cellspacing="0" cellpadding="0">
-                <tr>
-                  <td class="responsive-col" width="270" valign="top" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 18px;">
-                    <h3 style="margin: 0 0 8px 0; color: #0f172a; font-size: 18px;">Frontend Architecture</h3>
-                    <p style="margin: 0 0 16px 0; color: #64748b; font-size: 14px; line-height: 1.5;">Learn how modern teams build fast, accessible web applications with zero runtime overhead.</p>
-                    <a href="https://example.com/frontend" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600;">Read Article →</a>
-                  </td>
-                  <td width="20" class="responsive-col" style="height: 16px;"></td>
-                  <td class="responsive-col" width="270" valign="top" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 18px;">
-                    <h3 style="margin: 0 0 8px 0; color: #0f172a; font-size: 18px;">Cloud Native Systems</h3>
-                    <p style="margin: 0 0 16px 0; color: #64748b; font-size: 14px; line-height: 1.5;">Scaling microservices safely with isolated state containers and automated recovery pipelines.</p>
-                    <a href="https://example.com/cloud" style="display: inline-block; background-color: #059669; color: #ffffff; text-decoration: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600;">Explore Cloud →</a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
-              © 2026 Arch Newsletter. All rights reserved. <br/>
-              <a href="https://example.com/unsubscribe" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-` + '</' + 'body>' + '\n</' + 'html>';
-      editor.importHTML(sample);
-    });
-
-    document.getElementById('btn-get-json').addEventListener('click', () => {
-      const json = editor.getJSON();
-      console.log('Exported JSON template:', json);
-      alert('Template JSON logged to browser console! (' + json.blocks.length + ' blocks)');
-    });
-
-    document.getElementById('btn-show-html').addEventListener('click', () => {
-      const html = editor.getHTML();
-      const previewBox = document.getElementById('preview-box');
-      const iframe = document.getElementById('preview-iframe');
-      previewBox.style.display = 'block';
-      iframe.srcdoc = html;
-      previewBox.scrollIntoView({ behavior: 'smooth' });
-    });
+    // Expose editor globally on window for easy developer & console access
+    window.editor = editor;
   </script>
 </body>
 </html>
