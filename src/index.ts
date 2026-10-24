@@ -23,5 +23,7 @@ if (typeof window !== 'undefined') {
 }
 
 export { ArchEmailEditor, compileToEmailHtml, getDefaultDocument, parseHtmlToDocument };
+export { RightPanel } from './components/RightPanel';
+export { Inspector } from './components/Inspector';
 export default ArchEmailEditor;
 export * from './types';

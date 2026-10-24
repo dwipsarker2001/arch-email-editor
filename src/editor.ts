@@ -1,16 +1,17 @@
 /**
  * Arch Email Editor - Core Controller & Component Orchestrator
  *
- * Architecture pattern: Component Orchestrator + Core Controller.
+ * Architecture: Component Orchestrator + Core Controller
  *
- * Cleanly breaks responsibilities across focused sub-components:
- * - Toolbar: Top actions (Undo/Redo, Viewport Switcher, Size Meter, Import HTML, Export JSON/HTML, Clear)
- * - Palette: Left draggable block & row layout palette
- * - Canvas: Central real-fidelity email WYSIWYG canvas (isolated iframe + parent overlay)
- * - Inspector: Right smart property controls + structural breadcrumb
- * - ImportModal: File upload and paste HTML modal
- * - ExportModal: Formatted code viewer and copy-to-clipboard
- * - HistoryManager: Unified Undo/Redo snapshot stack
+ * Cleanly breaks responsibilities across focused, modular sub-components:
+ * - Toolbar: Top action bar (Undo/Redo, Viewport Switcher, Size Meter, Import HTML, Export JSON/HTML, Clear)
+ * - Canvas: Full-width WYSIWYG email canvas (isolated iframe + parent-layer Figma HUD overlay)
+ * - RightPanel: Unified 3-tab sidebar:
+ *     1. Blocks: Draggable & clickable content blocks (Text, Image, Button, Heading, etc.)
+ *     2. Sections: Multi-column auto-layout rows (1 Col, 2 Col 50/50, 3 Col, etc.)
+ *     3. Settings: Smart contextual element inspector and global email styling
+ * - ImportModal / ExportModal: Lossless template ingestion & export dialogs
+ * - HistoryManager: Immutable undo/redo snapshot stack
  *
  * 100% Vanilla TypeScript with zero runtime framework dependencies.
  */
