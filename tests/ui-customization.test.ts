@@ -173,7 +173,7 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     expect(emptyState?.textContent).toContain('No assets available');
 
     // Test functional Remove button
-    const removeBtn = container.querySelector('#btn-img-remove');
+    const removeBtn = container.querySelector<HTMLButtonElement>('#btn-img-remove');
     expect(removeBtn).not.toBeNull();
     removeBtn?.click();
     expect(container.querySelector<HTMLInputElement>('#inp-img-src')?.value).toBe('');
@@ -185,12 +185,12 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
       curSrcInput.value = 'https://example.com/test-crop.jpg';
       curSrcInput.dispatchEvent(new Event('input'));
     }
-    const cropBtn = container.querySelector('#btn-img-crop');
+    const cropBtn = container.querySelector<HTMLButtonElement>('#btn-img-crop');
     expect(cropBtn).not.toBeNull();
     cropBtn?.click();
     const cropModal = document.querySelector('#arch-crop-modal-overlay');
     expect(cropModal).not.toBeNull();
-    const closeCropBtn = cropModal?.querySelector('#btn-crop-modal-close');
+    const closeCropBtn = cropModal?.querySelector<HTMLButtonElement>('#btn-crop-modal-close');
     closeCropBtn?.click();
     expect(document.querySelector('#arch-crop-modal-overlay')).toBeNull();
   });

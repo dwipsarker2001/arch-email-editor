@@ -297,8 +297,4 @@ export interface EditorOptions {
   onCropImage?: (element: HTMLElement) => void;
   /** Callback fired when user clicks Image Remove button */
   onRemoveImage?: (element: HTMLElement) => void;
-  /** Callback fired when user clicks Image Crop button */
-  onCropImage?: (element: HTMLElement) => void;
-  /** Callback fired when user clicks Image Remove button */
-  onRemoveImage?: (element: HTMLElement) => void;
 }

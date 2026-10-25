@@ -824,8 +824,8 @@ describe('ArchEmailEditor Core Engine', () => {
     });
     const backBtn = container.querySelector('#arch-custom-btn-btn-back');
     expect(backBtn).toBeTruthy();
-    expect(backBtn.querySelector('svg.arch-btn-icon-svg')).toBeTruthy();
-    expect(backBtn.querySelector('svg').getAttribute('viewBox')).toBe('0 0 24 24');
+    expect(backBtn!.querySelector('svg.arch-btn-icon-svg')).toBeTruthy();
+    expect(backBtn!.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 24 24');
 
     editor.removeCustomButton('btn-save-draft');
     expect(container.querySelector('#arch-custom-btn-btn-save-draft')).toBeNull();
