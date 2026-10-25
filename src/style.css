@@ -320,6 +320,8 @@
   gap: 12px;
 }
 
+.arch-tab-panel--blocks,
+.arch-tab-panel--content,
 .arch-tab-panel--settings {
   width: 100% !important;
   max-width: 100% !important;
@@ -332,13 +334,22 @@
   display: none !important;
 }
 
+#arch-content-inspector-view,
+#arch-content-inspector-view .arch-editor__inspector,
 .arch-tab-panel--settings .arch-editor__inspector,
 .arch-tab-panel--settings.arch-editor__inspector {
   width: 100% !important;
   max-width: 100% !important;
   border-left: none !important;
   padding: 0 !important;
+  gap: 0 !important;
   box-sizing: border-box !important;
+}
+
+#arch-content-blocks-view {
+  padding: 14px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 /* Content Blocks 3-Column Square Grid */
