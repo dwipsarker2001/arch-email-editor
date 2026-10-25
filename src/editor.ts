@@ -551,6 +551,7 @@ export class ArchEmailEditor {
           this.insertHTML(section.html);
         },
         onUploadImage: this.options.onUploadImage,
+        assets: (this.options as any).assets,
         onBrowseMedia: this.options.onBrowseMedia,
         onCropImage: this.options.onCropImage,
         onRemoveImage: this.options.onRemoveImage,

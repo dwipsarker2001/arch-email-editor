@@ -31,6 +31,7 @@ export interface InspectorEvents {
   onBrowseMedia?: (callback: (url: string) => void) => void;
   onCropImage?: (element: HTMLElement) => void;
   onRemoveImage?: (element: HTMLElement) => void;
+  assets?: (AssetItem | string)[];
 }
 
 /**
@@ -57,89 +58,15 @@ function toHexColor(colorStr?: string, fallback = '#000000'): string {
 }
 
 
-interface DummyAsset {
-  id: string;
-  name: string;
+export interface AssetItem {
+  id?: string;
+  name?: string;
   url: string;
-  size: string;
+  size?: string;
 }
 
-const DUMMY_ASSETS: DummyAsset[] = [
-  {
-    id: '1',
-    name: 'workspace-minimal.jpg',
-    url: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=400&h=260&q=80',
-    size: '54.20kb'
-  },
-  {
-    id: '2',
-    name: 'modern-architecture.jpg',
-    url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=400&h=540&q=80',
-    size: '88.15kb'
-  },
-  {
-    id: '3',
-    name: 'team-collaboration.jpg',
-    url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=400&h=300&q=80',
-    size: '62.40kb'
-  },
-  {
-    id: '4',
-    name: 'creative-designer.jpg',
-    url: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=400&h=500&q=80',
-    size: '94.60kb'
-  },
-  {
-    id: '5',
-    name: 'analytics-dashboard.jpg',
-    url: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=400&h=280&q=80',
-    size: '49.80kb'
-  },
-  {
-    id: '6',
-    name: 'coffee-notebook.jpg',
-    url: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=400&h=240&q=80',
-    size: '42.30kb'
-  },
-  {
-    id: '7',
-    name: 'business-meeting.jpg',
-    url: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=400&h=460&q=80',
-    size: '79.10kb'
-  },
-  {
-    id: '8',
-    name: 'nature-mountains.jpg',
-    url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&h=290&q=80',
-    size: '58.50kb'
-  },
-  {
-    id: '9',
-    name: 'urban-skyline.jpg',
-    url: 'https://images.unsplash.com/photo-1477959858617-67f30bc75b82?auto=format&fit=crop&w=400&h=480&q=80',
-    size: '83.40kb'
-  },
-  {
-    id: '10',
-    name: 'colorful-abstract.jpg',
-    url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=400&h=310&q=80',
-    size: '67.90kb'
-  },
-  {
-    id: '11',
-    name: 'tech-gadgets.jpg',
-    url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&h=420&q=80',
-    size: '72.35kb'
-  },
-  {
-    id: '12',
-    name: 'indoor-plants.jpg',
-    url: 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?auto=format&fit=crop&w=400&h=250&q=80',
-    size: '45.15kb'
-  }
-];
-
 export class Inspector {
+  private customAssets: AssetItem[] = [];
   private element: HTMLElement;
   private events: InspectorEvents;
   private viewportMode: ViewportMode = 'desktop';
@@ -155,6 +82,7 @@ export class Inspector {
 
   constructor(events: InspectorEvents) {
     this.events = events;
+    if (events.assets) this.setAssets(events.assets);
     this.element = document.createElement('div');
     this.element.className = 'arch-editor__inspector';
   }
@@ -1069,6 +997,27 @@ export class Inspector {
 
   
   
+  
+  public setAssets(assets: (AssetItem | string)[]): void {
+    this.customAssets = (assets || []).map(item => {
+      if (typeof item === 'string') {
+        const url = item;
+        const name = url.split('/').pop()?.split('?')[0] || 'image.png';
+        return { id: url, name, url, size: '' };
+      }
+      return {
+        id: item.id || item.url,
+        name: item.name || item.url.split('/').pop()?.split('?')[0] || 'image.png',
+        url: item.url,
+        size: item.size || ''
+      };
+    });
+  }
+
+  public getAssets(): AssetItem[] {
+    return this.customAssets;
+  }
+
   public showUploadNotice(msg = 'Upload is not setup yet, check documentation.'): void {
     const notice = this.element.querySelector<HTMLElement>('#arch-img-upload-notice');
     if (notice) {
@@ -1103,16 +1052,13 @@ export class Inspector {
             </svg>
           </button>
           <button type="button" class="arch-icon-btn" id="btn-assets-close" title="Close Assets">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
       </div>
       <input type="file" id="inp-assets-upload-file" accept="image/*" style="display: none;" />
 
-      <div class="arch-assets-search-wrap" id="arch-assets-search-wrap">
+      <div class="arch-assets-search-wrap ${this.customAssets.length === 0 ? 'is-collapsed' : ''}" id="arch-assets-search-wrap">
         <div class="arch-assets-search-box">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           <input type="text" class="arch-assets-search-input" id="inp-assets-search" placeholder="Search images..." />
@@ -1134,8 +1080,9 @@ export class Inspector {
     const uploadBtn = panel.querySelector<HTMLButtonElement>('#btn-assets-upload')!;
     const uploadInput = panel.querySelector<HTMLInputElement>('#inp-assets-upload-file')!;
 
-    let searchVisible = true;
+    let searchVisible = this.customAssets.length > 0;
     searchToggleBtn?.addEventListener('click', () => {
+      if (this.customAssets.length === 0) return;
       searchVisible = !searchVisible;
       searchToggleBtn.classList.toggle('is-active', searchVisible);
       searchWrap?.classList.toggle('is-collapsed', !searchVisible);
@@ -1143,7 +1090,7 @@ export class Inspector {
         searchInp?.focus();
       } else {
         if (searchInp) searchInp.value = '';
-        renderGrid(DUMMY_ASSETS);
+        renderGrid(this.customAssets);
       }
     });
 
@@ -1169,14 +1116,15 @@ export class Inspector {
 
       const formattedKb = ((file.size / 1024).toFixed(2)) + 'kb';
       this.events.onUploadImage(file, (url: string) => {
-        const newAsset: DummyAsset = {
+        const newAsset: AssetItem = {
           id: 'asset-' + Date.now(),
           name: file.name,
           url: url,
           size: formattedKb
         };
-        DUMMY_ASSETS.unshift(newAsset);
-        renderGrid(DUMMY_ASSETS);
+        this.customAssets.unshift(newAsset);
+        searchWrap?.classList.remove('is-collapsed');
+        renderGrid(this.customAssets);
         onSelect(url, file.name, formattedKb);
         closePanel();
       });
@@ -1191,18 +1139,49 @@ export class Inspector {
       }, 260);
     };
 
-    const renderGrid = (items: typeof DUMMY_ASSETS) => {
+    const renderGrid = (items: AssetItem[]) => {
+      // If no assets sources configured/added, show empty state design
+      if (this.customAssets.length === 0) {
+        grid.innerHTML = `
+          <div class="arch-assets-empty-state" id="arch-assets-empty-state">
+            <div class="arch-assets-empty-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+                <circle cx="9" cy="9" r="2"></circle>
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+              </svg>
+            </div>
+            <div class="arch-assets-empty-title">No assets available</div>
+            <div class="arch-assets-empty-desc">No assets source has been added yet. Add media items to your asset library or upload an image.</div>
+            <button type="button" class="arch-assets-empty-upload-btn" id="btn-assets-empty-upload">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <span>Upload Image</span>
+            </button>
+          </div>
+        `;
+
+        grid.querySelector('#btn-assets-empty-upload')?.addEventListener('click', () => {
+          uploadBtn?.click();
+        });
+        return;
+      }
+
+      // If assets exist but search yields 0 matches
       if (items.length === 0) {
-        grid.innerHTML = '<div style="grid-column: span 2; text-align: center; color: #94a3b8; font-size: 12px; padding: 30px 0;">No matching assets found</div>';
+        grid.innerHTML = '<div style="column-span: all; text-align: center; color: #94a3b8; font-size: 12px; padding: 40px 10px;">No matching assets found</div>';
         return;
       }
 
       grid.innerHTML = items.map(asset => `
-        <div class="arch-assets-card" data-url="${asset.url}" data-name="${asset.name}" data-size="${asset.size}" title="${asset.name}">
-          <img src="${asset.url}" alt="${asset.name}" loading="lazy" />
+        <div class="arch-assets-card" data-url="${asset.url}" data-name="${asset.name || 'image.png'}" data-size="${asset.size || ''}" title="${asset.name || 'Image'}">
+          <img src="${asset.url}" alt="${asset.name || 'Asset'}" loading="lazy" />
           <div class="arch-assets-card-overlay">
-            <span class="arch-assets-card-name">${asset.name}</span>
-            <span class="arch-assets-card-size">${asset.size}</span>
+            <span class="arch-assets-card-name">${asset.name || 'image.png'}</span>
+            ${asset.size ? `<span class="arch-assets-card-size">${asset.size}</span>` : ''}
           </div>
         </div>
       `).join('');
@@ -1220,11 +1199,11 @@ export class Inspector {
       });
     };
 
-    renderGrid(DUMMY_ASSETS);
+    renderGrid(this.customAssets);
 
     searchInp?.addEventListener('input', () => {
       const query = searchInp.value.trim().toLowerCase();
-      const filtered = DUMMY_ASSETS.filter(a => a.name.toLowerCase().includes(query));
+      const filtered = this.customAssets.filter(a => (a.name || '').toLowerCase().includes(query));
       renderGrid(filtered);
     });
 

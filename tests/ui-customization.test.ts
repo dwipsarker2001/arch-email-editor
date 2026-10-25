@@ -160,6 +160,17 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     uploadOpt?.click();
     expect(notice?.classList.contains('is-visible')).toBe(true);
     expect(notice?.textContent).toContain('Upload is not setup yet, check documentation.');
+
+    // Clicking browse media when no assets sources added shows empty state design
+    const browseOpt = container.querySelector<HTMLButtonElement>('#opt-img-browse');
+    browseOpt?.click();
+
+    const assetsPanel = container.querySelector('.arch-assets-sidepanel');
+    expect(assetsPanel).not.toBeNull();
+
+    const emptyState = assetsPanel?.querySelector('#arch-assets-empty-state');
+    expect(emptyState).not.toBeNull();
+    expect(emptyState?.textContent).toContain('No assets available');
   });
 
 });

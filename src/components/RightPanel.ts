@@ -64,6 +64,7 @@ export class RightPanel {
     this.elementInspector = new Inspector({
       onChange: events.onChange,
       onUploadImage: events.onUploadImage,
+      assets: events.assets,
       onBrowseMedia: events.onBrowseMedia,
       onCropImage: events.onCropImage,
       onRemoveImage: events.onRemoveImage,
@@ -100,6 +101,11 @@ export class RightPanel {
 
   public getElement(): HTMLElement {
     return this.element;
+  }
+
+  
+  public setAssets(assets: any[]): void {
+    this.elementInspector.setAssets(assets);
   }
 
   public getInspector(): Inspector {

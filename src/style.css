@@ -2980,3 +2980,81 @@ input:checked + .arch-toggle-slider:before {
   color: #ef4444 !important;
   flex-shrink: 0 !important;
 }
+
+
+/* Assets Empty State Design */
+.arch-editor .arch-assets-empty-state,
+.arch-assets-empty-state {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 50px 20px !important;
+  min-height: 280px !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  column-span: all !important;
+}
+
+.arch-editor .arch-assets-empty-icon,
+.arch-assets-empty-icon {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 50% !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-bottom: 14px !important;
+}
+
+.arch-editor .arch-assets-empty-icon svg,
+.arch-assets-empty-icon svg {
+  color: #94a3b8 !important;
+}
+
+.arch-editor .arch-assets-empty-title,
+.arch-assets-empty-title {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  margin-bottom: 6px !important;
+}
+
+.arch-editor .arch-assets-empty-desc,
+.arch-assets-empty-desc {
+  font-size: 11px !important;
+  color: #64748b !important;
+  line-height: 1.5 !important;
+  max-width: 230px !important;
+  margin-bottom: 16px !important;
+}
+
+.arch-editor .arch-assets-empty-upload-btn,
+.arch-assets-empty-upload-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 7px 12px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+  background: #2563eb !important;
+  border: none !important;
+  border-radius: 5px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease !important;
+  line-height: 1 !important;
+}
+
+.arch-editor .arch-assets-empty-upload-btn:hover,
+.arch-assets-empty-upload-btn:hover {
+  background: #1d4ed8 !important;
+}
+
+.arch-editor .arch-assets-empty-upload-btn svg,
+.arch-assets-empty-upload-btn svg {
+  color: #ffffff !important;
+}
