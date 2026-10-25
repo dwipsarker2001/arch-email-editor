@@ -1855,7 +1855,7 @@ input:checked + .arch-toggle-slider:before {
 }
 
 
-/* Unlayer-style Bottom Action Bar (Attached to bottom-left corner of selected item) */
+/* Unlayer-style Bottom Action Bar (Attached to bottom-right corner of selected item) */
 .arch-editor .arch-rge-bottom-actions,
 .arch-rge-bottom-actions {
   position: absolute;

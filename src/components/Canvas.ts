@@ -2809,14 +2809,21 @@ export class Canvas {
         ? elRect
         : unitRect;
 
-    // 2. Bottom-left action bar (attached directly to the bottom-left corner of the selected item)
+    // 2. Bottom-right action bar (attached directly to the bottom-right corner of the selected item)
     if (this.bottomActions) {
       const actionsHeight = 28;
+      const actionsWidth = this.bottomActions.offsetWidth || 84;
       let actionsTop = offsetY + targetRect.bottom;
       if (actionsTop + actionsHeight > containerRect.height - 4) {
         actionsTop = Math.max(4, offsetY + targetRect.bottom - actionsHeight);
       }
-      const actionsLeft = Math.max(4, Math.min(offsetX + targetRect.left, containerRect.width - 95));
+      let actionsLeft = offsetX + targetRect.right - actionsWidth;
+      if (actionsLeft + actionsWidth > containerRect.width - 4) {
+        actionsLeft = Math.max(4, containerRect.width - actionsWidth - 4);
+      }
+      if (actionsLeft < 4) {
+        actionsLeft = 4;
+      }
       this.bottomActions.style.top = `${actionsTop}px`;
       this.bottomActions.style.left = `${actionsLeft}px`;
     }

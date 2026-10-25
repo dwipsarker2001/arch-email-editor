@@ -867,9 +867,9 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
 
     const bottomActions = container.querySelector('.arch-rge-bottom-actions') as HTMLElement;
     expect(bottomActions).toBeTruthy();
-    // Bottom actions must be positioned at the parent row's bottom/left, NOT child <p>
+    // Bottom actions must be positioned at the parent row's bottom/right, NOT child <p>
     expect(parseFloat(bottomActions.style.top)).toBe(250);
-    expect(parseFloat(bottomActions.style.left)).toBe(10);
+    expect(parseFloat(bottomActions.style.left)).toBe(506);
 
     // 2. First double click drills down from Row to Block Frame
     p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
@@ -882,7 +882,7 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     // After drilling down into child <p>, re-query bottom actions since toolbar re-renders
     const childBottomActions = container.querySelector('.arch-rge-bottom-actions') as HTMLElement;
     expect(childBottomActions).toBeTruthy();
-    expect(parseFloat(childBottomActions.style.left)).toBe(60);
+    expect(parseFloat(childBottomActions.style.left)).toBe(276);
     expect(parseFloat(childBottomActions.style.top)).toBe(160);
 
     editor.destroy();
