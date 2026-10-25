@@ -23,6 +23,7 @@ Just like Unlayer or BeeFree, Arch Email Editor guarantees that **your email tem
   - **Images**: Corner drag handles for smooth width scaling with live dimensions badge.
 - ⚡ **Dynamic HTML Injection API**: Dynamically load, replace, or insert custom HTML snippets into the email through JavaScript (`setHTML()`, `loadHTML()`, `insertHTML()`).
 - 🔘 **Custom Toolbar Buttons**: Add custom buttons (e.g., **Save**, **Publish**, **Send Test**) into the top-right toolbar via options or runtime API.
+- ↩️ **Floating Undo & Redo Widget**: Floating bottom-left canvas pill widget (BeeFree / Figma layout) synchronized with top toolbar buttons and global keyboard shortcuts (`Ctrl+Z` / `Cmd+Z`, `Ctrl+Y` / `Cmd+Shift+Z`).
 - 🏷️ **Template Name Controls**: Set the template name via JS options, allow users to click-and-rename inline in the toolbar, and listen for change events.
 - 📬 **Bulletproof Email Compilation**:
   - Microsoft Outlook table conditionals (`<!--[if mso]>...<![endif]-->`)

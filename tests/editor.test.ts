@@ -773,4 +773,40 @@ describe('ArchEmailEditor Core Engine', () => {
 
     editor.destroy();
   });
+
+  it('renders floating Undo and Redo buttons in the bottom-left corner of the canvas and handles undo/redo', () => {
+    const editor = ArchEmailEditor.create(container);
+
+    const floatHistory = container.querySelector('.arch-canvas-floating-history') as HTMLElement;
+    expect(floatHistory).toBeTruthy();
+
+    const undoBtn = floatHistory.querySelector('.arch-btn--undo') as HTMLButtonElement;
+    const redoBtn = floatHistory.querySelector('.arch-btn--redo') as HTMLButtonElement;
+    expect(undoBtn).toBeTruthy();
+    expect(redoBtn).toBeTruthy();
+
+    // Initially undo and redo are disabled (at initial state)
+    expect(undoBtn.disabled).toBe(true);
+    expect(redoBtn.disabled).toBe(true);
+
+    // Insert an item to push history
+    editor.insertHTML('<p>New change for undo</p>');
+
+    expect(undoBtn.disabled).toBe(false);
+    expect(redoBtn.disabled).toBe(true);
+
+    // Clicking floating undo reverts the change
+    undoBtn.click();
+    expect(editor.getHTML()).not.toContain('New change for undo');
+    expect(undoBtn.disabled).toBe(true);
+    expect(redoBtn.disabled).toBe(false);
+
+    // Clicking floating redo reapplies the change
+    redoBtn.click();
+    expect(editor.getHTML()).toContain('New change for undo');
+    expect(undoBtn.disabled).toBe(false);
+    expect(redoBtn.disabled).toBe(true);
+
+    editor.destroy();
+  });
 });

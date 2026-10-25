@@ -78,11 +78,14 @@ export interface CanvasEvents {
   onMoveBlock?: (id: string, direction: 'up' | 'down') => void;
   onRemoveBlock?: (id: string) => void;
   onInsertBlockAt?: (type: BlockType, targetIndex: number) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 export class Canvas {
   private element: HTMLElement;
   private containerElement: HTMLElement;
+  private floatingHistory: HTMLElement | null = null;
   private iframe: HTMLIFrameElement;
   private overlayLayer: HTMLElement;
   private floatingToolbar: HTMLElement | null = null;
@@ -173,11 +176,49 @@ export class Canvas {
     this.overlayLayer = document.createElement('div');
     this.overlayLayer.className = 'arch-canvas-overlay';
 
+    // Floating bottom-left Undo / Redo controls (BeeFree / Figma layout)
+    this.floatingHistory = document.createElement('div');
+    this.floatingHistory.className = 'arch-canvas-floating-history';
+    this.floatingHistory.innerHTML = `
+      <button class="arch-floating-history-btn arch-btn--undo" type="button" title="Undo (Ctrl+Z)" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 14 4 9l5-5"/>
+          <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/>
+        </svg>
+      </button>
+      <span class="arch-floating-history-divider"></span>
+      <button class="arch-floating-history-btn arch-btn--redo" type="button" title="Redo (Ctrl+Y)" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m15 14 5-5-5-5"/>
+          <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13"/>
+        </svg>
+      </button>
+    `;
+
+    this.floatingHistory.querySelector('.arch-btn--undo')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.events.onUndo?.();
+    });
+
+    this.floatingHistory.querySelector('.arch-btn--redo')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.events.onRedo?.();
+    });
+
     this.containerElement.appendChild(this.iframe);
     this.containerElement.appendChild(this.overlayLayer);
+    this.containerElement.appendChild(this.floatingHistory);
     this.element.appendChild(this.containerElement);
 
     this.bindOuterEvents();
+  }
+
+  public updateHistoryState(canUndo: boolean, canRedo: boolean): void {
+    if (!this.floatingHistory) return;
+    const undoBtn = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--undo');
+    const redoBtn = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--redo');
+    if (undoBtn) undoBtn.disabled = !canUndo;
+    if (redoBtn) redoBtn.disabled = !canRedo;
   }
 
   public getElement(): HTMLElement {
@@ -257,6 +298,29 @@ export class Canvas {
         if (this.activeMoveableUnit) {
           this.selectParentUnit(this.activeMoveableUnit);
           return;
+        }
+      }
+
+      // Global Undo/Redo Shortcuts (Ctrl+Z / Cmd+Z, Ctrl+Y / Cmd+Shift+Z)
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        const key = e.key.toLowerCase();
+        const active = document.activeElement;
+        const isEditingInp = active && (
+          active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          (active as HTMLElement).isContentEditable
+        );
+        if (!isEditingInp && !this.isEditingText) {
+          if (key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            this.events.onUndo?.();
+            return;
+          }
+          if (key === 'y' || (key === 'z' && e.shiftKey)) {
+            e.preventDefault();
+            this.events.onRedo?.();
+            return;
+          }
         }
       }
     });

@@ -1125,6 +1125,59 @@ input:checked + .arch-toggle-slider:before {
   position: relative;
 }
 
+/* Floating Bottom-Left History Widget (Undo / Redo) */
+.arch-canvas-floating-history {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--arch-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.05);
+  padding: 3px;
+  gap: 2px;
+  z-index: 30;
+  user-select: none;
+}
+
+.arch-floating-history-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.arch-floating-history-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: var(--arch-primary);
+}
+
+.arch-floating-history-btn:active:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.arch-floating-history-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.arch-floating-history-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--arch-border);
+  margin: 0 2px;
+}
+
 .arch-canvas-iframe {
   width: 100%;
   height: 100%;

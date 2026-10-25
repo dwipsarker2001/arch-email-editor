@@ -479,7 +479,9 @@ export class ArchEmailEditor {
         }
       },
       onMoveBlock: (id, dir) => this.moveBlock(id, dir),
-      onRemoveBlock: (id) => this.removeBlock(id)
+      onRemoveBlock: (id) => this.removeBlock(id),
+      onUndo: () => this.undo(),
+      onRedo: () => this.redo()
     });
 
     // 4. Initialize Unified Right Panel (Blocks | Sections | Settings)
@@ -537,7 +539,10 @@ export class ArchEmailEditor {
   private syncToolbarState(): void {
     const html = this.getHTML();
     const bytes = new Blob([html]).size;
-    this.toolbar?.updateState(this.history.canUndo(), this.history.canRedo(), bytes);
+    const canUndo = this.history.canUndo();
+    const canRedo = this.history.canRedo();
+    this.toolbar?.updateState(canUndo, canRedo, bytes);
+    this.canvas?.updateHistoryState(canUndo, canRedo);
   }
 
   /**
