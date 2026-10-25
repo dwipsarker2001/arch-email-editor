@@ -13,22 +13,67 @@
 }
 
 .arch-editor {
+  all: initial;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
   min-height: 560px;
-  background-color: var(--arch-bg-main);
-  font-family: var(--arch-font);
-  color: var(--arch-text-primary);
-  border: 1px solid var(--arch-border);
-  border-radius: var(--arch-radius);
-  box-sizing: border-box;
+  background-color: var(--arch-bg-main, #f8fafc);
+  font-family: var(--arch-font, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+  letter-spacing: normal;
+  color: var(--arch-text-primary, #0f172a);
+  border: 1px solid var(--arch-border, #e2e8f0);
+  border-radius: var(--arch-radius, 8px);
   overflow: hidden;
+  position: relative;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.arch-editor * {
+.arch-editor *,
+.arch-editor *::before,
+.arch-editor *::after {
   box-sizing: border-box;
+}
+
+/* Defensive resets against Tailwind Preflight, Bootstrap, and host CSS resets */
+.arch-editor button,
+.arch-editor input,
+.arch-editor select,
+.arch-editor textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  margin: 0;
+}
+
+.arch-editor svg {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.arch-editor ul,
+.arch-editor ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.arch-editor p,
+.arch-editor h1,
+.arch-editor h2,
+.arch-editor h3,
+.arch-editor h4,
+.arch-editor h5,
+.arch-editor h6 {
+  margin: 0;
 }
 
 /* Header Toolbar */
