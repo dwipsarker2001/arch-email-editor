@@ -2265,6 +2265,11 @@ export class Canvas {
     }
 
     // 1. Bottom Action Bar (Comment, Delete, Duplicate Attached to Bottom Edge)
+    const effectiveActionUnit =
+      (this.activeMoveableUnit && this.activeMoveableUnit.classList?.contains('arch-selected-element') ? this.activeMoveableUnit : null) ||
+      (unit && unit.classList?.contains('arch-selected-element') ? unit : null) ||
+      unit;
+
     const bottomActions = document.createElement('div');
     bottomActions.className = 'arch-rge-bottom-actions';
     bottomActions.innerHTML = `
@@ -2281,12 +2286,12 @@ export class Canvas {
 
     bottomActions.querySelector('.btn-rge-del')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.removeSelectedElement(unit);
+      this.removeSelectedElement(effectiveActionUnit);
     });
 
     bottomActions.querySelector('.btn-rge-dup')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.duplicateSelectedElement(unit);
+      this.duplicateSelectedElement(effectiveActionUnit);
     });
 
     bottomActions.querySelector('.btn-rge-comment')?.addEventListener('click', (e) => {
@@ -2673,38 +2678,7 @@ export class Canvas {
     const offsetX = iframeRect.left - containerRect.left;
     const offsetY = iframeRect.top - containerRect.top;
 
-    // 1. Bottom-left action bar (attached directly to the bottom-left corner of selected item)
-    if (this.bottomActions) {
-      const targetEl =
-        this.selectedElement && this.selectedElement !== this.iframe.contentDocument?.body
-          ? this.selectedElement
-          : unit;
-      const targetRect = targetEl.getBoundingClientRect();
-      const actionsHeight = 28;
-      let actionsTop = offsetY + targetRect.bottom;
-      if (actionsTop + actionsHeight > containerRect.height - 4) {
-        actionsTop = Math.max(4, offsetY + targetRect.bottom - actionsHeight);
-      }
-      const actionsLeft = Math.max(4, Math.min(offsetX + targetRect.left, containerRect.width - 95));
-      this.bottomActions.style.top = `${actionsTop}px`;
-      this.bottomActions.style.left = `${actionsLeft}px`;
-    }
-
-    // 3. Floating rich-text toolbar
-    const tb = this.textToolbar || toolbar;
-    if (tb) {
-      const tbWidth = tb.offsetWidth || 340;
-      const tbHeight = tb.offsetHeight || 60;
-      const fitsAbove = offsetY + unitRect.top >= tbHeight + 8;
-      const top = fitsAbove
-        ? Math.max(4, offsetY + unitRect.top - tbHeight - 6)
-        : Math.min(containerRect.height - tbHeight - 4, offsetY + unitRect.bottom + 32);
-      const left = Math.max(4, Math.min(offsetX + unitRect.left, containerRect.width - tbWidth - 4));
-      tb.style.top = `${top}px`;
-      tb.style.left = `${left}px`;
-    }
-
-    // 4. Element resize handles (Image, Button, Text Element)
+    // 1. Resolve selected element and target bounding box (Figma-style hierarchy)
     const isRowOrCol = isRowElement(unit) || isColumnElement(unit);
     const selectedEl =
       (this.selectedElement && this.selectedElement !== this.iframe.contentDocument?.body && this.selectedElement.classList?.contains('arch-selected-element') ? this.selectedElement : null) ||
@@ -2750,7 +2724,33 @@ export class Canvas {
         ? effectiveTargetEl.getBoundingClientRect()
         : unitRect;
 
-    // 5. Selection overlay (Low-opacity tint over selected element; hidden during inline text editing)
+    // 2. Bottom-left action bar (attached directly to the bottom-left corner of the selected item)
+    if (this.bottomActions) {
+      const actionsHeight = 28;
+      let actionsTop = offsetY + targetRect.bottom;
+      if (actionsTop + actionsHeight > containerRect.height - 4) {
+        actionsTop = Math.max(4, offsetY + targetRect.bottom - actionsHeight);
+      }
+      const actionsLeft = Math.max(4, Math.min(offsetX + targetRect.left, containerRect.width - 95));
+      this.bottomActions.style.top = `${actionsTop}px`;
+      this.bottomActions.style.left = `${actionsLeft}px`;
+    }
+
+    // 3. Floating rich-text toolbar
+    const tb = this.textToolbar || toolbar;
+    if (tb) {
+      const tbWidth = tb.offsetWidth || 340;
+      const tbHeight = tb.offsetHeight || 60;
+      const fitsAbove = offsetY + unitRect.top >= tbHeight + 8;
+      const top = fitsAbove
+        ? Math.max(4, offsetY + unitRect.top - tbHeight - 6)
+        : Math.min(containerRect.height - tbHeight - 4, offsetY + unitRect.bottom + 32);
+      const left = Math.max(4, Math.min(offsetX + unitRect.left, containerRect.width - tbWidth - 4));
+      tb.style.top = `${top}px`;
+      tb.style.left = `${left}px`;
+    }
+
+    // 4. Selection overlay (Low-opacity tint over selected element; hidden during inline text editing)
     if (this.selectionOverlay) {
       if (this.isEditingText || effectiveTargetEl?.classList?.contains('arch-has-hovered-child')) {
         this.selectionOverlay.style.display = 'none';

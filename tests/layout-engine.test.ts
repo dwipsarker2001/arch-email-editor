@@ -807,6 +807,87 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     editor.destroy();
   });
 
+  it('positions bottom action options at the parent container on parent click, and switches to child item on drill-down', () => {
+    const editor = ArchEmailEditor.create(container);
+    const html = `<!DOCTYPE html>
+<html>
+<body>
+  <table class="nl-container" width="100%">
+    <tbody><tr><td>
+      <table class="row row-1" width="100%">
+        <tbody><tr>
+          <td class="column column-1" width="100%">
+            <table class="text_block" width="100%">
+              <tr><td><p class="test-p">Sample Paragraph Copy</p></td></tr>
+            </table>
+          </td>
+        </tr></tbody>
+      </table>
+    </td></tr></tbody>
+  </table>
+</body>
+</html>`;
+    editor.importHTML(html);
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+    const row = ifrDoc.querySelector('table.row-1') as HTMLElement;
+    const p = ifrDoc.querySelector('p.test-p') as HTMLElement;
+
+    const canvas = (editor as any).canvas;
+    const containerEl = canvas.containerElement as HTMLElement;
+    containerEl.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600 }) as DOMRect;
+    iframe.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600 }) as DOMRect;
+
+    // Define distinct bounding rects for row vs p
+    row.getBoundingClientRect = () =>
+      ({
+        left: 10,
+        right: 590,
+        width: 580,
+        top: 50,
+        bottom: 250,
+        height: 200,
+      }) as DOMRect;
+
+    p.getBoundingClientRect = () =>
+      ({
+        left: 60,
+        right: 360,
+        width: 300,
+        top: 120,
+        bottom: 160,
+        height: 40,
+      }) as DOMRect;
+
+    // 1. Single click on child <p> selects the parent row
+    p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(row);
+
+    const bottomActions = container.querySelector('.arch-rge-bottom-actions') as HTMLElement;
+    expect(bottomActions).toBeTruthy();
+    // Bottom actions must be positioned at the parent row's bottom/left, NOT child <p>
+    expect(parseFloat(bottomActions.style.top)).toBe(250);
+    expect(parseFloat(bottomActions.style.left)).toBe(10);
+
+    // 2. First double click drills down from Row to Block Frame
+    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).not.toBe(row);
+
+    // 3. Second double click drills down from Block Frame to leaf <p>
+    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
+
+    // After drilling down into child <p>, re-query bottom actions since toolbar re-renders
+    const childBottomActions = container.querySelector('.arch-rge-bottom-actions') as HTMLElement;
+    expect(childBottomActions).toBeTruthy();
+    expect(parseFloat(childBottomActions.style.left)).toBe(60);
+    expect(parseFloat(childBottomActions.style.top)).toBe(160);
+
+    editor.destroy();
+  });
+
   it('drills down past <td> into inner <a> tags and smoothly reorders 3-column rows horizontally while preserving divider borders', () => {
     const editor = ArchEmailEditor.create(container);
     const threeColHtml = `<!DOCTYPE html>
