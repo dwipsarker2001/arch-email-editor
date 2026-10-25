@@ -1131,10 +1131,10 @@ export class Canvas {
         overflow: hidden !important;
         transition: border-color 0.15s ease, background-color 0.15s ease !important;
       }
-      /* Seamlessly connect adjacent empty column drop areas with no gap */
-      td.column + td.column .arch-empty-col-placeholder,
-      th.column + th.column .arch-empty-col-placeholder,
-      div.column + div.column .arch-empty-col-placeholder {
+      /* Seamlessly connect adjacent empty column drop areas with no gap only when preceding sibling also has a placeholder */
+      td.column:has(.arch-empty-col-placeholder) + td.column .arch-empty-col-placeholder,
+      th.column:has(.arch-empty-col-placeholder) + th.column .arch-empty-col-placeholder,
+      div.column:has(.arch-empty-col-placeholder) + div.column .arch-empty-col-placeholder {
         border-left: none !important;
       }
       .arch-empty-col-placeholder span {
