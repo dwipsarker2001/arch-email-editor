@@ -21,6 +21,7 @@ import {
   BlockNode,
   BlockType,
   EditorOptions,
+  PrebuiltSection,
   RowLayoutType,
   SelectedElementInfo,
   ToolbarCustomButton,
@@ -31,6 +32,7 @@ import {
   parseHtmlToDocument,
   normalizeDocument
 } from './compiler';
+import { getDefaultSections } from './engine/sections';
 import { Toolbar } from './components/Toolbar';
 import { Canvas } from './components/Canvas';
 import { Inspector } from './components/Inspector';
@@ -209,6 +211,41 @@ export class ArchEmailEditor {
    */
   public removeCustomButton(buttonId: string): void {
     this.toolbar?.removeCustomButton(buttonId);
+  }
+
+  /**
+   * Returns a copy of the modular sections loaded in the editor's SECTIONS tab.
+   */
+  public getSections(): PrebuiltSection[] {
+    return this.rightPanel?.getSections() || [];
+  }
+
+  /**
+   * Finds a loaded modular section by its unique ID.
+   */
+  public getSectionById(id: string): PrebuiltSection | undefined {
+    return this.rightPanel?.getSectionById(id);
+  }
+
+  /**
+   * Replaces the modular sections library and updates the sidebar UI.
+   */
+  public setSections(sections: PrebuiltSection[]): void {
+    this.rightPanel?.setSections(sections);
+  }
+
+  /**
+   * Dynamically adds or updates a modular section in the editor's library.
+   */
+  public addSection(section: PrebuiltSection): void {
+    this.rightPanel?.addSection(section);
+  }
+
+  /**
+   * Removes a modular section from the library by ID.
+   */
+  public removeSection(id: string): void {
+    this.rightPanel?.removeSection(id);
   }
 
   /**
@@ -480,39 +517,53 @@ export class ArchEmailEditor {
       },
       onMoveBlock: (id, dir) => this.moveBlock(id, dir),
       onRemoveBlock: (id) => this.removeBlock(id),
+      onResolveSection: (id) => this.getSectionById(id),
       onUndo: () => this.undo(),
       onRedo: () => this.redo()
     });
 
     // 4. Initialize Unified Right Panel (Blocks | Sections | Settings)
-    this.rightPanel = new RightPanel({
-      onAddBlock: (type) => this.addBlock(type),
-      onAddRowLayout: (layout) => this.addRowLayout(layout),
-      onChange: (isDocumentSetting?: boolean) => {
-        if (isDocumentSetting) {
-          this.document.rawHtml = compileToEmailHtml({ ...this.document, rawHtml: undefined });
-          this.updateViews(true);
-          this.recordHistory();
-          this.emit('change', this.getJSON());
-        } else if (this.canvas) {
-          this.canvas.onStructureChanged();
-        } else {
-          this.emit('change', this.getJSON());
+    const baseSections = this.options.sections && this.options.sections.length > 0
+      ? [...this.options.sections]
+      : getDefaultSections();
+    const resolvedSections = this.options.customSections && this.options.customSections.length > 0
+      ? [...baseSections, ...this.options.customSections]
+      : baseSections;
+
+    this.rightPanel = new RightPanel(
+      {
+        onAddBlock: (type) => this.addBlock(type),
+        onAddRowLayout: (layout) => this.addRowLayout(layout),
+        onInsertSection: (section) => {
+          this.insertHTML(section.html);
+        },
+        onChange: (isDocumentSetting?: boolean) => {
+          if (isDocumentSetting) {
+            this.document.rawHtml = compileToEmailHtml({ ...this.document, rawHtml: undefined });
+            this.updateViews(true);
+            this.recordHistory();
+            this.emit('change', this.getJSON());
+          } else if (this.canvas) {
+            this.canvas.onStructureChanged();
+          } else {
+            this.emit('change', this.getJSON());
+          }
+        },
+        onRemoveBlock: (id) => this.removeBlock(id),
+        onMoveElement: (dir) => this.canvas?.moveSelectedElement(dir),
+        onDuplicateElement: () => this.canvas?.duplicateSelectedElement(),
+        onRemoveElement: () => this.canvas?.removeSelectedElement(),
+        onSelectParent: () => this.canvas?.selectParentUnit(),
+        onSelectElementNode: (el) => this.canvas?.selectUnit(el, el),
+        onDeselect: () => {
+          this.selectedElement = null;
+          this.selectedBlockId = null;
+          this.canvas?.clearSelection();
+          this.rightPanel?.update(this.document, null, null);
         }
       },
-      onRemoveBlock: (id) => this.removeBlock(id),
-      onMoveElement: (dir) => this.canvas?.moveSelectedElement(dir),
-      onDuplicateElement: () => this.canvas?.duplicateSelectedElement(),
-      onRemoveElement: () => this.canvas?.removeSelectedElement(),
-      onSelectParent: () => this.canvas?.selectParentUnit(),
-      onSelectElementNode: (el) => this.canvas?.selectUnit(el, el),
-      onDeselect: () => {
-        this.selectedElement = null;
-        this.selectedBlockId = null;
-        this.canvas?.clearSelection();
-        this.rightPanel?.update(this.document, null, null);
-      }
-    });
+      resolvedSections
+    );
 
     // 5. Assemble DOM Hierarchy: Canvas (left/main) + Right Panel (right)
     this.rootElement.appendChild(this.toolbar.getElement());

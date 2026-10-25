@@ -219,6 +219,25 @@ export interface ToolbarCustomButton {
 }
 
 /**
+ * A prebuilt or custom modular email section that can be dragged or clicked
+ * to insert directly into an email template.
+ */
+export interface PrebuiltSection {
+  /** Unique section identifier */
+  id: string;
+  /** Section display title */
+  name: string;
+  /** Section category (e.g. 'Header', 'Hero', 'Features', 'Call to Action', 'Footer', 'General') */
+  category: string;
+  /** Optional visual thumbnail: SVG string, image URL, or silhouette */
+  thumbnail?: string;
+  /** Optional description for search and tooltips */
+  description?: string;
+  /** Cross-client email-safe HTML markup */
+  html: string;
+}
+
+/**
  * Configuration options passed to `ArchEmailEditor.create(target, options)`.
  */
 export interface EditorOptions {
@@ -238,6 +257,10 @@ export interface EditorOptions {
   onTemplateNameChange?: (name: string) => void;
   /** Custom action buttons added to the top-right toolbar actions bar (e.g. Save, Send) */
   customButtons?: ToolbarCustomButton[];
+  /** Prebuilt modular sections library (overrides built-in sections if provided) */
+  sections?: PrebuiltSection[];
+  /** Custom modular sections array to append to the sections library */
+  customSections?: PrebuiltSection[];
   /** Callback fired whenever blocks, content, or settings change */
   onChange?: (doc: EmailDocument) => void;
   /** Callback fired when an element or block is selected */

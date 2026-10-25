@@ -23,6 +23,7 @@ if (typeof window !== 'undefined') {
 }
 
 export { ArchEmailEditor, compileToEmailHtml, getDefaultDocument, parseHtmlToDocument };
+export { DEFAULT_PREBUILT_SECTIONS, getDefaultSections } from './engine/sections';
 export { RightPanel } from './components/RightPanel';
 export { Inspector } from './components/Inspector';
 export default ArchEmailEditor;

@@ -15,7 +15,7 @@
  *   - Double-click (or clicking `✎`) locks into Text Selection Mode for highlighting characters inside text.
  */
 
-import { BlockType, EmailDocument, LayerNode, RowLayoutType, SelectedElementInfo, ViewportMode } from '../types';
+import { BlockType, EmailDocument, LayerNode, PrebuiltSection, RowLayoutType, SelectedElementInfo, ViewportMode } from '../types';
 import { compileToEmailHtml } from '../compiler';
 import {
   extractFrameMeta,
@@ -78,6 +78,7 @@ export interface CanvasEvents {
   onMoveBlock?: (id: string, direction: 'up' | 'down') => void;
   onRemoveBlock?: (id: string) => void;
   onInsertBlockAt?: (type: BlockType, targetIndex: number) => void;
+  onResolveSection?: (id: string) => PrebuiltSection | undefined;
   onUndo?: () => void;
   onRedo?: () => void;
 }
@@ -1138,6 +1139,16 @@ export class Canvas {
       const layout = data.replace(/^(arch-)?row:/, '') as RowLayoutType;
       this.insertRowLayout(layout, targetUnit, position);
       return;
+    }
+
+    // Case 2b: Dropping a modular Section from the palette
+    if (data.startsWith('arch-section:') || data.startsWith('section:')) {
+      const sectionId = data.replace(/^(arch-)?section:/, '');
+      const section = this.events.onResolveSection?.(sectionId);
+      if (section && section.html) {
+        this.insertHTML(section.html, targetUnit, position);
+        return;
+      }
     }
 
     // Case 3: Dropping a content block from the palette

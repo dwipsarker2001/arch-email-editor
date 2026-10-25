@@ -299,6 +299,91 @@ onMounted(() => {
 
 ---
 
+## 🧩 Modular Prebuilt Sections & Custom Sections Library
+
+The right sidebar features a dedicated **`SECTIONS`** tab populated with modular, production-ready email sections (Headers, Hero Banners, 2-Col and 3-Col Features, Call to Action, Story Articles, and Footers), plus Empty Column Layouts.
+
+You can configure, override, or append your own custom sections using JavaScript options and runtime methods.
+
+### 1. Adding Custom Sections via Options
+
+Pass `customSections` to append your branded templates alongside the built-in sections, or use `sections` to supply an exclusive custom library:
+
+```javascript
+import { ArchEmailEditor } from 'arch-email-editor';
+
+const editor = ArchEmailEditor.create('#editor-container', {
+  // Append custom modular sections to the library
+  customSections: [
+    {
+      id: 'brand-hero-launch',
+      name: 'Product Launch Hero',
+      category: 'Hero',
+      description: 'Bold dark hero with vibrant action button',
+      thumbnail: `<svg viewBox="0 0 160 80" width="100%" height="60" fill="none">
+        <rect width="160" height="80" fill="#0f172a" rx="4"/>
+        <rect x="20" y="24" width="120" height="12" rx="2" fill="#ffffff"/>
+        <rect x="50" y="44" width="60" height="14" rx="4" fill="#6366f1"/>
+      </svg>`,
+      html: `
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="row" style="background-color: #0f172a; width: 100%;">
+          <tr>
+            <td align="center" style="padding: 48px 24px; font-family: -apple-system, sans-serif;">
+              <h1 style="color: #ffffff; font-size: 28px; margin: 0 0 16px 0;">New Product Announcement</h1>
+              <p style="color: #94a3b8; font-size: 15px; margin: 0 0 24px 0;">Discover groundbreaking tools built for high performance.</p>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="background-color: #6366f1; border-radius: 6px;">
+                    <a href="https://example.com" class="button" style="color: #ffffff; padding: 12px 24px; text-decoration: none; font-weight: 600; display: inline-block;">
+                      Pre-order Now &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      `
+    }
+  ]
+});
+```
+
+### 2. Runtime Section Methods
+
+You can dynamically retrieve, add, update, or remove modular sections at any time:
+
+```javascript
+// Add a section dynamically
+editor.addSection({
+  id: 'promo-banner',
+  name: 'Flash Sale 50% Off',
+  category: 'Promotions',
+  html: '<table role="presentation" class="row"><tr><td style="background: #ef4444; color: #fff; padding: 20px; text-align: center;">🔥 50% OFF FLASH SALE</td></tr></table>'
+});
+
+// Retrieve all loaded sections
+const sections = editor.getSections();
+
+// Find a section by ID
+const heroSection = editor.getSectionById('brand-hero-launch');
+
+// Remove a section
+editor.removeSection('promo-banner');
+
+// Replace the entire sections catalog
+editor.setSections([
+  // ...array of PrebuiltSection objects
+]);
+```
+
+### 3. Click-to-Insert & Drag-and-Drop
+
+- **Click**: Click any section card in the sidebar or its `+` action button to insert it into the active position in the canvas.
+- **Drag & Drop**: Drag a section card directly into the email canvas; the editor's live layout indicator will guide placement and insert the section seamlessly.
+
+---
+
 ## ⚡ Dynamic HTML Injection & Content Management
 
 Arch Email Editor provides flexible APIs to programmatically manipulate email content dynamically via JavaScript:
@@ -445,6 +530,8 @@ Initializes and mounts the editor.
 | `editableTemplateName`| `boolean` | `true` | Allows inline click-to-edit rename in the toolbar. |
 | `onTemplateNameChange`| `(name: string) => void` | `undefined` | Callback fired when the template name changes. |
 | `customButtons` | `ToolbarCustomButton[]` | `[]` | Array of custom buttons in the top-right toolbar. |
+| `sections` | `PrebuiltSection[]` | Built-in sections | Custom modular sections catalog (replaces defaults). |
+| `customSections` | `PrebuiltSection[]` | `[]` | Additional modular sections appended to the catalog. |
 | `theme` | `'light' \| 'dark'` | `'light'` | UI chrome theme. |
 | `readOnly` | `boolean` | `false` | Disables editing mode. |
 | `onChange` | `(doc: EmailDocument) => void` | `undefined` | Fired when any content or structure changes. |
@@ -465,6 +552,19 @@ Initializes and mounts the editor.
 
 ---
 
+### `PrebuiltSection`
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `id` | `string` | Unique section identifier. |
+| `name` | `string` | Display name shown on the section card. |
+| `category` | `string` | Section category (e.g. `'Header'`, `'Hero'`, `'Features'`, `'Call to Action'`, `'Footer'`). |
+| `thumbnail` | `string` *(optional)* | SVG markup or image URL for the card visual preview. |
+| `description`| `string` *(optional)* | Tooltip description for search and filtering. |
+| `html` | `string` | 100% email-safe HTML table row markup. |
+
+---
+
 ### Instance Methods
 
 | Method | Return Type | Description |
@@ -473,6 +573,11 @@ Initializes and mounts the editor.
 | `setHTML(html)` | `void` | Loads and sets new email HTML content dynamically. |
 | `loadHTML(html)` | `void` | Alias for `setHTML()`. |
 | `insertHTML(snippet, options?)` | `void` | Injects custom HTML markup into the email dynamically. |
+| `getSections()` | `PrebuiltSection[]` | Returns copy of all modular sections currently loaded in the SECTIONS tab. |
+| `getSectionById(id)` | `PrebuiltSection \| undefined` | Finds a modular section by its unique ID. |
+| `setSections(sections)` | `void` | Replaces the modular sections library and refreshes the sidebar. |
+| `addSection(section)` | `void` | Adds or updates a modular section in the catalog. |
+| `removeSection(id)` | `void` | Removes a modular section from the catalog by its ID. |
 | `getJSON()` | `EmailDocument` | Returns deep clone of current JSON AST state. |
 | `setJSON(doc)` | `void` | Sets document state from a JSON AST. |
 | `importHTML(html)` | `void` | Imports and parses an HTML email template. |

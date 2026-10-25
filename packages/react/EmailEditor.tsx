@@ -12,7 +12,7 @@
 
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { ArchEmailEditor } from '../../src/editor';
-import { EmailDocument, EditorOptions, ToolbarCustomButton } from '../../src/types';
+import { EmailDocument, EditorOptions, PrebuiltSection, ToolbarCustomButton } from '../../src/types';
 
 export interface ReactEmailEditorProps extends Omit<EditorOptions, 'target'> {
   /** Optional custom CSS class name for the wrapper element */
@@ -42,6 +42,16 @@ export interface ReactEmailEditorRef {
   addCustomButton: (button: ToolbarCustomButton) => void;
   /** Removes a custom button by id */
   removeCustomButton: (buttonId: string) => void;
+  /** Gets the current loaded modular sections */
+  getSections: () => PrebuiltSection[];
+  /** Gets a modular section by its unique ID */
+  getSectionById: (id: string) => PrebuiltSection | undefined;
+  /** Replaces modular sections library */
+  setSections: (sections: PrebuiltSection[]) => void;
+  /** Adds a custom modular section */
+  addSection: (section: PrebuiltSection) => void;
+  /** Removes a modular section by id */
+  removeSection: (id: string) => void;
 }
 
 export const ReactEmailEditor = forwardRef<ReactEmailEditorRef, ReactEmailEditorProps>(
@@ -54,6 +64,8 @@ export const ReactEmailEditor = forwardRef<ReactEmailEditorRef, ReactEmailEditor
       editableTemplateName,
       onTemplateNameChange,
       customButtons,
+      sections,
+      customSections,
       onChange,
       onSelectBlock,
       className,
@@ -85,6 +97,8 @@ export const ReactEmailEditor = forwardRef<ReactEmailEditorRef, ReactEmailEditor
         templateName,
         editableTemplateName,
         customButtons,
+        sections,
+        customSections,
         onTemplateNameChange: (name) => onTemplateNameChangeRef.current?.(name),
         onChange: (doc) => onChangeRef.current?.(doc),
         onSelectBlock: (block) => onSelectBlockRef.current?.(block)
@@ -130,6 +144,21 @@ export const ReactEmailEditor = forwardRef<ReactEmailEditorRef, ReactEmailEditor
       },
       removeCustomButton(buttonId: string) {
         editorInstance.current?.removeCustomButton(buttonId);
+      },
+      getSections() {
+        return editorInstance.current ? editorInstance.current.getSections() : [];
+      },
+      getSectionById(id: string) {
+        return editorInstance.current?.getSectionById(id);
+      },
+      setSections(newSections: PrebuiltSection[]) {
+        editorInstance.current?.setSections(newSections);
+      },
+      addSection(newSection: PrebuiltSection) {
+        editorInstance.current?.addSection(newSection);
+      },
+      removeSection(id: string) {
+        editorInstance.current?.removeSection(id);
       }
     }));
 

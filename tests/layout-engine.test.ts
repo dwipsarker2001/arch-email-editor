@@ -604,11 +604,11 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     expect(movedIntoSlot).toBe(true);
     expect(row11Border.contains(row2Block)).toBe(true);
 
-    // 5. Right panel has 3 tabs: CONTENT | ROWS | SETTINGS (matching RGE Studio)
+    // 5. Right panel has 3 tabs: CONTENT | SECTIONS | SETTINGS (matching RGE Studio)
     const rightPanelTabs = Array.from(container.querySelectorAll('.arch-right-tab')).map((t) =>
       (t.textContent || '').trim()
     );
-    expect(rightPanelTabs).toEqual(['CONTENT', 'ROWS', 'SETTINGS']);
+    expect(rightPanelTabs).toEqual(['CONTENT', 'SECTIONS', 'SETTINGS']);
 
     // 6. Exported HTML must not leak draggable="true"
     const exported = editor.getHTML();
