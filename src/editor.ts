@@ -120,6 +120,34 @@ export class ArchEmailEditor {
     return this.rightPanel?.getAssets() || [];
   }
 
+  public setReadOnly(readOnly: boolean): void {
+    this.options.readOnly = readOnly;
+    if (readOnly) {
+      this.rootElement?.classList.add('arch-editor--readonly');
+    } else {
+      this.rootElement?.classList.remove('arch-editor--readonly');
+    }
+    this.canvas?.setReadOnly(readOnly);
+    this.rightPanel?.setReadOnly(readOnly);
+  }
+
+  public isReadOnly(): boolean {
+    return Boolean(this.options.readOnly);
+  }
+
+  public setTheme(theme: 'light' | 'dark'): void {
+    this.options.theme = theme;
+    if (theme === 'dark') {
+      this.rootElement?.classList.add('arch-theme--dark');
+    } else {
+      this.rootElement?.classList.remove('arch-theme--dark');
+    }
+  }
+
+  public getTheme(): 'light' | 'dark' {
+    return this.options.theme === 'dark' ? 'dark' : 'light';
+  }
+
   public getOptions(): EditorOptions {
     return this.options;
   }
@@ -472,6 +500,12 @@ export class ArchEmailEditor {
   private mount(): void {
     this.rootElement = document.createElement('div');
     this.rootElement.className = 'arch-editor';
+    if (this.options.readOnly) {
+      this.rootElement.classList.add('arch-editor--readonly');
+    }
+    if (this.options.theme === 'dark') {
+      this.rootElement.classList.add('arch-theme--dark');
+    }
     this.container.innerHTML = '';
     this.container.appendChild(this.rootElement);
 
@@ -597,6 +631,11 @@ export class ArchEmailEditor {
       },
       resolvedSections
     );
+
+    if (this.options.readOnly) {
+      this.canvas.setReadOnly(true);
+      this.rightPanel.setReadOnly(true);
+    }
 
     // 5. Assemble DOM Hierarchy: Canvas (left/main) + Right Panel (right)
     this.rootElement.appendChild(this.toolbar.getElement());

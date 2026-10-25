@@ -99,6 +99,27 @@ export class RightPanel {
     this.render();
   }
 
+  private readOnly: boolean = false;
+
+  public setReadOnly(readOnly: boolean): void {
+    this.readOnly = readOnly;
+    if (readOnly) {
+      this.element.classList.add('arch-right-panel--readonly');
+      this.element.querySelectorAll<HTMLElement>('.arch-block-card').forEach((card) => {
+        card.setAttribute('draggable', 'false');
+      });
+    } else {
+      this.element.classList.remove('arch-right-panel--readonly');
+      this.element.querySelectorAll<HTMLElement>('.arch-block-card').forEach((card) => {
+        card.setAttribute('draggable', 'true');
+      });
+    }
+  }
+
+  public isReadOnly(): boolean {
+    return this.readOnly;
+  }
+
   public getElement(): HTMLElement {
     return this.element;
   }

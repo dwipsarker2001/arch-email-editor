@@ -142,6 +142,7 @@ export class Canvas {
     startPadY?: number;
   } | null = null;
   private columnResizeHandles: HTMLElement[] = [];
+  private readOnly: boolean = false;
   private activeColumnResize: {
     handle: HTMLElement;
     row: HTMLElement;
@@ -220,6 +221,32 @@ export class Canvas {
     const redoBtn = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--redo');
     if (undoBtn) undoBtn.disabled = !canUndo;
     if (redoBtn) redoBtn.disabled = !canRedo;
+  }
+
+  public setReadOnly(readOnly: boolean): void {
+    this.readOnly = readOnly;
+    if (readOnly) {
+      this.clearSelection();
+      this.exitTextEditMode();
+      this.removeFloatingToolbar();
+      if (this.floatingHistory) this.floatingHistory.style.display = 'none';
+      const ifrDoc = this.iframe.contentDocument;
+      if (ifrDoc) {
+        ifrDoc.body.querySelectorAll('[contenteditable]').forEach((el) => {
+          el.removeAttribute('contenteditable');
+        });
+      }
+    } else {
+      if (this.floatingHistory) this.floatingHistory.style.display = '';
+      const ifrDoc = this.iframe.contentDocument;
+      if (ifrDoc) {
+        this.enableDirectEditing(ifrDoc);
+      }
+    }
+  }
+
+  public isReadOnly(): boolean {
+    return this.readOnly;
   }
 
   public getElement(): HTMLElement {
@@ -1414,6 +1441,13 @@ export class Canvas {
    */
   public enableDirectEditing(doc: Document): void {
     if (!doc.body) return;
+    if (this.readOnly) {
+      doc.body.querySelectorAll('[contenteditable]').forEach((el) => {
+        el.removeAttribute('contenteditable');
+        el.removeAttribute('spellcheck');
+      });
+      return;
+    }
 
     ensureEmptyColumnPlaceholders(doc);
 
@@ -1962,6 +1996,7 @@ export class Canvas {
    * Handles Figma-style Double-Click Drill-Down (`Row Frame` -> `Column Frame` -> `Block Frame (td)` -> `Leaf (p / a / img)` -> `Inline Text Edit`).
    */
   public handleIframeDoubleClick(e: MouseEvent): void {
+    if (this.readOnly) return;
     const target = e.target as HTMLElement | null;
     if (!target) return;
 
@@ -2160,6 +2195,7 @@ export class Canvas {
    */
   private renderFloatingToolbar(unit: HTMLElement, innerTarget?: HTMLElement): void {
     this.removeFloatingToolbar();
+    if (this.readOnly) return;
 
     const editableHost = findEditableTextHost(innerTarget || this.selectedElement || unit, unit);
     const ifrDoc = this.iframe.contentDocument;
@@ -2837,6 +2873,10 @@ export class Canvas {
     doc.addEventListener(
       'dragstart',
       (e: DragEvent) => {
+        if (this.readOnly) {
+          e.preventDefault();
+          return;
+        }
         const target = e.target as HTMLElement | null;
         if (!target) return;
 
@@ -2875,6 +2915,10 @@ export class Canvas {
     doc.addEventListener(
       'dragover',
       (e: DragEvent) => {
+        if (this.readOnly) {
+          e.preventDefault();
+          return;
+        }
         e.preventDefault();
         if (e.dataTransfer) {
           e.dataTransfer.dropEffect = this.draggedUnit ? 'move' : 'copy';
@@ -2902,6 +2946,10 @@ export class Canvas {
     doc.addEventListener(
       'drop',
       (e: DragEvent) => {
+        if (this.readOnly) {
+          e.preventDefault();
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         const data = e.dataTransfer?.getData('text/plain') || '';

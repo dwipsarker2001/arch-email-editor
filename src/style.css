@@ -3172,3 +3172,139 @@ input:checked + .arch-toggle-slider:before {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
 }
 
+
+
+/* ==========================================================================
+   Read-Only Mode
+   ========================================================================== */
+.arch-editor--readonly .arch-canvas-floating-toolbar,
+.arch-editor--readonly .arch-canvas-floating-history,
+.arch-editor--readonly .arch-resize-handle,
+.arch-editor--readonly .arch-column-resize-handle,
+.arch-editor--readonly .arch-rge-bottom-actions,
+.arch-editor--readonly .arch-drop-indicator {
+  display: none !important;
+}
+
+.arch-editor--readonly .arch-block-card,
+.arch-editor--readonly .arch-section-card {
+  cursor: not-allowed !important;
+  opacity: 0.6 !important;
+  pointer-events: none !important;
+}
+
+.arch-editor--readonly .arch-btn--import-html,
+.arch-editor--readonly .arch-btn--clear,
+.arch-editor--readonly .arch-btn--undo,
+.arch-editor--readonly .arch-btn--redo {
+  display: none !important;
+}
+
+.arch-editor--readonly .arch-editor__inspector input,
+.arch-editor--readonly .arch-editor__inspector select,
+.arch-editor--readonly .arch-editor__inspector textarea,
+.arch-editor--readonly .arch-editor__inspector button:not(.arch-tab-btn):not(.arch-accordion-header) {
+  pointer-events: none !important;
+  opacity: 0.65 !important;
+  cursor: not-allowed !important;
+}
+
+/* ==========================================================================
+   Dark Theme Support
+   ========================================================================== */
+.arch-editor.arch-theme--dark,
+.arch-theme--dark {
+  --arch-bg-main: #0b0f19;
+  --arch-bg-surface: #1e293b;
+  --arch-border: #334155;
+  --arch-text-primary: #f8fafc;
+  --arch-text-secondary: #94a3b8;
+  --arch-primary: #3b82f6;
+  --arch-primary-hover: #60a5fa;
+  background-color: #0b0f19 !important;
+  color: #f8fafc !important;
+}
+
+.arch-theme--dark .arch-toolbar {
+  background-color: #1e293b !important;
+  border-bottom-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+.arch-theme--dark .arch-toolbar__title {
+  color: #f8fafc !important;
+}
+
+.arch-theme--dark .arch-right-panel,
+.arch-theme--dark .arch-editor__inspector,
+.arch-theme--dark .arch-tabs-header,
+.arch-theme--dark .arch-assets-sidepanel,
+.arch-theme--dark .arch-inspector-body {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+.arch-theme--dark .arch-editor__canvas {
+  background-color: #0b0f19 !important;
+}
+
+.arch-theme--dark .arch-block-card,
+.arch-theme--dark .arch-section-card {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+.arch-theme--dark .arch-block-card:hover,
+.arch-theme--dark .arch-section-card:hover {
+  background-color: #1e293b !important;
+  border-color: #3b82f6 !important;
+}
+
+.arch-theme--dark .arch-block-card__title,
+.arch-theme--dark .arch-section-card__title {
+  color: #f8fafc !important;
+}
+
+.arch-theme--dark .arch-block-card__desc,
+.arch-theme--dark .arch-section-card__desc {
+  color: #94a3b8 !important;
+}
+
+.arch-theme--dark .arch-tab-btn {
+  color: #94a3b8 !important;
+}
+
+.arch-theme--dark .arch-tab-btn.is-active {
+  color: #3b82f6 !important;
+  border-bottom-color: #3b82f6 !important;
+}
+
+.arch-theme--dark .arch-input,
+.arch-theme--dark .arch-select,
+.arch-theme--dark .arch-url-input,
+.arch-theme--dark .arch-search-input {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+.arch-theme--dark .arch-btn:not(.arch-btn--primary) {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+.arch-theme--dark .arch-sub-heading,
+.arch-theme--dark .arch-form-label,
+.arch-theme--dark .arch-form-label-sub,
+.arch-theme--dark .arch-rge-label {
+  color: #94a3b8 !important;
+}
+
+.arch-theme--dark .arch-accordion-header {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}

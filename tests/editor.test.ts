@@ -907,4 +907,65 @@ describe('ArchEmailEditor Core Engine', () => {
 
     editor.destroy();
   });
+  it('supports readOnly mode and prevents direct editing or dragging', () => {
+    const roContainer = document.createElement('div');
+    document.body.appendChild(roContainer);
+
+    const roEditor = new ArchEmailEditor(roContainer, { readOnly: true });
+    expect(roEditor.isReadOnly()).toBe(true);
+
+    const rootEl = roContainer.querySelector('.arch-editor');
+    expect(rootEl?.classList.contains('arch-editor--readonly')).toBe(true);
+
+    const iframe = roContainer.querySelector<HTMLIFrameElement>('.arch-canvas-iframe');
+    const ifrDoc = iframe?.contentDocument;
+    expect(ifrDoc).toBeDefined();
+
+    // In read-only mode, no elements should have contenteditable="true"
+    const editableElements = ifrDoc?.querySelectorAll('[contenteditable="true"]');
+    expect(editableElements?.length).toBe(0);
+
+    // Right panel block cards should not be draggable
+    const cards = roContainer.querySelectorAll('.arch-block-card');
+    cards.forEach((card) => {
+      expect(card.getAttribute('draggable')).toBe('false');
+    });
+
+    // Dynamic setReadOnly toggle to false
+    roEditor.setReadOnly(false);
+    expect(roEditor.isReadOnly()).toBe(false);
+    expect(rootEl?.classList.contains('arch-editor--readonly')).toBe(false);
+
+    // Dynamic setReadOnly toggle back to true
+    roEditor.setReadOnly(true);
+    expect(roEditor.isReadOnly()).toBe(true);
+    expect(rootEl?.classList.contains('arch-editor--readonly')).toBe(true);
+
+    roEditor.destroy();
+    roContainer.remove();
+  });
+
+  it('supports dark theme and runtime theme switching', () => {
+    const darkContainer = document.createElement('div');
+    document.body.appendChild(darkContainer);
+
+    const darkEditor = new ArchEmailEditor(darkContainer, { theme: 'dark' });
+    expect(darkEditor.getTheme()).toBe('dark');
+
+    const rootEl = darkContainer.querySelector('.arch-editor');
+    expect(rootEl?.classList.contains('arch-theme--dark')).toBe(true);
+
+    // Switch theme dynamically to light
+    darkEditor.setTheme('light');
+    expect(darkEditor.getTheme()).toBe('light');
+    expect(rootEl?.classList.contains('arch-theme--dark')).toBe(false);
+
+    // Switch theme dynamically back to dark
+    darkEditor.setTheme('dark');
+    expect(darkEditor.getTheme()).toBe('dark');
+    expect(rootEl?.classList.contains('arch-theme--dark')).toBe(true);
+
+    darkEditor.destroy();
+    darkContainer.remove();
+  });
 });
