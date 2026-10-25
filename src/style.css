@@ -97,6 +97,13 @@
   color: var(--arch-text-primary);
 }
 
+.arch-editor__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--arch-primary);
+}
+
 .arch-template-name {
   cursor: pointer;
   padding: 2px 6px;
@@ -457,10 +464,10 @@
 
 .arch-editor__section-label {
   font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--arch-text-secondary);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #6b7280;
   margin-bottom: 4px;
 }
 
@@ -486,8 +493,17 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
+/* `.arch-editor button` is more specific, so restate the tile label look here. */
+.arch-editor .arch-palette-item {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #3f3f46;
+}
+
 .arch-block-svg {
-  color: #374151;
+  color: #52525b;
   transition: transform 0.15s ease, color 0.15s ease;
 }
 

@@ -174,35 +174,93 @@ export class Toolbar {
   private render(): void {
     this.element.innerHTML = `
       <div class="arch-editor__title">
-        <span>📬</span>
+        <span class="arch-editor__logo">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="20" height="16" x="2" y="4" rx="2"/>
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+          </svg>
+        </span>
         <span class="arch-template-name" title="Click to rename template">${this.templateName}</span>
-        ${this.editableTemplateName ? '<button class="arch-btn-rename-icon" type="button" title="Rename template">✎</button>' : ''}
+        ${this.editableTemplateName ? `
+          <button class="arch-btn-rename-icon" type="button" title="Rename template">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+            </svg>
+          </button>
+        ` : ''}
         <span class="arch-size-badge" title="Email HTML size (Gmail limit: 102 KB)">0.0 KB</span>
       </div>
       <div class="arch-toolbar-center">
         <div class="arch-btn-group">
-          <button class="arch-btn arch-btn--icon arch-btn--undo" type="button" title="Undo (Ctrl+Z)" disabled>↶</button>
-          <button class="arch-btn arch-btn--icon arch-btn--redo" type="button" title="Redo (Ctrl+Y)" disabled>↷</button>
+          <button class="arch-btn arch-btn--icon arch-btn--undo" type="button" title="Undo (Ctrl+Z)" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 14 4 9l5-5"/>
+              <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/>
+            </svg>
+          </button>
+          <button class="arch-btn arch-btn--icon arch-btn--redo" type="button" title="Redo (Ctrl+Y)" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m15 14 5-5-5-5"/>
+              <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13"/>
+            </svg>
+          </button>
         </div>
         <div class="arch-btn-group arch-viewport-switcher">
-          <button class="arch-btn arch-btn--viewport is-active" type="button" data-viewport="desktop" title="Desktop View (100%)">🖥️ Desktop</button>
-          <button class="arch-btn arch-btn--viewport" type="button" data-viewport="tablet" title="Tablet View (768px)">📱 Tablet</button>
-          <button class="arch-btn arch-btn--viewport" type="button" data-viewport="mobile" title="Mobile View (375px)">📱 Mobile</button>
+          <button class="arch-btn arch-btn--viewport is-active" type="button" data-viewport="desktop" title="Desktop View (100%)">
+            <svg class="arch-btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="20" height="14" x="2" y="3" rx="2"/>
+              <line x1="8" x2="16" y1="21" y2="21"/>
+              <line x1="12" x2="12" y1="17" y2="21"/>
+            </svg>
+            <span>Desktop</span>
+          </button>
+          <button class="arch-btn arch-btn--viewport" type="button" data-viewport="tablet" title="Tablet View (768px)">
+            <svg class="arch-btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="16" height="20" x="4" y="2" rx="2"/>
+              <line x1="12" x2="12.01" y1="18" y2="18"/>
+            </svg>
+            <span>Tablet</span>
+          </button>
+          <button class="arch-btn arch-btn--viewport" type="button" data-viewport="mobile" title="Mobile View (375px)">
+            <svg class="arch-btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="14" height="20" x="5" y="2" rx="2"/>
+              <line x1="12" x2="12.01" y1="18" y2="18"/>
+            </svg>
+            <span>Mobile</span>
+          </button>
         </div>
       </div>
       <div class="arch-editor__actions">
         <div class="arch-custom-buttons"></div>
         <button class="arch-btn arch-btn--import-html" type="button" title="Load a prebuilt HTML newsletter">
-          📥 Import HTML
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>Import HTML</span>
         </button>
         <button class="arch-btn arch-btn--export-json" type="button" title="Export template as JSON schema">
-          Export JSON
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span>Export JSON</span>
         </button>
         <button class="arch-btn arch-btn--primary arch-btn--export-html" type="button" title="Export client-safe HTML">
-          Export HTML
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"/>
+            <polyline points="8 6 2 12 8 18"/>
+          </svg>
+          <span>Export HTML</span>
         </button>
         <button class="arch-btn arch-btn--danger arch-btn--clear" type="button" title="Clear all blocks">
-          Clear
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18"/>
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+          </svg>
+          <span>Clear</span>
         </button>
       </div>
     `;
