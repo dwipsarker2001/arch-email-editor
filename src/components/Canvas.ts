@@ -889,7 +889,7 @@ export class Canvas {
   /**
    * Executes a drop operation (either moving `this.draggedUnit` or inserting a block/row from the Assets Palette).
    */
-  private executeDrop(data: string): void {
+  public executeDrop(data: string): void {
     const targetUnit = this.hoveredDropTarget;
     const position = this.hoveredDropPosition;
     this.clearDropIndicators();
@@ -917,16 +917,27 @@ export class Canvas {
     }
 
     // Case 2: Dropping a multi-column Row Layout from the palette
-    if (data.startsWith('arch-row:')) {
-      const layout = data.replace('arch-row:', '') as RowLayoutType;
-      this.insertRowLayout(layout, targetUnit);
+    if (data.startsWith('arch-row:') || data.startsWith('row:')) {
+      const layout = data.replace(/^(arch-)?row:/, '') as RowLayoutType;
+      this.insertRowLayout(layout, targetUnit, position);
       return;
     }
 
     // Case 3: Dropping a content block from the palette
     if (data && data !== 'arch-move-unit') {
       const blockType = (data.startsWith('arch-block:') ? 'button' : data) as BlockType;
-      this.insertBlock(blockType, targetUnit);
+      let targetIdx = -1;
+      if (targetUnit && targetUnit.parentElement) {
+        const peers = getMoveableSiblings(targetUnit);
+        const refIdx = peers.indexOf(targetUnit);
+        if (refIdx !== -1) {
+          targetIdx = position === 'before' ? refIdx : refIdx + 1;
+        }
+      }
+      this.insertBlock(blockType, targetUnit, position);
+      if (this.events.onInsertBlockAt && targetIdx !== -1) {
+        this.events.onInsertBlockAt(blockType, targetIdx);
+      }
     }
   }
 
@@ -2359,7 +2370,11 @@ export class Canvas {
   /**
    * Inserts a context-aware email block at the target unit or canonical column slot container (Fixes R3).
    */
-  public insertBlock(type: BlockType, targetElement?: HTMLElement | null): void {
+  public insertBlock(
+    type: BlockType,
+    targetElement?: HTMLElement | null,
+    position: 'before' | 'after' = 'after'
+  ): void {
     const ifrDoc = this.iframe.contentDocument;
     if (!ifrDoc || !ifrDoc.body) return;
 
@@ -2370,20 +2385,29 @@ export class Canvas {
       if (isColumnElement(refUnit)) {
         const slot = getColumnSlotContainer(refUnit);
         const snippet = buildContextAwareBlockHtml(type, slot.tagName.toLowerCase());
-        slot.insertAdjacentHTML('beforeend', snippet);
-        insertedEl = slot.lastElementChild as HTMLElement;
+        const insertPosition = position === 'before' ? 'afterbegin' : 'beforeend';
+        slot.insertAdjacentHTML(insertPosition, snippet);
+        insertedEl = position === 'before'
+          ? (slot.firstElementChild as HTMLElement)
+          : (slot.lastElementChild as HTMLElement);
       } else {
         const parentTag = refUnit.parentElement.tagName.toLowerCase();
         const snippet = buildContextAwareBlockHtml(type, parentTag);
-        refUnit.insertAdjacentHTML('afterend', snippet);
-        insertedEl = refUnit.nextElementSibling as HTMLElement;
+        const insertPosition = position === 'before' ? 'beforebegin' : 'afterend';
+        refUnit.insertAdjacentHTML(insertPosition, snippet);
+        insertedEl = position === 'before'
+          ? (refUnit.previousElementSibling as HTMLElement)
+          : (refUnit.nextElementSibling as HTMLElement);
       }
     } else {
       const container = findPrimaryContentContainer(ifrDoc);
       const containerTag = container.tagName.toLowerCase();
       const snippet = buildContextAwareBlockHtml(type, containerTag);
-      container.insertAdjacentHTML('beforeend', snippet);
-      insertedEl = container.lastElementChild as HTMLElement;
+      const insertPosition = position === 'before' ? 'afterbegin' : 'beforeend';
+      container.insertAdjacentHTML(insertPosition, snippet);
+      insertedEl = position === 'before'
+        ? (container.firstElementChild as HTMLElement)
+        : (container.lastElementChild as HTMLElement);
     }
 
     this.onStructureChanged();
@@ -2398,7 +2422,11 @@ export class Canvas {
   /**
    * Inserts a new multi-column Row Section into the email layout.
    */
-  public insertRowLayout(layout: RowLayoutType, targetElement?: HTMLElement | null): void {
+  public insertRowLayout(
+    layout: RowLayoutType,
+    targetElement?: HTMLElement | null,
+    position: 'before' | 'after' = 'after'
+  ): void {
     const ifrDoc = this.iframe.contentDocument;
     if (!ifrDoc || !ifrDoc.body) return;
 
@@ -2417,17 +2445,25 @@ export class Canvas {
       const parentTag = effectiveRow.parentElement.tagName.toLowerCase();
       const wrapInTr = parentTag === 'tbody' || parentTag === 'table';
       const html = buildRowLayoutHtml(layout, wrapInTr);
-      effectiveRow.insertAdjacentHTML('afterend', html);
-      insertedRow = effectiveRow.nextElementSibling as HTMLElement;
+      const insertPosition = position === 'before' ? 'beforebegin' : 'afterend';
+      effectiveRow.insertAdjacentHTML(insertPosition, html);
+      insertedRow = position === 'before'
+        ? (effectiveRow.previousElementSibling as HTMLElement)
+        : (effectiveRow.nextElementSibling as HTMLElement);
     } else {
       const existingRows = ifrDoc.body.querySelectorAll<HTMLElement>('table.row, section');
       if (existingRows.length > 0) {
-        const lastRow = resolveEffectiveMoveUnit(existingRows[existingRows.length - 1]);
-        const parentTag = lastRow.parentElement?.tagName.toLowerCase() || 'td';
+        const targetRow = position === 'before'
+          ? resolveEffectiveMoveUnit(existingRows[0])
+          : resolveEffectiveMoveUnit(existingRows[existingRows.length - 1]);
+        const parentTag = targetRow.parentElement?.tagName.toLowerCase() || 'td';
         const wrapInTr = parentTag === 'tbody' || parentTag === 'table';
         const html = buildRowLayoutHtml(layout, wrapInTr);
-        lastRow.insertAdjacentHTML('afterend', html);
-        insertedRow = lastRow.nextElementSibling as HTMLElement;
+        const insertPosition = position === 'before' ? 'beforebegin' : 'afterend';
+        targetRow.insertAdjacentHTML(insertPosition, html);
+        insertedRow = position === 'before'
+          ? (targetRow.previousElementSibling as HTMLElement)
+          : (targetRow.nextElementSibling as HTMLElement);
       } else {
         const container = findPrimaryContentContainer(ifrDoc);
         const rowContainer = isColumnElement(container)
@@ -2436,8 +2472,11 @@ export class Canvas {
         const containerTag = rowContainer.tagName.toLowerCase();
         const wrapInTr = containerTag === 'tbody' || containerTag === 'table';
         const html = buildRowLayoutHtml(layout, wrapInTr);
-        rowContainer.insertAdjacentHTML('beforeend', html);
-        insertedRow = rowContainer.lastElementChild as HTMLElement;
+        const insertPosition = position === 'before' ? 'afterbegin' : 'beforeend';
+        rowContainer.insertAdjacentHTML(insertPosition, html);
+        insertedRow = position === 'before'
+          ? (rowContainer.firstElementChild as HTMLElement)
+          : (rowContainer.lastElementChild as HTMLElement);
       }
     }
 

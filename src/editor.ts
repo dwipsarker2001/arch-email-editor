@@ -397,7 +397,15 @@ export class ArchEmailEditor {
       },
       onAddBlock: (type) => this.addBlock(type),
       onReorderBlock: (sourceId, targetIdx) => this.reorderBlock(sourceId, targetIdx),
-      onInsertBlockAt: (type, targetIdx) => this.insertBlockAt(type, targetIdx),
+      onInsertBlockAt: (type, targetIdx) => {
+        if (this.document.blocks && this.document.blocks.length > 0) {
+          const newBlock = this.createBlock(type);
+          const safeIndex = Math.max(0, Math.min(targetIdx, this.document.blocks.length));
+          this.document.blocks.splice(safeIndex, 0, newBlock);
+          this.selectedBlockId = newBlock.id;
+          this.emit('select', newBlock);
+        }
+      },
       onMoveBlock: (id, dir) => this.moveBlock(id, dir),
       onRemoveBlock: (id) => this.removeBlock(id)
     });

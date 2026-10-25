@@ -123,6 +123,51 @@ describe('ArchEmailEditor Core Engine', () => {
     editor.destroy();
   });
 
+  it('inserts dropped palette block at exact position (before vs after target image)', () => {
+    const editor = ArchEmailEditor.create(container);
+    const canvas = (editor as any).canvas;
+    const ifrDoc = canvas.iframe.contentDocument!;
+
+    // 1. Target the image block at index 1
+    const imgEl = ifrDoc.querySelector('img')!;
+    const imageUnit = canvas.findMoveableUnit(imgEl);
+    expect(imageUnit).toBeTruthy();
+
+    // 2. Drop heading on top half of image (position: 'before') -> must land at index 1 (before image)
+    (canvas as any).hoveredDropTarget = imageUnit;
+    (canvas as any).hoveredDropPosition = 'before';
+    canvas.executeDrop('heading');
+
+    expect(imageUnit.previousElementSibling?.tagName.toLowerCase()).toBe('tr');
+    expect(imageUnit.previousElementSibling?.textContent).toContain('New Heading');
+
+    const docBefore = editor.getJSON();
+    expect(docBefore.blocks[0].type).toBe('heading'); // original heading
+    expect(docBefore.blocks[1].type).toBe('heading'); // newly inserted heading at position 1
+    expect(docBefore.blocks[2].type).toBe('image');   // image moved down to position 2
+
+    // 3. Drop paragraph on bottom half of image (position: 'after') -> must land at index 3 (after image)
+    (canvas as any).hoveredDropTarget = imageUnit;
+    (canvas as any).hoveredDropPosition = 'after';
+    canvas.executeDrop('text');
+
+    expect(imageUnit.nextElementSibling?.tagName.toLowerCase()).toBe('tr');
+    expect(imageUnit.nextElementSibling?.textContent).toContain('Add your newsletter copy here');
+
+    const docAfter = editor.getJSON();
+    expect(docAfter.blocks[2].type).toBe('image');
+    expect(docAfter.blocks[3].type).toBe('text');
+
+    // 4. Drop multi-column row layout with 'row:2-col-50-50' above image
+    (canvas as any).hoveredDropTarget = imageUnit;
+    (canvas as any).hoveredDropPosition = 'before';
+    canvas.executeDrop('row:2-col-50-50');
+
+    expect(imageUnit.previousElementSibling?.innerHTML).toContain('Column 1 content');
+
+    editor.destroy();
+  });
+
   it('imports complex multi-column HTML email template losslessly without breaking styles or tables', () => {
     const editor = ArchEmailEditor.create(container);
 
