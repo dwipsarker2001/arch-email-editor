@@ -1115,17 +1115,17 @@ export class Canvas {
         border: 2px dashed #cbd5e1 !important;
         background-color: #f8fafc !important;
         border-radius: 6px !important;
-        padding: 18px 12px !important;
+        padding: 24px 14px !important;
         text-align: center !important;
         cursor: pointer !important;
         user-select: none !important;
         -webkit-user-select: none !important;
-        min-height: 58px !important;
+        min-height: 80px !important;
         display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 6px !important;
+        gap: 8px !important;
         margin: 4px 0 !important;
         overflow: hidden !important;
         transition: border-color 0.15s ease, background-color 0.15s ease !important;
@@ -1146,8 +1146,8 @@ export class Canvas {
       td[width*="25%"] .arch-empty-col-placeholder,
       td[width*="33%"] .arch-empty-col-placeholder,
       td[width*="30%"] .arch-empty-col-placeholder {
-        padding: 12px 6px !important;
-        min-height: 46px !important;
+        padding: 24px 8px !important;
+        min-height: 80px !important;
         gap: 0 !important;
       }
       .arch-empty-col-placeholder.arch-empty-col-narrow span,
@@ -1161,8 +1161,8 @@ export class Canvas {
           display: none !important;
         }
         .arch-empty-col-placeholder {
-          padding: 12px 6px !important;
-          min-height: 46px !important;
+          padding: 24px 8px !important;
+          min-height: 80px !important;
           gap: 0 !important;
         }
       }

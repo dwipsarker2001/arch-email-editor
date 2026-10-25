@@ -725,8 +725,8 @@ export function buildEmptyColumnPlaceholderHtml(isNarrow = false): string {
     ? ''
     : `<span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 500; color: #64748b; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: block;">No content here. Drag content from the right.</span>`;
 
-  return `<div class="arch-empty-col-placeholder${narrowClass}" data-arch-placeholder="true" title="No content here. Drag content from the right." style="box-sizing: border-box; border: 2px dashed #cbd5e1; background-color: #f8fafc; border-radius: 6px; padding: ${isNarrow ? '14px 8px' : '20px 12px'}; text-align: center; cursor: pointer; user-select: none; -webkit-user-select: none; min-height: ${isNarrow ? '48px' : '64px'}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; overflow: hidden;">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="2 2" style="display: block; flex-shrink: 0;">
+  return `<div class="arch-empty-col-placeholder${narrowClass}" data-arch-placeholder="true" title="No content here. Drag content from the right." style="box-sizing: border-box; border: 2px dashed #cbd5e1; background-color: #f8fafc; border-radius: 6px; padding: ${isNarrow ? '24px 8px' : '24px 14px'}; text-align: center; cursor: pointer; user-select: none; -webkit-user-select: none; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; overflow: hidden;">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="2 2" style="display: block; flex-shrink: 0;">
       <rect x="3" y="3" width="18" height="18" rx="3"></rect>
       <line x1="12" y1="8" x2="12" y2="16" stroke-dasharray="none"></line>
       <line x1="8" y1="12" x2="16" y2="12" stroke-dasharray="none"></line>
