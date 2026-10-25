@@ -1321,13 +1321,23 @@ export class Canvas {
         background-color: #7747ff !important;
         color: #ffffff !important;
       }
-      .arch-selected-element {
+      .arch-selected-element:not(.arch-has-hovered-child) {
         outline: 2px solid #7747ff !important;
         outline-offset: -2px !important;
+      }
+      .arch-selected-element.arch-has-hovered-child {
+        outline: none !important;
       }
       .arch-hover-element:not(.arch-selected-element) {
         outline: 1.5px solid rgba(119, 71, 255, 0.75) !important;
         outline-offset: -1.5px;
+      }
+      /* Smart single-outline enforcement: never show borders on parent and child simultaneously */
+      .arch-selected-element .arch-selected-element,
+      .arch-selected-element .arch-hover-element,
+      .arch-hover-element .arch-hover-element,
+      .arch-hover-element .arch-selected-element {
+        outline: none !important;
       }
       .arch-dragging-source {
         opacity: 0.35 !important;
@@ -1598,15 +1608,50 @@ export class Canvas {
       (e) => {
         if (this.draggedUnit || this.pointerDragCandidate?.active) return;
         const target = e.target as HTMLElement | null;
-        if (!target || target.tagName.toLowerCase() === 'body' || target.tagName.toLowerCase() === 'html') {
+        if (!target || target.tagName.toLowerCase() === 'body' || target.tagName.toLowerCase() === 'html' || target === doc.body) {
+          this.clearHoverElements(doc);
           return;
         }
-        doc.querySelectorAll('.arch-hover-element').forEach((el) => el.classList.remove('arch-hover-element'));
-        const unit = this.resolveHoverUnitForHierarchy(target);
-        if (unit && unit !== doc.body) {
-          unit.classList.add('arch-hover-element');
-          this.hoveredUnit = unit;
+
+        const unit = this.resolveHoverUnit(target);
+        if (!unit || unit === doc.body || unit === doc.documentElement) {
+          this.clearHoverElements(doc);
+          return;
         }
+
+        // SMART HANDLING: Prevent parent and child from both showing borders simultaneously
+        // Case A: The unit itself is already selected -> clear hover outline (already has 2px selection outline)
+        if (unit.classList.contains('arch-selected-element')) {
+          this.clearHoverElements(doc);
+          this.hoveredUnit = unit;
+          return;
+        }
+
+        // Case B: The unit is an ancestor of the currently selected element -> do not hover parent over selected child
+        if (this.activeMoveableUnit && unit.contains(this.activeMoveableUnit) && unit !== this.activeMoveableUnit) {
+          this.clearHoverElements(doc);
+          return;
+        }
+
+        // Clear previous hover outlines
+        this.clearHoverElements(doc);
+
+        // Case C: The unit is a child inside the currently selected container
+        // Temporarily suspend parent container's outline so ONLY the hovered child shows border
+        if (this.activeMoveableUnit && this.activeMoveableUnit.contains(unit) && unit !== this.activeMoveableUnit) {
+          this.activeMoveableUnit.classList.add('arch-has-hovered-child');
+        }
+
+        unit.classList.add('arch-hover-element');
+        this.hoveredUnit = unit;
+      },
+      { signal }
+    );
+
+    doc.addEventListener(
+      'mouseleave',
+      () => {
+        this.clearHoverElements(doc);
       },
       { signal }
     );
@@ -1663,27 +1708,23 @@ export class Canvas {
   }
 
   /**
-   * Resolves the unit to preview on hover based on current Figma hierarchy depth:
-   * - If nothing is selected, previews the Top Container (`Row Frame`).
-   * - If a Container (`Row` or `Column`) is selected and cursor is inside it, previews the immediate child level!
+   * Clears hover outline classes and restores parent container outline states.
    */
-  private resolveHoverUnitForHierarchy(target: HTMLElement): HTMLElement {
-    const chain = getContainerChain(target);
-    if (chain.length === 0) return this.findMoveableUnit(target);
+  private clearHoverElements(doc?: Document | null): void {
+    const d = doc || this.iframe.contentDocument;
+    if (!d) return;
+    d.querySelectorAll('.arch-hover-element').forEach((el) => el.classList.remove('arch-hover-element'));
+    d.querySelectorAll('.arch-has-hovered-child').forEach((el) => el.classList.remove('arch-has-hovered-child'));
+    this.hoveredUnit = null;
+  }
 
-    if (!this.activeMoveableUnit) {
-      return chain[0];
-    }
-
-    const activeIdx = chain.indexOf(this.activeMoveableUnit);
-    if (activeIdx !== -1) {
-      return activeIdx + 1 < chain.length ? chain[activeIdx + 1] : chain[activeIdx];
-    }
-
-    // If hovering a sibling inside the same Top Row, preview at the same role level (`column` or `block`)
-    const activeRole = classifyUnitRole(this.activeMoveableUnit);
-    const sameRole = chain.find((u) => classifyUnitRole(u) === activeRole);
-    return sameRole || chain[0];
+  /**
+   * Resolves the primary unit to highlight on hover:
+   * When hovering over any element or block, resolves to its first parent structural unit
+   * (e.g. text/image/button leaf -> parent block unit; column padding -> column; row padding -> row).
+   */
+  private resolveHoverUnit(target: HTMLElement): HTMLElement {
+    return this.findMoveableUnit(target);
   }
 
   /**
@@ -1723,9 +1764,15 @@ export class Canvas {
   public highlightUnitFromTree(unit: HTMLElement | null): void {
     const ifrDoc = this.iframe.contentDocument;
     if (!ifrDoc) return;
-    ifrDoc.querySelectorAll('.arch-hover-element').forEach((el) => el.classList.remove('arch-hover-element'));
+    this.clearHoverElements(ifrDoc);
     if (unit && ifrDoc.body.contains(unit)) {
-      unit.classList.add('arch-hover-element');
+      if (!unit.classList.contains('arch-selected-element')) {
+        if (this.activeMoveableUnit && this.activeMoveableUnit.contains(unit) && unit !== this.activeMoveableUnit) {
+          this.activeMoveableUnit.classList.add('arch-has-hovered-child');
+        }
+        unit.classList.add('arch-hover-element');
+      }
+      this.hoveredUnit = unit;
     }
   }
 
@@ -1763,7 +1810,9 @@ export class Canvas {
     this.isEditingText = true;
     host.classList.add('arch-editing-text');
     host.classList.add('arch-selected-element');
-    activeUnit.classList.add('arch-selected-element');
+    if (activeUnit && activeUnit !== host) {
+      activeUnit.classList.remove('arch-selected-element');
+    }
     if (host.getAttribute('contenteditable') !== 'true') {
       host.setAttribute('contenteditable', 'true');
       host.setAttribute('spellcheck', 'false');
@@ -1869,6 +1918,7 @@ export class Canvas {
     if (ifrDoc) {
       ifrDoc.querySelectorAll('.arch-editing-text').forEach((el) => {
         el.classList.remove('arch-editing-text');
+        el.classList.remove('arch-selected-element');
         (el as HTMLElement).style?.removeProperty('caret-color');
       });
       if (ifrDoc.activeElement instanceof HTMLElement) {
@@ -1880,6 +1930,7 @@ export class Canvas {
       } catch {}
     }
     if (this.activeMoveableUnit) {
+      this.activeMoveableUnit.classList.add('arch-selected-element');
       this.renderFloatingToolbar(this.activeMoveableUnit, this.selectedElement || this.activeMoveableUnit);
     }
   }
@@ -2074,9 +2125,6 @@ export class Canvas {
     this.selectedElement = effectiveSelectable;
     this.activeMoveableUnit = resolvedUnit;
     resolvedUnit.classList.add('arch-selected-element');
-    if (effectiveSelectable && effectiveSelectable !== resolvedUnit) {
-      effectiveSelectable.classList.add('arch-selected-element');
-    }
 
     this.renderFloatingToolbar(resolvedUnit, effectiveSelectable);
 
@@ -2814,8 +2862,8 @@ export class Canvas {
 
     const ifrDoc = this.iframe.contentDocument;
     if (ifrDoc) {
-      ifrDoc.querySelectorAll('.arch-selected-element, .arch-hover-element, .arch-editing-text').forEach((el) => {
-        el.classList.remove('arch-selected-element', 'arch-hover-element', 'arch-editing-text');
+      ifrDoc.querySelectorAll('.arch-selected-element, .arch-hover-element, .arch-editing-text, .arch-has-hovered-child').forEach((el) => {
+        el.classList.remove('arch-selected-element', 'arch-hover-element', 'arch-editing-text', 'arch-has-hovered-child');
         (el as HTMLElement).style?.removeProperty('caret-color');
       });
     }

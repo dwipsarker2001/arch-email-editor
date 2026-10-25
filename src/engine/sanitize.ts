@@ -223,6 +223,7 @@ export function serializeCleanDocument(
               !c.startsWith('arch-selected') &&
               !c.startsWith('arch-drop') &&
               !c.startsWith('arch-hover') &&
+              !c.startsWith('arch-has-') &&
               !c.startsWith('arch-col-') &&
               !c.startsWith('arch-dragging') &&
               !c.startsWith('arch-editing')

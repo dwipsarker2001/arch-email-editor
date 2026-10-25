@@ -1701,4 +1701,79 @@ describe('Figma vertical displacement', () => {
     editor.destroy();
     container.remove();
   });
+
+  it('smart hover: highlights first parent structural unit on element hover and prevents parent and child from both showing borders simultaneously', () => {
+    const container = document.createElement('div');
+    container.id = 'hover-test-container';
+    document.body.appendChild(container);
+
+    const html = `
+      <table class="row row-1" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td class="column col-1">
+            <table class="button_block" border="0" cellpadding="0" cellspacing="0">
+              <tr>
+                <td>
+                  <a href="#" class="button"><span class="btn-txt">Click Me</span></a>
+                </td>
+              </tr>
+            </table>
+            <table class="text_block" border="0" cellpadding="0" cellspacing="0">
+              <tr>
+                <td>
+                  <p class="desc">Sample paragraph text</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    `;
+
+    const editor = new ArchEmailEditor(container);
+    editor.importHTML(html);
+
+    const canvas = (editor as any).canvas;
+    const ifrDoc = canvas.iframe.contentDocument as Document;
+
+    const row = ifrDoc.querySelector('.row-1') as HTMLElement;
+    const btnBlock = ifrDoc.querySelector('.button_block') as HTMLElement;
+    const btnSpan = ifrDoc.querySelector('.btn-txt') as HTMLElement;
+    const textBlock = ifrDoc.querySelector('.text_block') as HTMLElement;
+    const descP = ifrDoc.querySelector('.desc') as HTMLElement;
+
+    // 1. Hovering inner leaf span (.btn-txt) highlights its first parent element (.button_block), NOT the leaf span itself
+    btnSpan.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(btnBlock.classList.contains('arch-hover-element')).toBe(true);
+    expect(btnSpan.classList.contains('arch-hover-element')).toBe(false);
+    expect(row.classList.contains('arch-hover-element')).toBe(false);
+
+    // 2. Hovering paragraph leaf (.desc) switches hover to its first parent (.text_block)
+    descP.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(textBlock.classList.contains('arch-hover-element')).toBe(true);
+    expect(btnBlock.classList.contains('arch-hover-element')).toBe(false);
+    expect(descP.classList.contains('arch-hover-element')).toBe(false);
+    expect(row.classList.contains('arch-hover-element')).toBe(false);
+
+    // 3. Hovering outside / mouseleave cleanly clears hover outlines
+    ifrDoc.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+    expect(ifrDoc.querySelectorAll('.arch-hover-element').length).toBe(0);
+
+    // 4. When Row is selected (outline 2px), hovering child block inside it suspends parent outline (.arch-has-hovered-child)
+    canvas.selectUnit(row, row);
+    expect(row.classList.contains('arch-selected-element')).toBe(true);
+
+    btnSpan.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(btnBlock.classList.contains('arch-hover-element')).toBe(true);
+    expect(row.classList.contains('arch-has-hovered-child')).toBe(true);
+    // Never show both: child has hover outline, parent's outline is suspended
+
+    // 5. When cursor leaves child back to outer canvas, parent outline is restored
+    ifrDoc.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+    expect(row.classList.contains('arch-has-hovered-child')).toBe(false);
+    expect(row.classList.contains('arch-selected-element')).toBe(true);
+
+    editor.destroy();
+    container.remove();
+  });
 });
