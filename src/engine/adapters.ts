@@ -610,10 +610,13 @@ export const ColumnLayoutAdapter = {
     if (!parentTr) return;
 
     // If we need more columns than currently exist, clone the last column shell (with an empty placeholder drop area)
+    const isNarrow = targetWidths.length >= 3;
     while (cols.length < targetWidths.length) {
       const templateCol = cols[cols.length - 1];
       const newCol = templateCol.cloneNode(false) as HTMLElement;
-      newCol.innerHTML = buildEmptyColumnPlaceholderHtml();
+      newCol.style.height = '100%';
+      newCol.style.verticalAlign = 'top';
+      newCol.innerHTML = buildEmptyColumnPlaceholderHtml(isNarrow);
       parentTr.appendChild(newCol);
       cols.push(newCol);
     }
@@ -725,7 +728,7 @@ export function buildEmptyColumnPlaceholderHtml(isNarrow = false): string {
     ? ''
     : `<span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 500; color: #64748b; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: block;">No content here. Drag content from the right.</span>`;
 
-  return `<div class="arch-empty-col-placeholder${narrowClass}" data-arch-placeholder="true" title="No content here. Drag content from the right." style="box-sizing: border-box; border: 1px dashed #cbd5e1; background-color: #f8fafc; border-radius: 0; padding: ${isNarrow ? '24px 8px' : '24px 14px'}; text-align: center; cursor: pointer; user-select: none; -webkit-user-select: none; min-height: 80px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; margin: 0; overflow: hidden;">
+  return `<div class="arch-empty-col-placeholder${narrowClass}" data-arch-placeholder="true" title="No content here. Drag content from the right." style="box-sizing: border-box; border: 1px dashed #cbd5e1; background-color: #f8fafc; border-radius: 0; padding: ${isNarrow ? '20px 6px' : '20px 10px'}; text-align: center; cursor: pointer; user-select: none; -webkit-user-select: none; min-height: 80px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: ${isNarrow ? '0' : '8px'}; margin: 0; overflow: hidden;">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1" style="display: block; flex-shrink: 0;">
       <rect x="3.5" y="3.5" width="17" height="17" rx="0" ry="0" stroke-dasharray="3 2" stroke-linecap="butt"></rect>
       <line x1="12" y1="8" x2="12" y2="16" stroke-width="1.3"></line>
@@ -753,9 +756,10 @@ export function ensureEmptyColumnPlaceholders(root: Document | HTMLElement): voi
     if (visibleBlocks.length === 0) {
       const existing = slot.querySelector('.arch-empty-col-placeholder, [data-arch-placeholder="true"]');
       if (!existing) {
-        const wAttr = col.getAttribute('width') || col.style?.width || '';
-        const wVal = parseFloat(wAttr);
-        const isNarrow = !isNaN(wVal) && wVal <= 35;
+        const siblingCols = Array.from(col.parentElement?.children || []).filter(
+          (c) => (c.tagName.toLowerCase() === 'td' || c.tagName.toLowerCase() === 'th') && !isGutterCell(c as HTMLElement)
+        );
+        const isNarrow = siblingCols.length >= 3;
         slot.insertAdjacentHTML('beforeend', buildEmptyColumnPlaceholderHtml(isNarrow));
       }
     } else {
@@ -774,24 +778,25 @@ export function buildRowLayoutHtml(layout: RowLayoutType, wrapInTr: boolean): st
     '4-col': [25, 25, 25, 25]
   };
   const cols = widthsMap[layout] || [100];
+  const isNarrowLayout = layout === '3-col' || layout === '4-col';
 
   const colsHtml = cols
     .map(
       (w, idx) => `
-      <td class="column column-${idx + 1}" width="${w}%" valign="top" style="box-sizing: border-box; padding: 0; vertical-align: top;">
-        ${buildEmptyColumnPlaceholderHtml(w <= 35)}
+      <td class="column column-${idx + 1}" width="${w}%" valign="top" style="box-sizing: border-box; padding: 0; vertical-align: top; height: 100%;">
+        ${buildEmptyColumnPlaceholderHtml(isNarrowLayout)}
       </td>`
     )
     .join('');
 
   const rowTable = `
-    <table class="row" align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="mso-table-lspace: 0; mso-table-rspace: 0;">
+    <table class="row" align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="mso-table-lspace: 0; mso-table-rspace: 0; height: 100%;">
       <tbody>
-        <tr>
+        <tr style="height: 100%;">
           <td>
-            <table class="row-content stack" align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #ffffff; color: #000000; width: 600px; margin: 0 auto; border-collapse: collapse;" width="600">
+            <table class="row-content stack" align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #ffffff; color: #000000; width: 600px; margin: 0 auto; border-collapse: collapse; height: 100%;" width="600">
               <tbody>
-                <tr>
+                <tr style="height: 100%;">
                   ${colsHtml}
                 </tr>
               </tbody>
@@ -801,5 +806,5 @@ export function buildRowLayoutHtml(layout: RowLayoutType, wrapInTr: boolean): st
       </tbody>
     </table>`;
 
-  return wrapInTr ? `<tr><td>${rowTable}</td></tr>` : rowTable;
+  return wrapInTr ? `<tr style="height: 100%;"><td>${rowTable}</td></tr>` : rowTable;
 }

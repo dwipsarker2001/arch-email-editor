@@ -1109,13 +1109,26 @@ export class Canvas {
       .arch-drop-line-bottom {
         box-shadow: inset 0 -3px 0 0 #7747ff !important;
       }
+      table.row-content {
+        height: 100% !important;
+      }
+      table.row-content > tbody,
+      table.row-content > tbody > tr {
+        height: 100% !important;
+      }
+      td.column,
+      th.column {
+        height: 100% !important;
+        vertical-align: top !important;
+        box-sizing: border-box !important;
+      }
       .arch-empty-col-placeholder {
         container-type: inline-size;
         box-sizing: border-box !important;
         border: 1px dashed #cbd5e1 !important;
         background-color: #f8fafc !important;
         border-radius: 0 !important;
-        padding: 24px 14px !important;
+        padding: 20px 10px !important;
         text-align: center !important;
         cursor: pointer !important;
         user-select: none !important;
@@ -1131,12 +1144,6 @@ export class Canvas {
         overflow: hidden !important;
         transition: border-color 0.15s ease, background-color 0.15s ease !important;
       }
-      /* Seamlessly connect adjacent empty column drop areas with no gap only when preceding sibling also has a placeholder */
-      td.column:has(.arch-empty-col-placeholder) + td.column .arch-empty-col-placeholder,
-      th.column:has(.arch-empty-col-placeholder) + th.column .arch-empty-col-placeholder,
-      div.column:has(.arch-empty-col-placeholder) + div.column .arch-empty-col-placeholder {
-        border-left: none !important;
-      }
       .arch-empty-col-placeholder span {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
         font-size: 12px !important;
@@ -1150,25 +1157,21 @@ export class Canvas {
         padding: 0 4px !important;
       }
       .arch-empty-col-placeholder.arch-empty-col-narrow,
-      td[width*="25%"] .arch-empty-col-placeholder,
-      td[width*="33%"] .arch-empty-col-placeholder,
-      td[width*="30%"] .arch-empty-col-placeholder {
-        padding: 24px 8px !important;
+      td[width*="25%"] .arch-empty-col-placeholder {
+        padding: 20px 6px !important;
         min-height: 80px !important;
         gap: 0 !important;
       }
       .arch-empty-col-placeholder.arch-empty-col-narrow span,
-      td[width*="25%"] .arch-empty-col-placeholder span,
-      td[width*="33%"] .arch-empty-col-placeholder span,
-      td[width*="30%"] .arch-empty-col-placeholder span {
+      td[width*="25%"] .arch-empty-col-placeholder span {
         display: none !important;
       }
-      @container (max-width: 250px) {
+      @container (max-width: 170px) {
         .arch-empty-col-placeholder span {
           display: none !important;
         }
         .arch-empty-col-placeholder {
-          padding: 24px 8px !important;
+          padding: 20px 6px !important;
           min-height: 80px !important;
           gap: 0 !important;
         }
