@@ -1112,23 +1112,30 @@ export class Canvas {
       .arch-empty-col-placeholder {
         container-type: inline-size;
         box-sizing: border-box !important;
-        border: 2px dashed #cbd5e1 !important;
+        border: 1px dashed #cbd5e1 !important;
         background-color: #f8fafc !important;
-        border-radius: 6px !important;
+        border-radius: 0 !important;
         padding: 24px 14px !important;
         text-align: center !important;
         cursor: pointer !important;
         user-select: none !important;
         -webkit-user-select: none !important;
         min-height: 80px !important;
+        height: 100% !important;
         display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
         gap: 8px !important;
-        margin: 4px 0 !important;
+        margin: 0 !important;
         overflow: hidden !important;
         transition: border-color 0.15s ease, background-color 0.15s ease !important;
+      }
+      /* Seamlessly connect adjacent empty column drop areas with no gap */
+      td.column + td.column .arch-empty-col-placeholder,
+      th.column + th.column .arch-empty-col-placeholder,
+      div.column + div.column .arch-empty-col-placeholder {
+        border-left: none !important;
       }
       .arch-empty-col-placeholder span {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
