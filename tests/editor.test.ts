@@ -402,6 +402,32 @@ describe('ArchEmailEditor Core Engine', () => {
     expect(toolbarAfterBodyClick).toBeNull();
     expect(ifrDoc.querySelector('.arch-selected-element')).toBeNull();
 
+    // 4. In text edit mode, double-clicking inside the active editable text element does not collapse selection or exit edit mode
+    canvas.enterTextEditMode(p);
+    expect(canvas.isEditingText).toBe(true);
+
+    const sel = ifrDoc.defaultView?.getSelection();
+    if (sel) {
+      const range = ifrDoc.createRange();
+      const textNode = p.firstChild || p;
+      if (textNode.nodeType === 3) {
+        range.setStart(textNode, 0);
+        range.setEnd(textNode, Math.min(4, (textNode.nodeValue || '').length));
+      } else {
+        range.selectNodeContents(p);
+      }
+      sel.removeAllRanges();
+      sel.addRange(range);
+      expect(sel.isCollapsed).toBe(false);
+
+      // Fire double-click inside p
+      p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+
+      // Editor must still be in text edit mode and the word selection preserved
+      expect(canvas.isEditingText).toBe(true);
+      expect(sel.isCollapsed).toBe(false);
+    }
+
     editor.destroy();
   });
 });

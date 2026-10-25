@@ -1391,7 +1391,8 @@ export class Canvas {
   public enterTextEditMode(
     target: HTMLElement,
     unit?: HTMLElement,
-    clickCoords?: { clientX: number; clientY: number }
+    clickCoords?: { clientX: number; clientY: number },
+    selectWord?: boolean
   ): void {
     const activeUnit = unit || this.activeMoveableUnit || this.findMoveableUnit(target);
     const host = findEditableTextHost(target, activeUnit);
@@ -1439,32 +1440,61 @@ export class Canvas {
     const sel = win.getSelection();
 
     if (sel) {
-      let range: Range | null = null;
+      // If there is already an active non-collapsed text selection inside host, preserve it
+      const hasWordSelection =
+        !sel.isCollapsed && sel.rangeCount > 0 && host.contains(sel.getRangeAt(0).commonAncestorContainer);
 
-      if (clickCoords) {
-        if (typeof doc.caretRangeFromPoint === 'function') {
-          range = doc.caretRangeFromPoint(clickCoords.clientX, clickCoords.clientY);
-        } else if (typeof (doc as any).caretPositionFromPoint === 'function') {
-          const pos = (doc as any).caretPositionFromPoint(clickCoords.clientX, clickCoords.clientY);
-          if (pos && pos.offsetNode) {
-            range = doc.createRange();
-            range.setStart(pos.offsetNode, pos.offset);
-            range.collapse(true);
+      if (!hasWordSelection) {
+        let range: Range | null = null;
+
+        if (clickCoords) {
+          if (typeof doc.caretRangeFromPoint === 'function') {
+            range = doc.caretRangeFromPoint(clickCoords.clientX, clickCoords.clientY);
+          } else if (typeof (doc as any).caretPositionFromPoint === 'function') {
+            const pos = (doc as any).caretPositionFromPoint(clickCoords.clientX, clickCoords.clientY);
+            if (pos && pos.offsetNode) {
+              range = doc.createRange();
+              range.setStart(pos.offsetNode, pos.offset);
+              range.collapse(true);
+            }
           }
         }
-      }
 
-      if (range && host.contains(range.startContainer)) {
-        sel.removeAllRanges();
-        sel.addRange(range);
-      } else {
-        try {
-          const fallbackRange = doc.createRange();
-          fallbackRange.selectNodeContents(host);
-          fallbackRange.collapse(false);
+        if (range && host.contains(range.startContainer)) {
+          if (selectWord && range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+            if (typeof (range as any).expand === 'function') {
+              try {
+                (range as any).expand('word');
+              } catch (_) {}
+            }
+            if (range.collapsed) {
+              const text = range.startContainer.nodeValue || '';
+              const offset = range.startOffset;
+              let start = offset;
+              let end = offset;
+              while (start > 0 && /\w/.test(text[start - 1])) {
+                start--;
+              }
+              while (end < text.length && /\w/.test(text[end])) {
+                end++;
+              }
+              if (end > start) {
+                range.setStart(range.startContainer, start);
+                range.setEnd(range.startContainer, end);
+              }
+            }
+          }
           sel.removeAllRanges();
-          sel.addRange(fallbackRange);
-        } catch (_) {}
+          sel.addRange(range);
+        } else {
+          try {
+            const fallbackRange = doc.createRange();
+            fallbackRange.selectNodeContents(host);
+            fallbackRange.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(fallbackRange);
+          } catch (_) {}
+        }
       }
     }
 
@@ -1616,6 +1646,16 @@ export class Canvas {
     const target = e.target as HTMLElement | null;
     if (!target) return;
 
+    // If currently editing text, let the browser's native text selection (double-click to select word, triple-click to select paragraph) work without interruption!
+    if (
+      this.isEditingText &&
+      ((this.activeMoveableUnit && this.activeMoveableUnit.contains(target)) ||
+        (this.selectedElement && this.selectedElement.contains(target)) ||
+        Boolean(target.closest('.arch-editing-text')))
+    ) {
+      return;
+    }
+
     const anchor = target.closest('a');
     if (anchor) {
       e.preventDefault();
@@ -1653,7 +1693,7 @@ export class Canvas {
           : target.closest<HTMLElement>('[contenteditable="true"]') || findEditableTextHost(target, leafBlock)
         : null;
       if (directHost && leafBlock.contains(directHost)) {
-        this.enterTextEditMode(directHost, leafBlock, { clientX: e.clientX, clientY: e.clientY });
+        this.enterTextEditMode(directHost, leafBlock, { clientX: e.clientX, clientY: e.clientY }, true);
       }
       return;
     }
@@ -1993,6 +2033,11 @@ export class Canvas {
         const next = cur === 'left' ? 'center' : cur === 'center' ? 'right' : 'left';
         editableHost.style.textAlign = next;
         this.onStructureChanged();
+      });
+
+      // Prevent clicking buttons in the toolbar from blurring the iframe or dropping the active text selection
+      textToolbar.addEventListener('mousedown', (e) => {
+        e.preventDefault();
       });
 
       this.overlayLayer.appendChild(textToolbar);
