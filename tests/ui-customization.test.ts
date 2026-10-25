@@ -109,4 +109,46 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     customEditor.destroy();
     customContainer.remove();
   });
+
+  it('renders image preview box and removes replace/effects buttons when image is selected', () => {
+    const iframe = container.querySelector<HTMLIFrameElement>('.arch-canvas-iframe');
+    const ifrDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
+    expect(ifrDoc).toBeDefined();
+
+    // Find or create an img element inside iframe
+    let imgEl = ifrDoc?.querySelector<HTMLImageElement>('img');
+    if (!imgEl && ifrDoc?.body) {
+      imgEl = ifrDoc.createElement('img');
+      imgEl.src = 'https://example.com/sample.png';
+      imgEl.alt = 'Sample image';
+      ifrDoc.body.appendChild(imgEl);
+    }
+
+    expect(imgEl).not.toBeNull();
+    imgEl?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    // Verify replace and apply effects buttons are completely removed
+    const replaceBtn = container.querySelector('#btn-img-replace');
+    const effectsBtn = container.querySelector('#btn-img-effects');
+    expect(replaceBtn).toBeNull();
+    expect(effectsBtn).toBeNull();
+
+    // Verify image preview box is rendered
+    const previewBox = container.querySelector('#arch-img-preview-box');
+    expect(previewBox).not.toBeNull();
+
+    const previewTag = container.querySelector<HTMLImageElement>('#arch-img-preview-tag');
+    expect(previewTag).not.toBeNull();
+
+    // Changing the URL input updates the preview image
+    const srcInput = container.querySelector<HTMLInputElement>('#inp-img-src');
+    expect(srcInput).not.toBeNull();
+
+    if (srcInput && previewTag) {
+      srcInput.value = 'https://example.com/new-photo.jpg';
+      srcInput.dispatchEvent(new Event('input'));
+      expect(previewTag.src).toBe('https://example.com/new-photo.jpg');
+    }
+  });
+
 });

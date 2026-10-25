@@ -27,6 +27,10 @@ export interface InspectorEvents {
   onSelectParent?: () => void;
   onSelectElementNode?: (el: HTMLElement) => void;
   onDeselect?: () => void;
+  onUploadImage?: (file: File, callback: (url: string) => void) => void;
+  onBrowseMedia?: (callback: (url: string) => void) => void;
+  onCropImage?: (element: HTMLElement) => void;
+  onRemoveImage?: (element: HTMLElement) => void;
 }
 
 /**
@@ -51,6 +55,89 @@ function toHexColor(colorStr?: string, fallback = '#000000'): string {
   }
   return fallback;
 }
+
+
+interface DummyAsset {
+  id: string;
+  name: string;
+  url: string;
+  size: string;
+}
+
+const DUMMY_ASSETS: DummyAsset[] = [
+  {
+    id: '1',
+    name: 'workspace-minimal.jpg',
+    url: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=400&h=260&q=80',
+    size: '54.20kb'
+  },
+  {
+    id: '2',
+    name: 'modern-architecture.jpg',
+    url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=400&h=540&q=80',
+    size: '88.15kb'
+  },
+  {
+    id: '3',
+    name: 'team-collaboration.jpg',
+    url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=400&h=300&q=80',
+    size: '62.40kb'
+  },
+  {
+    id: '4',
+    name: 'creative-designer.jpg',
+    url: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=400&h=500&q=80',
+    size: '94.60kb'
+  },
+  {
+    id: '5',
+    name: 'analytics-dashboard.jpg',
+    url: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=400&h=280&q=80',
+    size: '49.80kb'
+  },
+  {
+    id: '6',
+    name: 'coffee-notebook.jpg',
+    url: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=400&h=240&q=80',
+    size: '42.30kb'
+  },
+  {
+    id: '7',
+    name: 'business-meeting.jpg',
+    url: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=400&h=460&q=80',
+    size: '79.10kb'
+  },
+  {
+    id: '8',
+    name: 'nature-mountains.jpg',
+    url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&h=290&q=80',
+    size: '58.50kb'
+  },
+  {
+    id: '9',
+    name: 'urban-skyline.jpg',
+    url: 'https://images.unsplash.com/photo-1477959858617-67f30bc75b82?auto=format&fit=crop&w=400&h=480&q=80',
+    size: '83.40kb'
+  },
+  {
+    id: '10',
+    name: 'colorful-abstract.jpg',
+    url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=400&h=310&q=80',
+    size: '67.90kb'
+  },
+  {
+    id: '11',
+    name: 'tech-gadgets.jpg',
+    url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&h=420&q=80',
+    size: '72.35kb'
+  },
+  {
+    id: '12',
+    name: 'indoor-plants.jpg',
+    url: 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?auto=format&fit=crop&w=400&h=250&q=80',
+    size: '45.15kb'
+  }
+];
 
 export class Inspector {
   private element: HTMLElement;
@@ -980,8 +1067,168 @@ export class Inspector {
     });
   }
 
+  
+  public openAssetsPanel(onSelect: (url: string, name?: string, size?: string) => void): void {
+    const existing = this.element.querySelector('.arch-assets-sidepanel');
+    if (existing) existing.remove();
+
+    const panel = document.createElement('div');
+    panel.className = 'arch-assets-sidepanel';
+    panel.innerHTML = `
+      <div class="arch-prop-header arch-assets-header">
+        <div class="arch-prop-title">Assets</div>
+        <div class="arch-prop-actions arch-assets-header-actions">
+          <button type="button" class="arch-icon-btn" id="btn-assets-upload" title="Upload Image">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+          </button>
+          <button type="button" class="arch-icon-btn" id="btn-assets-search-toggle" title="Search Images">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </button>
+          <button type="button" class="arch-icon-btn" id="btn-assets-close" title="Close Assets">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <input type="file" id="inp-assets-upload-file" accept="image/*" style="display: none;" />
+
+      <div class="arch-assets-search-wrap" id="arch-assets-search-wrap">
+        <div class="arch-assets-search-box">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" class="arch-assets-search-input" id="inp-assets-search" placeholder="Search images..." />
+        </div>
+      </div>
+
+      <div class="arch-assets-body">
+        <div class="arch-assets-masonry" id="arch-assets-grid"></div>
+      </div>
+    `;
+
+    this.element.appendChild(panel);
+
+    const grid = panel.querySelector<HTMLElement>('#arch-assets-grid')!;
+    const searchInp = panel.querySelector<HTMLInputElement>('#inp-assets-search')!;
+    const closeBtn = panel.querySelector<HTMLButtonElement>('#btn-assets-close')!;
+    const searchToggleBtn = panel.querySelector<HTMLButtonElement>('#btn-assets-search-toggle')!;
+    const searchWrap = panel.querySelector<HTMLElement>('#arch-assets-search-wrap')!;
+    const uploadBtn = panel.querySelector<HTMLButtonElement>('#btn-assets-upload')!;
+    const uploadInput = panel.querySelector<HTMLInputElement>('#inp-assets-upload-file')!;
+
+    let searchVisible = true;
+    searchToggleBtn?.addEventListener('click', () => {
+      searchVisible = !searchVisible;
+      searchToggleBtn.classList.toggle('is-active', searchVisible);
+      searchWrap?.classList.toggle('is-collapsed', !searchVisible);
+      if (searchVisible) {
+        searchInp?.focus();
+      } else {
+        if (searchInp) searchInp.value = '';
+        renderGrid(DUMMY_ASSETS);
+      }
+    });
+
+    uploadBtn?.addEventListener('click', () => {
+      uploadInput?.click();
+    });
+
+    uploadInput?.addEventListener('change', () => {
+      const file = uploadInput.files?.[0];
+      if (!file) return;
+
+      const formattedKb = ((file.size / 1024).toFixed(2)) + 'kb';
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        if (dataUrl) {
+          const newAsset: DummyAsset = {
+            id: 'asset-' + Date.now(),
+            name: file.name,
+            url: dataUrl,
+            size: formattedKb
+          };
+          DUMMY_ASSETS.unshift(newAsset);
+          renderGrid(DUMMY_ASSETS);
+          onSelect(dataUrl, file.name, formattedKb);
+          closePanel();
+        }
+      };
+      reader.readAsDataURL(file);
+      uploadInput.value = '';
+    });
+
+    const closePanel = () => {
+      panel.classList.remove('is-open');
+      this.element.style.overflow = '';
+      setTimeout(() => {
+        panel.remove();
+      }, 260);
+    };
+
+    const renderGrid = (items: typeof DUMMY_ASSETS) => {
+      if (items.length === 0) {
+        grid.innerHTML = '<div style="grid-column: span 2; text-align: center; color: #94a3b8; font-size: 12px; padding: 30px 0;">No matching assets found</div>';
+        return;
+      }
+
+      grid.innerHTML = items.map(asset => `
+        <div class="arch-assets-card" data-url="${asset.url}" data-name="${asset.name}" data-size="${asset.size}" title="${asset.name}">
+          <img src="${asset.url}" alt="${asset.name}" loading="lazy" />
+          <div class="arch-assets-card-overlay">
+            <span class="arch-assets-card-name">${asset.name}</span>
+            <span class="arch-assets-card-size">${asset.size}</span>
+          </div>
+        </div>
+      `).join('');
+
+      grid.querySelectorAll<HTMLElement>('.arch-assets-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const url = card.dataset.url || '';
+          const name = card.dataset.name || '';
+          const size = card.dataset.size || '';
+          if (url) {
+            onSelect(url, name, size);
+            closePanel();
+          }
+        });
+      });
+    };
+
+    renderGrid(DUMMY_ASSETS);
+
+    searchInp?.addEventListener('input', () => {
+      const query = searchInp.value.trim().toLowerCase();
+      const filtered = DUMMY_ASSETS.filter(a => a.name.toLowerCase().includes(query));
+      renderGrid(filtered);
+    });
+
+    closeBtn?.addEventListener('click', closePanel);
+
+    requestAnimationFrame(() => {
+      this.element.scrollTop = 0;
+      this.element.style.overflow = 'hidden';
+      panel.classList.add('is-open');
+    });
+  }
+
   private renderImageElementControls(container: HTMLElement, info: SelectedElementInfo): void {
-    const src = ImageAdapter.getSrc(info.element, info.unit);
+    let src = ImageAdapter.getSrc(info.element, info.unit) || info.src || '';
+    if (!src && info.element) {
+      const img = info.element.tagName.toLowerCase() === 'img' ? (info.element as HTMLImageElement) : info.element.querySelector<HTMLImageElement>('img');
+      if (img) src = img.getAttribute('src') || img.src || '';
+    }
+    if (!src && info.unit) {
+      const img = info.unit.querySelector<HTMLImageElement>('img');
+      if (img) src = img.getAttribute('src') || img.src || '';
+    }
     const alt = ImageAdapter.getAlt(info.element, info.unit);
     const linkUrl = ImageAdapter.getLinkUrl(info.element, info.unit);
     const width = ImageAdapter.getWidth(info.element, info.unit);
@@ -990,18 +1237,76 @@ export class Inspector {
     const filename = src.split('/').pop()?.split('?')[0] || 'image.png';
 
     container.innerHTML = `
-      <div style="display: flex; gap: 8px; padding: 14px 18px; border-bottom: 1px solid #f2f3f5;">
-        <button type="button" class="arch-btn arch-btn--primary" id="btn-img-replace" style="flex: 1; height: 34px; font-size: 12px; font-weight: 600;">Replace</button>
-        <button type="button" class="arch-btn" id="btn-img-effects" style="flex: 1; height: 34px; font-size: 12px; font-weight: 600;">Apply effects</button>
+      <div class="arch-inspector-img-preview-wrap">
+        <div class="arch-inspector-img-preview-box ${src ? 'has-image' : 'is-empty'}" id="arch-img-preview-box">
+          <img id="arch-img-preview-tag" src="${src}" alt="${alt}" />
+          <div class="arch-inspector-img-preview-empty" id="arch-img-preview-empty">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+              <circle cx="9" cy="9" r="2"/>
+              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+            </svg>
+            <span>No image preview</span>
+          </div>
+
+          <!-- Bottom Right Replace Dropdown -->
+          <div class="arch-img-replace-dropdown" id="arch-img-replace-dropdown">
+            <button type="button" class="arch-img-replace-btn" id="btn-img-replace-toggle" title="Replace image">
+              <span>Replace</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="arch-img-replace-menu" id="menu-img-replace">
+              <button type="button" class="arch-img-replace-item" id="opt-img-upload">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <span>Upload</span>
+              </button>
+              <button type="button" class="arch-img-replace-item" id="opt-img-browse">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+                  <line x1="3" y1="9" x2="21" y2="9"></line>
+                  <line x1="9" y1="21" x2="9" y2="9"></line>
+                </svg>
+                <span>Browse media</span>
+              </button>
+            </div>
+            <input type="file" id="inp-img-file-upload" accept="image/*" style="display: none;" />
+          </div>
+        </div>
+
+        <!-- Meta info & Actions row below the image -->
+        <div class="arch-inspector-img-meta-row">
+          <div class="arch-inspector-img-meta-info">
+            <div class="arch-inspector-img-meta-name" id="arch-img-meta-name" title="${filename}">${src ? filename : 'No image selected'}</div>
+            <div class="arch-inspector-img-meta-size" id="arch-img-meta-size">—</div>
+          </div>
+          <div class="arch-inspector-img-meta-actions">
+            <button type="button" class="arch-img-meta-icon-btn" id="btn-img-crop" title="Crop image">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 2v14a2 2 0 0 0 2 2h14"></path>
+                <path d="M18 22V8a2 2 0 0 0-2-2H2"></path>
+              </svg>
+            </button>
+            <button type="button" class="arch-img-meta-icon-btn arch-img-btn-remove" id="btn-img-remove" title="Remove image">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div style="padding: 12px 18px; border-bottom: 1px solid #f2f3f5;">
         <div class="arch-url-group">
           <span class="arch-url-prefix">Url</span>
           <input type="text" class="arch-url-input" id="inp-img-src" value="${src}" placeholder="https://..." />
-        </div>
-        <div style="font-size: 11px; color: #6b7280; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-          Image name: <strong>${filename}</strong>
         </div>
       </div>
 
@@ -1056,9 +1361,198 @@ export class Inspector {
       </div>
     `;
 
+    const previewBox = container.querySelector<HTMLElement>('#arch-img-preview-box');
+    const previewImg = container.querySelector<HTMLImageElement>('#arch-img-preview-tag');
+    const nameLabel = container.querySelector<HTMLElement>('#arch-img-meta-name');
+    const sizeLabel = container.querySelector<HTMLElement>('#arch-img-meta-size');
+    const cropBtn = container.querySelector<HTMLButtonElement>('#btn-img-crop');
+    const removeBtn = container.querySelector<HTMLButtonElement>('#btn-img-remove');
+
+    const formatKb = (bytes: number): string => {
+      if (!bytes || bytes <= 0) return '';
+      const kb = (bytes / 1024).toFixed(2);
+      return `${kb}kb`;
+    };
+
+    let currentKnownFileSize = '';
+
+    const updateDimensionsAndSize = (url: string) => {
+      if (!url) {
+        if (sizeLabel) sizeLabel.textContent = '—';
+        return;
+      }
+
+      const cleanUrl = url.trim();
+
+      // Extract file size if not yet known
+      if (!currentKnownFileSize) {
+        if (cleanUrl.startsWith('data:')) {
+          const base64Data = cleanUrl.split(',')[1] || '';
+          const byteLength = Math.round((base64Data.length * 3) / 4);
+          currentKnownFileSize = formatKb(byteLength);
+        } else {
+          try {
+            fetch(cleanUrl)
+              .then(res => {
+                const cl = res.headers.get('content-length');
+                if (cl) return parseInt(cl, 10);
+                return res.blob().then(b => b.size);
+              })
+              .then(sizeBytes => {
+                if (sizeBytes && sizeBytes > 0) {
+                  currentKnownFileSize = formatKb(sizeBytes);
+                  if (testImg.naturalWidth && testImg.naturalHeight && sizeLabel) {
+                    sizeLabel.textContent = `${testImg.naturalWidth} × ${testImg.naturalHeight} px • ${currentKnownFileSize}`;
+                  }
+                }
+              })
+              .catch(() => {});
+          } catch (_) {}
+        }
+      }
+
+      const testImg = new Image();
+      testImg.onload = () => {
+        const dims = `${testImg.naturalWidth} × ${testImg.naturalHeight} px`;
+        if (sizeLabel) {
+          sizeLabel.textContent = currentKnownFileSize ? `${dims} • ${currentKnownFileSize}` : dims;
+        }
+      };
+      testImg.onerror = () => {
+        if (sizeLabel) sizeLabel.textContent = currentKnownFileSize || '—';
+      };
+      testImg.src = cleanUrl;
+    };
+
+    const updatePreview = (url: string, explicitName?: string, fileSize?: number) => {
+      const cleanUrl = (url || '').trim();
+      if (fileSize !== undefined) {
+        currentKnownFileSize = formatBytes(fileSize);
+      } else if (!cleanUrl) {
+        currentKnownFileSize = '';
+      }
+
+      if (cleanUrl) {
+        if (previewImg) previewImg.src = cleanUrl;
+        previewBox?.classList.add('has-image');
+        previewBox?.classList.remove('is-empty');
+
+        const resolvedName = explicitName || cleanUrl.split('/').pop()?.split('?')[0] || 'image.png';
+        if (nameLabel) {
+          nameLabel.textContent = resolvedName;
+          nameLabel.title = resolvedName;
+        }
+        updateDimensionsAndSize(cleanUrl);
+      } else {
+        if (previewImg) previewImg.removeAttribute('src');
+        previewBox?.classList.remove('has-image');
+        previewBox?.classList.add('is-empty');
+        if (nameLabel) {
+          nameLabel.textContent = 'No image selected';
+          nameLabel.title = '';
+        }
+        if (sizeLabel) sizeLabel.textContent = '—';
+      }
+    };
+
+    // Initialize dimensions for currently loaded image
+    if (src) {
+      updateDimensionsAndSize(src);
+    }
+
+    // Dummy crop and remove buttons
+    cropBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+    });
+
+    removeBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+    });
+
+    // Replace Dropdown Handlers
+    const replaceDropdown = container.querySelector<HTMLElement>('#arch-img-replace-dropdown');
+    const replaceBtn = container.querySelector<HTMLButtonElement>('#btn-img-replace-toggle');
+    const replaceMenu = container.querySelector<HTMLElement>('#menu-img-replace');
+    const uploadOpt = container.querySelector<HTMLButtonElement>('#opt-img-upload');
+    const browseOpt = container.querySelector<HTMLButtonElement>('#opt-img-browse');
+    const fileInput = container.querySelector<HTMLInputElement>('#inp-img-file-upload');
+
+    replaceBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = replaceDropdown?.classList.contains('is-open');
+      if (isOpen) {
+        replaceDropdown?.classList.remove('is-open');
+        replaceMenu?.classList.remove('is-open');
+      } else {
+        replaceDropdown?.classList.add('is-open');
+        replaceMenu?.classList.add('is-open');
+      }
+    });
+
+    const onDocClick = (e: MouseEvent) => {
+      if (replaceDropdown && !replaceDropdown.contains(e.target as Node)) {
+        replaceDropdown.classList.remove('is-open');
+        replaceMenu?.classList.remove('is-open');
+      }
+    };
+    document.addEventListener('click', onDocClick);
+
+    const applySelectedUrl = (url: string, explicitName?: string, fileSize?: number) => {
+      const srcInp = container.querySelector<HTMLInputElement>('#inp-img-src');
+      if (srcInp) srcInp.value = url;
+      updatePreview(url, explicitName, fileSize);
+      ImageAdapter.setSrc(info.element, url, info.unit);
+      this.events.onChange();
+    };
+
+    uploadOpt?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      replaceDropdown?.classList.remove('is-open');
+      replaceMenu?.classList.remove('is-open');
+      fileInput?.click();
+    });
+
+    fileInput?.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+
+      const formattedKb = formatKb(file.size);
+      if (this.events.onUploadImage) {
+        this.events.onUploadImage(file, (url: string) => applySelectedUrl(url, file.name, file.size));
+      } else {
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          const res = re.target?.result as string;
+          if (res) applySelectedUrl(res, file.name, file.size);
+        };
+        reader.readAsDataURL(file);
+      }
+      fileInput.value = '';
+    });
+
+    browseOpt?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      replaceDropdown?.classList.remove('is-open');
+      replaceMenu?.classList.remove('is-open');
+
+      this.openAssetsPanel(applySelectedUrl);
+
+      if (this.events.onBrowseMedia) {
+        this.events.onBrowseMedia(applySelectedUrl);
+      } else {
+        const ev = new CustomEvent('arch:browse-media', {
+          bubbles: true,
+          detail: { setSrc: applySelectedUrl }
+        });
+        container.dispatchEvent(ev);
+      }
+    });
+
     const srcInp = container.querySelector<HTMLInputElement>('#inp-img-src')!;
     srcInp.addEventListener('input', (e) => {
-      ImageAdapter.setSrc(info.element, (e.target as HTMLInputElement).value, info.unit);
+      const newSrc = (e.target as HTMLInputElement).value;
+      updatePreview(newSrc);
+      ImageAdapter.setSrc(info.element, newSrc, info.unit);
       this.events.onChange();
     });
 

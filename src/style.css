@@ -2362,3 +2362,591 @@ input:checked + .arch-toggle-slider:before {
 }
 
 
+
+/* Inspector Image Preview Box */
+.arch-editor .arch-inspector-img-preview-wrap,
+.arch-inspector-img-preview-wrap {
+  padding: 14px 18px !important;
+  border-bottom: 1px solid var(--arch-border, #f2f3f5) !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-inspector-img-preview-box,
+.arch-inspector-img-preview-box {
+  width: 100% !important;
+  height: 140px !important;
+  background-color: #f8fafc !important;
+  background-image: 
+    linear-gradient(45deg, #f1f5f9 25%, transparent 25%), 
+    linear-gradient(-45deg, #f1f5f9 25%, transparent 25%), 
+    linear-gradient(45deg, transparent 75%, #f1f5f9 75%), 
+    linear-gradient(-45deg, transparent 75%, #f1f5f9 75%) !important;
+  background-size: 16px 16px !important;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px !important;
+  border: 1px solid var(--arch-border, #e2e8f0) !important;
+  border-radius: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: visible !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-inspector-img-preview-box img,
+.arch-inspector-img-preview-box img {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  margin: 0 !important;
+  border: none !important;
+  white-space: nowrap !important;
+  user-select: none !important;
+}
+
+.arch-editor .arch-img-replace-item span,
+.arch-img-replace-item span {
+  white-space: nowrap !important;
+}
+
+.arch-editor .arch-inspector-img-preview-box.has-image .arch-inspector-img-preview-empty,
+.arch-inspector-img-preview-box.has-image .arch-inspector-img-preview-empty {
+  display: none !important;
+}
+
+.arch-editor .arch-inspector-img-preview-box.is-empty img,
+.arch-inspector-img-preview-box.is-empty img {
+  display: none !important;
+}
+
+.arch-editor .arch-inspector-img-preview-empty,
+.arch-inspector-img-preview-empty {
+  display: flex;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  color: #94a3b8 !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  text-align: center !important;
+  user-select: none !important;
+}
+
+/* Image Preview Box - Corner Replace Dropdown */
+.arch-editor .arch-img-replace-dropdown,
+.arch-img-replace-dropdown {
+  position: absolute !important;
+  bottom: 8px !important;
+  right: 8px !important;
+  z-index: 10 !important;
+}
+
+.arch-editor .arch-img-replace-btn,
+.arch-img-replace-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  color: #1e293b !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  border-radius: 4px !important;
+  padding: 5px 9px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.15s ease !important;
+  outline: none !important;
+  user-select: none !important;
+}
+
+.arch-editor .arch-img-replace-btn:hover,
+.arch-img-replace-btn:hover {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+}
+
+.arch-editor .arch-img-replace-menu,
+.arch-img-replace-menu {
+  display: none !important;
+  position: absolute !important;
+  top: calc(100% + 4px) !important;
+  bottom: auto !important;
+  right: 0 !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12) !important;
+  width: max-content !important;
+  min-width: 145px !important;
+  padding: 4px !important;
+  z-index: 50 !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-img-replace-dropdown.is-open .arch-img-replace-menu,
+.arch-img-replace-dropdown.is-open .arch-img-replace-menu,
+.arch-editor .arch-img-replace-menu.is-open,
+.arch-img-replace-menu.is-open {
+  display: flex !important;
+}
+
+.arch-editor .arch-img-replace-item,
+.arch-img-replace-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  padding: 6px 10px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #1e293b !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease !important;
+  box-sizing: border-box !important;
+  user-select: none !important;
+}
+
+.arch-editor .arch-img-replace-item:hover,
+.arch-img-replace-item:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+.arch-editor .arch-img-replace-item svg,
+.arch-img-replace-item svg {
+  color: #64748b !important;
+  stroke: #64748b !important;
+  flex-shrink: 0 !important;
+}
+
+
+/* Image Preview Box - Meta Info & Actions Row */
+.arch-editor .arch-inspector-img-meta-row,
+.arch-inspector-img-meta-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin-top: 10px !important;
+}
+
+.arch-editor .arch-inspector-img-meta-info,
+.arch-inspector-img-meta-info {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+.arch-editor .arch-inspector-img-meta-name,
+.arch-inspector-img-meta-name {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  line-height: 1.3 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.arch-editor .arch-inspector-img-meta-size,
+.arch-inspector-img-meta-size {
+  font-size: 11px !important;
+  color: #64748b !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.arch-editor .arch-inspector-img-meta-actions,
+.arch-inspector-img-meta-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-shrink: 0 !important;
+}
+
+.arch-editor .arch-img-meta-btn,
+.arch-img-meta-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 4px 8px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #475569 !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  line-height: 1 !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+  user-select: none !important;
+}
+
+.arch-editor .arch-img-meta-btn:hover,
+.arch-img-meta-btn:hover {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.arch-editor .arch-img-meta-btn svg,
+.arch-img-meta-btn svg {
+  color: #64748b !important;
+  flex-shrink: 0 !important;
+}
+
+.arch-editor .arch-img-meta-btn:hover svg,
+.arch-img-meta-btn:hover svg {
+  color: #1e293b !important;
+}
+
+.arch-editor .arch-img-meta-btn.arch-img-btn-remove:hover,
+.arch-img-meta-btn.arch-img-btn-remove:hover {
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+  border-color: #fecaca !important;
+}
+
+.arch-editor .arch-img-meta-btn.arch-img-btn-remove:hover svg,
+.arch-img-meta-btn.arch-img-btn-remove:hover svg {
+  color: #dc2626 !important;
+}
+
+
+/* Square Icon Buttons for Crop and Remove */
+.arch-editor .arch-img-meta-icon-btn,
+.arch-img-meta-icon-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 5px !important;
+  color: #475569 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-img-meta-icon-btn:hover,
+.arch-img-meta-icon-btn:hover {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.arch-editor .arch-img-meta-icon-btn svg,
+.arch-img-meta-icon-btn svg {
+  color: #64748b !important;
+  transition: color 0.15s ease !important;
+}
+
+.arch-editor .arch-img-meta-icon-btn:hover svg,
+.arch-img-meta-icon-btn:hover svg {
+  color: #0f172a !important;
+}
+
+.arch-editor .arch-img-meta-icon-btn.arch-img-btn-remove:hover,
+.arch-img-meta-icon-btn.arch-img-btn-remove:hover {
+  background: #fef2f2 !important;
+  border-color: #fecaca !important;
+}
+
+.arch-editor .arch-img-meta-icon-btn.arch-img-btn-remove:hover svg,
+.arch-img-meta-icon-btn.arch-img-btn-remove:hover svg {
+  color: #dc2626 !important;
+}
+
+
+/* Assets Slidepanel (Browse Media) */
+.arch-editor .arch-editor__inspector,
+.arch-editor__inspector {
+  position: relative !important;
+}
+
+.arch-editor .arch-assets-sidepanel,
+.arch-assets-sidepanel {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: #ffffff !important;
+  z-index: 100 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  transform: translateX(100%) !important;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.arch-editor .arch-assets-sidepanel.is-open,
+.arch-assets-sidepanel.is-open {
+  transform: translateX(0) !important;
+}
+
+.arch-editor .arch-assets-header,
+.arch-assets-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  padding: 12px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-assets-header .arch-prop-title,
+.arch-assets-header .arch-prop-title {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+}
+
+.arch-editor .arch-assets-search-wrap,
+.arch-assets-search-wrap {
+  padding: 10px 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  background: #fafafa !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-assets-search-box,
+.arch-assets-search-box {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 4px !important;
+  padding: 5px 8px !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-assets-search-box svg,
+.arch-assets-search-box svg {
+  color: #94a3b8 !important;
+  flex-shrink: 0 !important;
+}
+
+.arch-editor .arch-assets-search-input,
+.arch-assets-search-input {
+  width: 100% !important;
+  border: none !important;
+  outline: none !important;
+  font-size: 12px !important;
+  color: #1e293b !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.arch-editor .arch-assets-count-badge,
+.arch-assets-count-badge {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #64748b !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+.arch-editor .arch-assets-body,
+.arch-assets-body {
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  padding: 12px 14px 20px 14px !important;
+  box-sizing: border-box !important;
+}
+
+/* 2-Column Masonry with Variable Heights */
+.arch-editor .arch-assets-masonry,
+.arch-assets-masonry {
+  column-count: 2 !important;
+  column-gap: 10px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-assets-card,
+.arch-assets-card {
+  break-inside: avoid !important;
+  display: inline-block !important;
+  width: 100% !important;
+  margin-bottom: 10px !important;
+  border-radius: 6px !important;
+  overflow: hidden !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  cursor: pointer !important;
+  position: relative !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-assets-card:hover,
+.arch-assets-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12) !important;
+  border-color: #3b82f6 !important;
+}
+
+.arch-editor .arch-assets-card img,
+.arch-assets-card img {
+  width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  object-fit: cover !important;
+  transition: transform 0.25s ease !important;
+}
+
+.arch-editor .arch-assets-card:hover img,
+.arch-assets-card:hover img {
+  transform: scale(1.03) !important;
+}
+
+.arch-editor .arch-assets-card-overlay,
+.arch-assets-card-overlay {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 24px 8px 6px 8px !important;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0) 100%) !important;
+  opacity: 0 !important;
+  transition: opacity 0.2s ease !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+  pointer-events: none !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-assets-card:hover .arch-assets-card-overlay,
+.arch-assets-card:hover .arch-assets-card-overlay {
+  opacity: 1 !important;
+}
+
+.arch-editor .arch-assets-card-name,
+.arch-assets-card-name {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.arch-editor .arch-assets-card-size,
+.arch-assets-card-size {
+  font-size: 10px !important;
+  color: #cbd5e1 !important;
+}
+
+
+/* Assets Header Action Buttons: Upload, Search, Close */
+.arch-editor .arch-assets-header-actions,
+.arch-assets-header-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.arch-editor .arch-assets-btn-upload,
+.arch-assets-btn-upload {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 4px 9px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 5px !important;
+  cursor: pointer !important;
+  line-height: 1 !important;
+  transition: all 0.15s ease !important;
+  user-select: none !important;
+}
+
+.arch-editor .arch-assets-btn-upload:hover,
+.arch-assets-btn-upload:hover {
+  background: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+  color: #020617 !important;
+}
+
+.arch-editor .arch-assets-btn-upload svg,
+.arch-assets-btn-upload svg {
+  color: #475569 !important;
+  flex-shrink: 0 !important;
+}
+
+.arch-editor .arch-assets-search-btn.is-active,
+.arch-assets-search-btn.is-active {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.arch-editor .arch-assets-search-wrap.is-collapsed,
+.arch-assets-search-wrap.is-collapsed {
+  display: none !important;
+}
+
+
+.arch-editor .arch-assets-header-actions .arch-icon-btn,
+.arch-assets-header-actions .arch-icon-btn {
+  width: 28px !important;
+  height: 28px !important;
+  border: none !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  color: #6b7280 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  padding: 0 !important;
+}
+
+.arch-editor .arch-assets-header-actions .arch-icon-btn:hover,
+.arch-assets-header-actions .arch-icon-btn:hover {
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+}

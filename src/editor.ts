@@ -550,6 +550,10 @@ export class ArchEmailEditor {
         onInsertSection: (section) => {
           this.insertHTML(section.html);
         },
+        onUploadImage: this.options.onUploadImage,
+        onBrowseMedia: this.options.onBrowseMedia,
+        onCropImage: this.options.onCropImage,
+        onRemoveImage: this.options.onRemoveImage,
         onChange: (isDocumentSetting?: boolean) => {
           if (isDocumentSetting) {
             this.document.rawHtml = compileToEmailHtml({ ...this.document, rawHtml: undefined });

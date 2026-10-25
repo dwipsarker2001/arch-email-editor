@@ -63,6 +63,10 @@ export class RightPanel {
 
     this.elementInspector = new Inspector({
       onChange: events.onChange,
+      onUploadImage: events.onUploadImage,
+      onBrowseMedia: events.onBrowseMedia,
+      onCropImage: events.onCropImage,
+      onRemoveImage: events.onRemoveImage,
       onRemoveBlock: events.onRemoveBlock,
       onMoveElement: events.onMoveElement,
       onDuplicateElement: events.onDuplicateElement,

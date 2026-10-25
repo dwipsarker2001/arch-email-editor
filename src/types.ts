@@ -289,4 +289,16 @@ export interface EditorOptions {
   onChange?: (doc: EmailDocument) => void;
   /** Callback fired when an element or block is selected */
   onSelectBlock?: (block: BlockNode | null) => void;
+  /** Callback fired when user selects a file via Image Replace > Upload */
+  onUploadImage?: (file: File, callback: (url: string) => void) => void;
+  /** Callback fired when user clicks Image Replace > Browse media */
+  onBrowseMedia?: (callback: (url: string) => void) => void;
+  /** Callback fired when user clicks Image Crop button */
+  onCropImage?: (element: HTMLElement) => void;
+  /** Callback fired when user clicks Image Remove button */
+  onRemoveImage?: (element: HTMLElement) => void;
+  /** Callback fired when user clicks Image Crop button */
+  onCropImage?: (element: HTMLElement) => void;
+  /** Callback fired when user clicks Image Remove button */
+  onRemoveImage?: (element: HTMLElement) => void;
 }
