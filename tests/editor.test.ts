@@ -668,6 +668,32 @@ describe('ArchEmailEditor Core Engine', () => {
       toJSON: () => {}
     });
 
+    const innerTd = btn.closest('td')!;
+    vi.spyOn(innerTd, 'getBoundingClientRect').mockReturnValue({
+      left: 200,
+      right: 360,
+      top: 100,
+      bottom: 144,
+      width: 160,
+      height: 44,
+      x: 200,
+      y: 100,
+      toJSON: () => {}
+    });
+
+    const outerTd = btn.closest('table')!.parentElement!.closest('td')!;
+    vi.spyOn(outerTd, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      right: 600,
+      top: 0,
+      bottom: 200,
+      width: 600,
+      height: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => {}
+    });
+
     // Start drag on right handle and drag +40px to widen button
     eHandle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 360, clientY: 122, button: 0 }));
     window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 400, clientY: 122 }));

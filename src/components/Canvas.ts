@@ -2626,9 +2626,30 @@ export class Canvas {
               this.activeMoveableUnit ||
               unit;
             const targetElRect = selectedEl ? selectedEl.getBoundingClientRect() : resizableTarget!.getBoundingClientRect();
-            const colCell = resizableTarget!.closest('td, th') as HTMLElement | null;
-            const colWidth = colCell?.getBoundingClientRect().width || 0;
-            const maxWidth = colWidth > 40 ? Math.round(colWidth) : 600;
+
+            // Resolve the true layout column / container cell.
+            // For elements nested inside component helper tables (e.g. bulletproof buttons or social strips),
+            // the immediate closest('td, th') is just an internal tight wrapper cell whose width equals the element.
+            // Look up past nested component tables to find the enclosing column, row, or content container.
+            let colCell = resizableTarget!.closest('td, th') as HTMLElement | null;
+            if (colCell) {
+              const nestedTable = colCell.closest('table');
+              if (nestedTable && nestedTable.parentElement) {
+                const parentCell = (nestedTable.parentElement.closest('td, th') ||
+                  nestedTable.closest('td.column, th.column, div.column') ||
+                  unit.closest('td, th')) as HTMLElement | null;
+                if (parentCell && parentCell !== colCell) {
+                  colCell = parentCell;
+                }
+              }
+            }
+
+            const unitRect = unit?.getBoundingClientRect();
+            const colRect = colCell?.getBoundingClientRect();
+            const colWidth = (colRect && colRect.width > 40)
+              ? colRect.width
+              : (unitRect && unitRect.width > 40 ? unitRect.width : 600);
+            const maxWidth = Math.round(colWidth);
 
             let parsedWidth = 120;
             let parsedHeight = 80;

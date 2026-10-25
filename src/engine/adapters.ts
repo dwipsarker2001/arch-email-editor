@@ -225,7 +225,7 @@ export const ButtonAdapter = {
   },
 
   setWidth(el: HTMLElement, width: string, unit?: HTMLElement): void {
-    const { anchor, visualBox, msoComments } = resolveButtonAnatomy(el, unit);
+    const { anchor, visualBox, padCell, msoComments } = resolveButtonAnatomy(el, unit);
     const norm = /^\d+$/.test(width.trim()) ? `${width.trim()}px` : width.trim();
     visualBox.style.width = norm;
     visualBox.style.boxSizing = 'border-box';
@@ -237,6 +237,10 @@ export const ButtonAdapter = {
       anchor.style.boxSizing = 'border-box';
       anchor.style.display = 'inline-block';
       anchor.style.textAlign = 'center';
+    }
+
+    if (padCell && !padCell.classList.contains('pad') && (padCell.getAttribute('width') || padCell.style.width)) {
+      padCell.style.width = norm;
     }
 
     const px = parseFloat(norm);
