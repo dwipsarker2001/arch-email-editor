@@ -2107,6 +2107,15 @@ input:checked + .arch-toggle-slider:before {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
+/* Active drag grabbing cursor styles */
+body.arch-canvas-dragging,
+body.arch-canvas-dragging *,
+.arch-canvas-container.arch-is-dragging,
+.arch-canvas-container.arch-is-dragging *,
+.arch-canvas-overlay.arch-is-dragging {
+  cursor: grabbing !important;
+}
+
 .arch-figma-drag-ghost {
   position: absolute;
   left: 0;

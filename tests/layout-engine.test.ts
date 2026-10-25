@@ -2003,6 +2003,18 @@ describe('Figma vertical displacement', () => {
     expect(selOverlay).not.toBeNull();
     expect(selOverlay.style.display).toBe('block');
 
+    // 3. During pointer drag move: does NOT show tooltip with cursor, changes cursor to grabbing
+    const canvasContainer = container.querySelector('.arch-canvas-container') as HTMLElement;
+    row.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 100, clientY: 100, button: 0 }));
+    canvas.handlePointerDragMove(150, 150);
+    expect(overlay.querySelector('.arch-figma-drag-ghost')).toBeNull();
+    expect(overlay.style.cursor).toBe('grabbing');
+    expect(canvasContainer.classList.contains('arch-is-dragging')).toBe(true);
+
+    canvas.finishPointerDrag();
+    expect(overlay.style.cursor).toBe('');
+    expect(canvasContainer.classList.contains('arch-is-dragging')).toBe(false);
+
     editor.destroy();
     container.remove();
   });

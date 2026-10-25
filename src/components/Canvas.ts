@@ -132,7 +132,6 @@ export class Canvas {
   private resizeHandles: HTMLElement[] = [];
   private pendingMove: { x: number; y: number } | null = null;
   private moveRaf = 0;
-  private containerRectCache: DOMRect | null = null;
   private displaceKey = '';
   private dropMemoDragged: HTMLElement | null = null;
   private slotRectCache = new Map<HTMLElement, { rect: DOMRect; scrollX: number; scrollY: number }>();
@@ -496,12 +495,14 @@ export class Canvas {
         ifrDoc.activeElement.blur();
       }
 
-      // Activate parent overlay shield so pointer tracking is 100% smooth across iframe boundaries
+      // Activate parent overlay shield and set grabbing cursor
       this.overlayLayer.style.pointerEvents = 'auto';
-      this.createDragGhost(cand.unit, clientX, clientY);
+      this.overlayLayer.style.cursor = 'grabbing';
+      this.containerElement.classList.add('arch-is-dragging');
+      document.body.classList.add('arch-canvas-dragging');
+      if (ifrDoc?.body) ifrDoc.body.style.cursor = 'grabbing';
     }
 
-    this.updateDragGhostPosition(clientX, clientY);
     this.updateDropTargetFromClientPoint(clientX, clientY);
   }
 
@@ -512,7 +513,6 @@ export class Canvas {
     const cand = this.pointerDragCandidate;
     this.pointerDragCandidate = null;
     this.pendingMove = null;
-    this.containerRectCache = null;
 
     if (!cand || !cand.active) {
       return;
@@ -529,37 +529,16 @@ export class Canvas {
     }
   }
 
-  /**
-   * Creates the floating Figma Ghost Preview Card during pointer drag.
-   */
-  private createDragGhost(unit: HTMLElement, clientX: number, clientY: number): void {
-    this.removeDragGhost();
-    const desc = describeUnitForLayer(unit);
-    const ghost = document.createElement('div');
-    ghost.className = 'arch-figma-drag-ghost';
-    ghost.innerHTML = `
-      <span class="arch-ghost-badge">${desc.label}</span>
-      <span class="arch-ghost-text">${desc.sublabel || 'Moving layer'}</span>
-    `;
-    this.overlayLayer.appendChild(ghost);
-    this.dragGhostEl = ghost;
-    this.updateDragGhostPosition(clientX, clientY);
-  }
-
-  private updateDragGhostPosition(clientX: number, clientY: number): void {
-    if (!this.dragGhostEl) return;
-    // GPU-composited move (no layout): cached container origin + translate3d
-    if (!this.containerRectCache) this.containerRectCache = this.containerElement.getBoundingClientRect();
-    const x = clientX - this.containerRectCache.left + 14;
-    const y = clientY - this.containerRectCache.top + 14;
-    this.dragGhostEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-  }
-
   private removeDragGhost(): void {
     if (this.dragGhostEl) {
       this.dragGhostEl.remove();
       this.dragGhostEl = null;
     }
+    this.overlayLayer.style.cursor = '';
+    this.containerElement.classList.remove('arch-is-dragging');
+    document.body.classList.remove('arch-canvas-dragging');
+    const ifrDoc = this.iframe.contentDocument;
+    if (ifrDoc?.body) ifrDoc.body.style.cursor = '';
   }
 
   /**
@@ -1358,6 +1337,10 @@ export class Canvas {
       .arch-hover-element .arch-hover-element,
       .arch-hover-element .arch-selected-element {
         outline: none !important;
+      }
+      body.arch-canvas-dragging,
+      body.arch-canvas-dragging * {
+        cursor: grabbing !important;
       }
       .arch-dragging-source {
         opacity: 0.35 !important;
