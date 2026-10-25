@@ -45,6 +45,13 @@ onBeforeUnmount(() => {
 defineExpose({
   getJSON: () => editorInstance?.getJSON() ?? null,
   getHTML: () => editorInstance?.getHTML() ?? '',
+  setHTML: (html: string) => editorInstance?.setHTML(html),
+  loadHTML: (html: string) => editorInstance?.loadHTML(html),
+  insertHTML: (html: string, options?: any) => editorInstance?.insertHTML(html, options),
+  setTemplateName: (name: string) => editorInstance?.setTemplateName(name),
+  getTemplateName: () => editorInstance?.getTemplateName() ?? '',
+  addCustomButton: (button: any) => editorInstance?.addCustomButton(button),
+  removeCustomButton: (id: string) => editorInstance?.removeCustomButton(id),
   getEditor: () => editorInstance
 });
 </script>
