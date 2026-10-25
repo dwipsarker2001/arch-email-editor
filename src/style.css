@@ -2258,6 +2258,12 @@ input:checked + .arch-toggle-slider:before {
   outline: none;
 }
 
+.arch-crop-ratio-btn.is-active {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #2563eb !important;
+}
+
 /* Figma Image Resize Corner Handles */
 .arch-resize-handle {
   position: absolute;

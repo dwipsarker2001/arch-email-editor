@@ -171,6 +171,28 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     const emptyState = assetsPanel?.querySelector('#arch-assets-empty-state');
     expect(emptyState).not.toBeNull();
     expect(emptyState?.textContent).toContain('No assets available');
+
+    // Test functional Remove button
+    const removeBtn = container.querySelector('#btn-img-remove');
+    expect(removeBtn).not.toBeNull();
+    removeBtn?.click();
+    expect(container.querySelector<HTMLInputElement>('#inp-img-src')?.value).toBe('');
+    expect(container.querySelector('#arch-img-preview-box')?.classList.contains('is-empty')).toBe(true);
+
+    // Test functional Crop button
+    const curSrcInput = container.querySelector<HTMLInputElement>('#inp-img-src');
+    if (curSrcInput) {
+      curSrcInput.value = 'https://example.com/test-crop.jpg';
+      curSrcInput.dispatchEvent(new Event('input'));
+    }
+    const cropBtn = container.querySelector('#btn-img-crop');
+    expect(cropBtn).not.toBeNull();
+    cropBtn?.click();
+    const cropModal = document.querySelector('#arch-crop-modal-overlay');
+    expect(cropModal).not.toBeNull();
+    const closeCropBtn = cropModal?.querySelector('#btn-crop-modal-close');
+    closeCropBtn?.click();
+    expect(document.querySelector('#arch-crop-modal-overlay')).toBeNull();
   });
 
 });

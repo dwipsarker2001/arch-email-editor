@@ -1255,15 +1255,122 @@ export class Inspector {
     });
   }
 
+  public openCropModal(imageUrl: string, onApply: (croppedDataUrl: string) => void): void {
+    const existing = document.getElementById('arch-crop-modal-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'arch-modal-overlay';
+    overlay.id = 'arch-crop-modal-overlay';
+    overlay.style.zIndex = '9999';
+
+    let selectedRatio = '1:1';
+
+    overlay.innerHTML = `
+      <div class="arch-modal" style="max-width: 480px; width: 90%;">
+        <div class="arch-modal__header">
+          <div style="font-weight: 700; font-size: 14px; color: #0f172a;">Crop Image</div>
+          <button type="button" class="arch-modal__close" id="btn-crop-modal-close" style="background: none; border: none; cursor: pointer; color: #64748b; padding: 4px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="arch-modal__body" style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="width: 100%; height: 220px; background: #0f172a; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
+            <img id="arch-crop-modal-img" src="${imageUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;" crossOrigin="anonymous" />
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 8px; text-transform: uppercase;">Select Aspect Ratio</div>
+            <div class="arch-crop-ratios" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+              <button type="button" class="arch-btn arch-crop-ratio-btn is-active" data-ratio="1:1" style="font-size: 11px; padding: 6px 4px; text-align: center;">1:1 Square</button>
+              <button type="button" class="arch-btn arch-crop-ratio-btn" data-ratio="16:9" style="font-size: 11px; padding: 6px 4px; text-align: center;">16:9 Wide</button>
+              <button type="button" class="arch-btn arch-crop-ratio-btn" data-ratio="4:3" style="font-size: 11px; padding: 6px 4px; text-align: center;">4:3 Standard</button>
+              <button type="button" class="arch-btn arch-crop-ratio-btn" data-ratio="3:2" style="font-size: 11px; padding: 6px 4px; text-align: center;">3:2 Photo</button>
+            </div>
+          </div>
+        </div>
+        <div style="padding: 12px 18px; border-top: 1px solid var(--arch-border); display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="arch-btn" id="btn-crop-modal-cancel">Cancel</button>
+          <button type="button" class="arch-btn arch-btn--primary" id="btn-crop-modal-apply">Apply Crop</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const closeBtn = overlay.querySelector('#btn-crop-modal-close');
+    const cancelBtn = overlay.querySelector('#btn-crop-modal-cancel');
+    const applyBtn = overlay.querySelector('#btn-crop-modal-apply');
+    const ratioBtns = overlay.querySelectorAll<HTMLButtonElement>('.arch-crop-ratio-btn');
+
+    const closeModal = () => overlay.remove();
+    closeBtn?.addEventListener('click', closeModal);
+    cancelBtn?.addEventListener('click', closeModal);
+
+    ratioBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        ratioBtns.forEach(b => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        selectedRatio = btn.getAttribute('data-ratio') || '1:1';
+      });
+    });
+
+    applyBtn?.addEventListener('click', () => {
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const natW = img.naturalWidth || img.width || 400;
+          const natH = img.naturalHeight || img.height || 400;
+          let targetRatio = 1;
+          if (selectedRatio === '16:9') targetRatio = 16 / 9;
+          else if (selectedRatio === '4:3') targetRatio = 4 / 3;
+          else if (selectedRatio === '3:2') targetRatio = 3 / 2;
+          else targetRatio = 1;
+
+          let cropW = natW;
+          let cropH = natW / targetRatio;
+          if (cropH > natH) {
+            cropH = natH;
+            cropW = natH * targetRatio;
+          }
+
+          const startX = (natW - cropW) / 2;
+          const startY = (natH - cropH) / 2;
+
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(cropW);
+          canvas.height = Math.round(cropH);
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, startX, startY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+            const cropped = canvas.toDataURL('image/png');
+            onApply(cropped);
+          } else {
+            onApply(imageUrl);
+          }
+          closeModal();
+        };
+        img.onerror = () => {
+          onApply(imageUrl);
+          closeModal();
+        };
+        img.src = imageUrl;
+      } catch {
+        onApply(imageUrl);
+        closeModal();
+      }
+    });
+  }
+
   private renderImageElementControls(container: HTMLElement, info: SelectedElementInfo): void {
     let src = ImageAdapter.getSrc(info.element, info.unit) || info.src || '';
     if (!src && info.element) {
       const img = info.element.tagName.toLowerCase() === 'img' ? (info.element as HTMLImageElement) : info.element.querySelector<HTMLImageElement>('img');
-      if (img) src = img.getAttribute('src') || img.src || '';
+      if (img) src = img.getAttribute('src') || '';
     }
     if (!src && info.unit) {
       const img = info.unit.querySelector<HTMLImageElement>('img');
-      if (img) src = img.getAttribute('src') || img.src || '';
+      if (img) src = img.getAttribute('src') || '';
     }
     const alt = ImageAdapter.getAlt(info.element, info.unit);
     const linkUrl = ImageAdapter.getLinkUrl(info.element, info.unit);
@@ -1511,13 +1618,39 @@ export class Inspector {
       updateDimensionsAndSize(src);
     }
 
-    // Dummy crop and remove buttons
-    cropBtn?.addEventListener('click', (e) => {
-      e.preventDefault();
-    });
+    const applySelectedUrl = (url: string, explicitName?: string, fileSize?: number | string) => {
+      const srcInp = container.querySelector<HTMLInputElement>('#inp-img-src');
+      if (srcInp) srcInp.value = url;
+      updatePreview(url, explicitName, fileSize);
+      ImageAdapter.setSrc(info.element, url, info.unit);
+      this.events.onChange();
+    };
 
+    // Functional remove button: clears image & fires onRemoveImage callback
     removeBtn?.addEventListener('click', (e) => {
       e.preventDefault();
+      if (this.events.onRemoveImage) {
+        this.events.onRemoveImage(info.element);
+      }
+      applySelectedUrl('');
+    });
+
+    // Functional crop button: opens aspect ratio crop modal & fires onCropImage callback
+    cropBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (this.events.onCropImage) {
+        this.events.onCropImage(info.element);
+      }
+
+      const currentSrc = ImageAdapter.getSrc(info.element, info.unit) || (srcInp ? srcInp.value : '') || '';
+      if (!currentSrc) {
+        this.showUploadNotice('Please select or upload an image first to crop.');
+        return;
+      }
+
+      this.openCropModal(currentSrc, (croppedUrl) => {
+        applySelectedUrl(croppedUrl, 'cropped-image.png');
+      });
     });
 
     // Replace Dropdown Handlers
@@ -1547,14 +1680,6 @@ export class Inspector {
       }
     };
     document.addEventListener('click', onDocClick);
-
-    const applySelectedUrl = (url: string, explicitName?: string, fileSize?: number | string) => {
-      const srcInp = container.querySelector<HTMLInputElement>('#inp-img-src');
-      if (srcInp) srcInp.value = url;
-      updatePreview(url, explicitName, fileSize);
-      ImageAdapter.setSrc(info.element, url, info.unit);
-      this.events.onChange();
-    };
 
     uploadOpt?.addEventListener('click', (e) => {
       e.stopPropagation();

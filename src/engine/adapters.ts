@@ -338,7 +338,8 @@ export const ImageAdapter = {
   },
 
   setSrc(el: HTMLElement, src: string, unit?: HTMLElement): void {
-    resolveImageAnatomy(el, unit).img.setAttribute('src', src);
+    const { img } = resolveImageAnatomy(el, unit);
+    if (!src) { img.removeAttribute('src'); } else { img.setAttribute('src', src); }
   },
 
   getAlt(el: HTMLElement, unit?: HTMLElement): string {
