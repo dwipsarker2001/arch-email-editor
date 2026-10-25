@@ -267,7 +267,7 @@ export class Canvas {
    */
   public syncHUDPosition(): void {
     const target = this.activeMoveableUnit || this.hoveredUnit;
-    if (target && (this.floatingToolbar || this.columnResizeHandles.length > 0)) {
+    if (target && (this.floatingToolbar || this.bottomActions || this.columnResizeHandles.length > 0)) {
       this.positionFloatingToolbar(target, this.floatingToolbar || undefined);
     }
   }
@@ -1290,8 +1290,8 @@ export class Canvas {
         color: #ffffff !important;
       }
       .arch-selected-element {
-        outline: 2px solid #7747ff !important;
-        outline-offset: -2px;
+        outline: 1px solid #7747ff !important;
+        outline-offset: -1px !important;
       }
       .arch-hover-element:not(.arch-selected-element) {
         outline: 1.5px solid rgba(119, 71, 255, 0.75) !important;
@@ -1613,8 +1613,8 @@ export class Canvas {
 
     const onScroll = () => {
       const target = this.activeMoveableUnit || this.hoveredUnit;
-      if (target && this.floatingToolbar) {
-        this.positionFloatingToolbar(target, this.floatingToolbar);
+      if (target && (this.floatingToolbar || this.bottomActions)) {
+        this.positionFloatingToolbar(target, this.floatingToolbar || undefined);
       }
     };
     doc.addEventListener('scroll', onScroll, { passive: true, signal });
@@ -1932,9 +1932,9 @@ export class Canvas {
       return;
     }
 
-    // 1. If clicking inside the currently selected container, keep ONLY that container selected (NEVER enter edit mode on single click)
+    // 1. If clicking inside the currently selected container, keep that container selected and focus the clicked item
     if (this.activeMoveableUnit && chain.includes(this.activeMoveableUnit)) {
-      this.selectUnit(this.activeMoveableUnit, this.activeMoveableUnit);
+      this.selectUnit(selectable, this.activeMoveableUnit);
       return;
     }
 
@@ -1947,15 +1947,15 @@ export class Canvas {
         const sameRoleUnit = chain.find((u) => classifyUnitRole(u) === activeRole);
         if (sameRoleUnit) {
           this.exitTextEditMode();
-          this.selectUnit(sameRoleUnit, sameRoleUnit);
+          this.selectUnit(selectable, sameRoleUnit);
           return;
         }
       }
     }
 
-    // 3. Otherwise select the Top Container (`chain[0]`, the Row Frame)!
+    // 3. Otherwise select the element and its top container!
     this.exitTextEditMode();
-    this.selectUnit(chain[0], chain[0]);
+    this.selectUnit(selectable, chain[0]);
   }
 
   /**
@@ -2034,6 +2034,9 @@ export class Canvas {
     this.selectedElement = effectiveSelectable;
     this.activeMoveableUnit = resolvedUnit;
     resolvedUnit.classList.add('arch-selected-element');
+    if (effectiveSelectable && effectiveSelectable !== resolvedUnit) {
+      effectiveSelectable.classList.add('arch-selected-element');
+    }
 
     this.renderFloatingToolbar(resolvedUnit, effectiveSelectable);
 
@@ -2166,13 +2169,13 @@ export class Canvas {
     bottomActions.className = 'arch-rge-bottom-actions';
     bottomActions.innerHTML = `
       <button type="button" class="arch-rge-action-btn btn-rge-comment" title="Add comment">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       </button>
       <button type="button" class="arch-rge-action-btn btn-rge-del" title="Delete element">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       </button>
-      <button type="button" class="arch-rge-action-btn btn-rge-dup" title="Duplicate element">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      <button type="button" class="arch-rge-action-btn btn-rge-dup" title="Copy / Duplicate element">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
       </button>
     `;
 
@@ -2551,10 +2554,19 @@ export class Canvas {
     const offsetX = iframeRect.left - containerRect.left;
     const offsetY = iframeRect.top - containerRect.top;
 
-    // 1. Bottom-left action bar (attached directly below the bottom edge)
+    // 1. Bottom-left action bar (attached directly to the bottom-left corner of selected item)
     if (this.bottomActions) {
-      const actionsTop = offsetY + unitRect.bottom;
-      const actionsLeft = offsetX + unitRect.left;
+      const targetEl =
+        this.selectedElement && this.selectedElement !== this.iframe.contentDocument?.body
+          ? this.selectedElement
+          : unit;
+      const targetRect = targetEl.getBoundingClientRect();
+      const actionsHeight = 28;
+      let actionsTop = offsetY + targetRect.bottom;
+      if (actionsTop + actionsHeight > containerRect.height - 4) {
+        actionsTop = Math.max(4, offsetY + targetRect.bottom - actionsHeight);
+      }
+      const actionsLeft = Math.max(4, Math.min(offsetX + targetRect.left, containerRect.width - 95));
       this.bottomActions.style.top = `${actionsTop}px`;
       this.bottomActions.style.left = `${actionsLeft}px`;
     }

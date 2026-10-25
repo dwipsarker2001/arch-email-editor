@@ -10,6 +10,7 @@
   --arch-danger: #ef4444;
   --arch-radius: 8px;
   --arch-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --arch-sidebar-width: 360px;
 }
 
 .arch-editor {
@@ -42,6 +43,11 @@
 }
 
 /* Defensive resets against Tailwind Preflight, Bootstrap, and host CSS resets */
+.arch-editor,
+.arch-editor * {
+  box-sizing: border-box;
+}
+
 .arch-editor button,
 .arch-editor input,
 .arch-editor select,
@@ -51,6 +57,190 @@
   line-height: inherit;
   color: inherit;
   margin: 0;
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   ARCH EMAIL EDITOR - HOST ISOLATION SHIELD
+   Completely neutralizes external host CMS styles (e.g. input[type="text"])
+   ========================================================================== */
+
+/* 1. Stepper Input ([ - ] [ value ] [ + ]) */
+.arch-editor .arch-stepper input,
+.arch-editor .arch-stepper input[type="text"],
+.arch-editor .arch-stepper input[type="number"],
+.arch-editor input.arch-stepper-val {
+  border: none !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  width: 36px !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #111827 !important;
+  text-align: center !important;
+  line-height: normal !important;
+  transition: none !important;
+  -moz-appearance: textfield !important;
+  -webkit-appearance: none !important;
+}
+
+.arch-editor .arch-stepper input:hover,
+.arch-editor .arch-stepper input:focus,
+.arch-editor .arch-stepper input:active,
+.arch-editor input.arch-stepper-val:hover,
+.arch-editor input.arch-stepper-val:focus,
+.arch-editor input.arch-stepper-val:active {
+  border: none !important;
+  border-width: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* 2. Color Picker Hex Input ([ ■ ] [ #000000 ]) */
+.arch-editor .arch-color-picker-control input[type="text"],
+.arch-editor .arch-color-picker-control input,
+.arch-editor input.arch-color-hex {
+  border: none !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin: 0 0 0 8px !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  width: 65px !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #111827 !important;
+  text-transform: uppercase !important;
+  line-height: normal !important;
+  transition: none !important;
+}
+
+.arch-editor .arch-color-picker-control input:hover,
+.arch-editor .arch-color-picker-control input:focus,
+.arch-editor .arch-color-picker-control input:active,
+.arch-editor input.arch-color-hex:hover,
+.arch-editor input.arch-color-hex:focus,
+.arch-editor input.arch-color-hex:active {
+  border: none !important;
+  border-width: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* 3. URL Input with prefix ([ Url ] [ https://... ]) */
+.arch-editor .arch-url-group input,
+.arch-editor .arch-url-group input[type="text"],
+.arch-editor input.arch-url-input {
+  border: none !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 10px !important;
+  margin: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  font-size: 12px !important;
+  color: #111827 !important;
+  flex: 1 !important;
+  line-height: normal !important;
+  transition: none !important;
+}
+
+.arch-editor .arch-url-group input:hover,
+.arch-editor .arch-url-group input:focus,
+.arch-editor .arch-url-group input:active,
+.arch-editor input.arch-url-input:hover,
+.arch-editor input.arch-url-input:focus,
+.arch-editor input.arch-url-input:active {
+  border: none !important;
+  border-width: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* 4. Stepper Buttons */
+.arch-editor .arch-stepper button,
+.arch-editor .arch-stepper .arch-stepper-btn {
+  border-top: none !important;
+  border-bottom: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #4b5563 !important;
+  width: 28px !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  font-size: 15px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+}
+
+.arch-editor .arch-stepper .arch-stepper-btn--minus {
+  border-left: none !important;
+  border-right: 1px solid #e5e7eb !important;
+}
+
+.arch-editor .arch-stepper .arch-stepper-btn--plus {
+  border-right: none !important;
+  border-left: 1px solid #e5e7eb !important;
+}
+
+/* 5. Select dropdowns */
+.arch-editor select.arch-select,
+.arch-editor select.arch-rge-select {
+  height: 32px !important;
+  padding: 0 24px 0 8px !important;
+  font-size: 12px !important;
+  color: #111827 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 4px !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 6. Toggle Switch hidden checkbox */
+.arch-editor .arch-toggle-switch input {
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  position: absolute !important;
+  pointer-events: none !important;
 }
 
 .arch-editor svg {
@@ -136,23 +326,26 @@
   background-color: rgba(0, 0, 0, 0.06);
 }
 
+.arch-editor input.arch-template-name-input,
+.arch-editor .arch-template-name-input,
 .arch-template-name-input {
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border: 1px solid var(--arch-primary);
-  border-radius: 4px;
-  background-color: var(--arch-bg-surface);
-  color: var(--arch-text-primary);
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  padding: 2px 8px !important;
+  border: 1px solid var(--arch-primary) !important;
+  border-radius: 4px !important;
+  background-color: var(--arch-bg-surface) !important;
+  color: var(--arch-text-primary) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
 }
 
 .arch-custom-buttons {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  order: 10;
 }
 
 .arch-size-badge {
@@ -252,6 +445,66 @@
   border-color: #fecaca;
 }
 
+/* ==========================================================================
+   Topbar Right-Side Action Buttons: Framework-Isolated Pure White Text & Icons
+   Ensures 100% resilience against Bootstrap (.btn) and Tailwind resets
+   ========================================================================== */
+.arch-editor .arch-editor__actions .arch-btn {
+  box-sizing: border-box !important;
+  color: #ffffff !important;
+  background-color: #334155 !important;
+  border: 1px solid #475569 !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+}
+
+.arch-editor .arch-editor__actions .arch-btn span {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-decoration: none !important;
+}
+
+.arch-editor .arch-editor__actions .arch-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+  fill: none !important;
+}
+
+.arch-editor .arch-editor__actions .arch-btn:hover:not(:disabled) {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #ffffff !important;
+}
+
+/* Primary Action: Export HTML */
+.arch-editor .arch-editor__actions .arch-btn--primary {
+  background-color: #2563eb !important;
+  border-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+.arch-editor .arch-editor__actions .arch-btn--primary:hover:not(:disabled) {
+  background-color: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+  color: #ffffff !important;
+}
+
+/* Destructive Action: Clear */
+.arch-editor .arch-editor__actions .arch-btn--danger,
+.arch-editor .arch-editor__actions .arch-btn--clear {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+.arch-editor .arch-editor__actions .arch-btn--danger:hover:not(:disabled),
+.arch-editor .arch-editor__actions .arch-btn--clear:hover:not(:disabled) {
+  background-color: #b91c1c !important;
+  border-color: #b91c1c !important;
+  color: #ffffff !important;
+}
+
 /* Main Body Layout: Canvas (left/full) + Right Panel (Blocks | Sections | Settings) */
 .arch-editor__body {
   display: flex;
@@ -262,7 +515,7 @@
 
 /* Right Panel (Blocks | Sections | Settings) */
 .arch-editor__right-panel {
-  width: 420px;
+  width: var(--arch-sidebar-width, 360px);
   background-color: #ffffff;
   border-left: 1px solid #e5e7eb;
   display: flex;
@@ -595,22 +848,27 @@
   pointer-events: none;
 }
 
+.arch-editor input.arch-sections-search-input,
+.arch-editor .arch-sections-search-input,
 .arch-sections-search-input {
   width: 100%;
-  box-sizing: border-box;
-  padding: 7px 10px 7px 30px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 12px;
-  background-color: #ffffff;
-  color: #1e293b;
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box !important;
+  padding: 7px 10px 7px 30px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+  outline: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
 }
 
+.arch-editor input.arch-sections-search-input:focus,
+.arch-editor .arch-sections-search-input:focus,
 .arch-sections-search-input:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
+  outline: none !important;
 }
 
 .arch-sections-grid {
@@ -888,61 +1146,94 @@
 }
 
 /* RGE Stepper [ - ] [ value ] [ + ] */
+.arch-editor .arch-stepper,
 .arch-stepper {
   display: inline-flex;
   align-items: center;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: #ffffff;
+  border: 1px solid #d1d5db !important;
+  border-radius: 4px !important;
+  background: #ffffff !important;
   overflow: hidden;
   height: 32px;
+  box-sizing: border-box !important;
 }
 
+.arch-editor .arch-stepper-btn,
+.arch-editor button.arch-stepper-btn,
+.arch-editor .arch-stepper button,
 .arch-stepper-btn {
-  width: 28px;
-  height: 100%;
-  background: #ffffff;
-  border: none;
-  font-size: 15px;
-  font-weight: 400;
-  color: #4b5563;
+  width: 28px !important;
+  height: 100% !important;
+  background: #ffffff !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 15px !important;
+  font-weight: 400 !important;
+  color: #4b5563 !important;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  user-select: none;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  user-select: none !important;
+  box-sizing: border-box !important;
   transition: background 0.12s ease, color 0.12s ease;
 }
 
+.arch-editor .arch-stepper-btn--minus,
 .arch-stepper-btn--minus {
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb !important;
 }
 
+.arch-editor .arch-stepper-btn--plus,
 .arch-stepper-btn--plus {
-  border-left: 1px solid #e5e7eb;
+  border-left: 1px solid #e5e7eb !important;
 }
 
+.arch-editor .arch-stepper-btn:hover,
 .arch-stepper-btn:hover {
-  background: #f9fafb;
-  color: #111827;
+  background: #f9fafb !important;
+  color: #111827 !important;
 }
 
+.arch-editor .arch-stepper-btn:active,
 .arch-stepper-btn:active {
-  background: #e5e7eb;
+  background: #e5e7eb !important;
 }
 
+.arch-editor .arch-stepper-val,
+.arch-editor input.arch-stepper-val,
+.arch-editor .arch-stepper input,
 .arch-stepper-val {
-  width: 36px;
-  height: 100%;
-  border: none;
-  outline: none;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: #111827;
-  background: #ffffff;
-  padding: 0;
-  -moz-appearance: textfield;
+  width: 36px !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  text-align: center !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #111827 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  -moz-appearance: textfield !important;
+}
+
+.arch-editor .arch-stepper-val:focus,
+.arch-editor input.arch-stepper-val:focus,
+.arch-editor .arch-stepper input:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
 .arch-stepper-val::-webkit-inner-spin-button,
@@ -963,62 +1254,102 @@
 }
 
 /* Select Control */
+.arch-editor select.arch-select,
+.arch-editor select.arch-rge-select,
+.arch-editor .arch-select,
+.arch-editor .arch-rge-select,
 .arch-select,
 .arch-rge-select {
-  height: 32px;
+  height: 32px !important;
   width: 145px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  padding: 0 26px 0 10px;
-  font-size: 12px;
-  color: #111827;
-  background-color: #ffffff;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: calc(100% - 8px) center;
-  appearance: none;
-  outline: none;
+  border: 1px solid #d1d5db !important;
+  border-radius: 4px !important;
+  padding: 0 26px 0 10px !important;
+  margin: 0 !important;
+  font-size: 12px !important;
+  color: #111827 !important;
+  background-color: #ffffff !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: calc(100% - 8px) center !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
   cursor: pointer;
 }
 
+.arch-editor select.arch-select:focus,
+.arch-editor select.arch-rge-select:focus,
+.arch-editor .arch-select:focus,
+.arch-editor .arch-rge-select:focus,
 .arch-select:focus,
 .arch-rge-select:focus {
-  border-color: #7747ff;
+  border-color: #7747ff !important;
+  box-shadow: 0 0 0 2px rgba(119, 71, 255, 0.15) !important;
+  outline: none !important;
 }
 
 /* URL Input with prefix */
+.arch-editor .arch-url-group,
 .arch-url-group {
   display: flex;
   align-items: center;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: #ffffff;
+  border: 1px solid #d1d5db !important;
+  border-radius: 4px !important;
+  background: #ffffff !important;
   overflow: hidden;
   height: 32px;
+  box-sizing: border-box !important;
 }
 
+.arch-editor .arch-url-prefix,
 .arch-url-prefix {
-  padding: 0 10px;
-  height: 100%;
-  background: #f9fafb;
-  border-right: 1px solid #e5e7eb;
-  font-size: 11px;
-  font-weight: 600;
-  color: #6b7280;
-  display: flex;
-  align-items: center;
+  padding: 0 10px !important;
+  height: 100% !important;
+  background: #f9fafb !important;
+  border-right: 1px solid #e5e7eb !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #6b7280 !important;
+  display: flex !important;
+  align-items: center !important;
   flex-shrink: 0;
+  box-sizing: border-box !important;
 }
 
+.arch-editor .arch-url-input,
+.arch-editor input.arch-url-input,
+.arch-editor .arch-url-group input,
 .arch-url-input {
-  border: none;
-  outline: none;
-  padding: 0 10px;
-  font-size: 12px;
-  color: #111827;
-  flex: 1;
-  background: transparent;
-  height: 100%;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 10px !important;
+  margin: 0 !important;
+  font-size: 12px !important;
+  color: #111827 !important;
+  flex: 1 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-url-input:focus,
+.arch-editor input.arch-url-input:focus,
+.arch-editor .arch-url-group input:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
 }
 
 .arch-action-links {
@@ -1110,30 +1441,38 @@
 }
 
 /* Color Picker Swatch Control */
+.arch-editor .arch-color-picker-control,
 .arch-color-picker-control {
   display: inline-flex;
   align-items: center;
   height: 32px;
   width: 105px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  padding: 2px 8px;
-  background: #ffffff;
-  box-sizing: border-box;
+  border: 1px solid #d1d5db !important;
+  border-radius: 4px !important;
+  padding: 2px 8px !important;
+  background: #ffffff !important;
+  box-sizing: border-box !important;
   position: relative;
   cursor: pointer;
 }
 
+.arch-editor .arch-color-swatch,
+.arch-editor input[type="color"].arch-color-swatch,
 .arch-color-swatch {
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  border-radius: 2px;
+  width: 18px !important;
+  height: 18px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  outline: none !important;
   cursor: pointer;
   flex-shrink: 0;
-  background: none;
+  background: none !important;
   overflow: hidden;
+  box-sizing: border-box !important;
 }
 
 /* Fill the swatch completely with the chosen color (strip UA padding/border) */
@@ -1151,17 +1490,36 @@
   border-radius: 1px;
 }
 
+.arch-editor .arch-color-hex,
+.arch-editor input.arch-color-hex,
+.arch-editor .arch-color-picker-control input[type="text"],
 .arch-color-hex {
-  border: none;
-  outline: none;
-  font-size: 12px;
-  font-family: inherit;
-  font-weight: 500;
-  width: 65px;
-  margin-left: 8px;
-  color: #111827;
-  background: transparent;
-  text-transform: uppercase;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin: 0 0 0 8px !important;
+  font-size: 12px !important;
+  font-family: inherit !important;
+  font-weight: 500 !important;
+  width: 65px !important;
+  color: #111827 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  text-transform: uppercase !important;
+  height: auto !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-color-hex:focus,
+.arch-editor input.arch-color-hex:focus,
+.arch-editor .arch-color-picker-control input[type="text"]:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
 }
 
 /* Toggle Switch */
@@ -1172,10 +1530,19 @@
   height: 20px;
 }
 
+.arch-editor .arch-toggle-switch input,
 .arch-toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  position: absolute !important;
 }
 
 .arch-toggle-slider {
@@ -1353,43 +1720,90 @@ input:checked + .arch-toggle-slider:before {
 }
 
 
-/* RGE Bottom Action Bar (Attached to bottom edge of selected block) */
+/* Unlayer-style Bottom Action Bar (Attached to bottom-left corner of selected item) */
+.arch-editor .arch-rge-bottom-actions,
 .arch-rge-bottom-actions {
   position: absolute;
-  display: flex;
-  background: #7747ff;
-  border-radius: 0 0 4px 4px;
-  overflow: hidden;
-  z-index: 45;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-  pointer-events: auto;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  background: #7747ff !important;
+  border-radius: 0 0 4px 4px !important;
+  overflow: hidden !important;
+  z-index: 9999 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  pointer-events: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  height: 28px !important;
 }
 
+.arch-editor .arch-rge-action-btn,
 .arch-rge-action-btn {
-  width: 26px;
-  height: 26px;
-  background: transparent;
-  border: none;
-  border-right: 1px solid rgba(255, 255, 255, 0.25);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  transition: background-color 0.12s ease;
+  width: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  background: transparent !important;
+  border: none !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  line-height: 1 !important;
+  transition: background-color 0.12s ease !important;
+  box-sizing: border-box !important;
 }
 
+.arch-editor .arch-rge-action-btn:last-child,
 .arch-rge-action-btn:last-child {
-  border-right: none;
+  border-right: none !important;
 }
 
+.arch-editor .arch-rge-action-btn:hover,
 .arch-rge-action-btn:hover {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.25) !important;
 }
 
+.arch-editor .arch-rge-action-btn:active,
 .arch-rge-action-btn:active {
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Ensure comment, delete, copy icons are always pure white with zero external framework bleed */
+.arch-editor .arch-rge-action-btn svg,
+.arch-rge-action-btn svg,
+.arch-rge-bottom-actions svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+  fill: none !important;
+  display: block !important;
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  max-width: 14px !important;
+  min-height: 14px !important;
+  max-height: 14px !important;
+  margin: auto !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-rge-action-btn svg *,
+.arch-rge-action-btn svg *,
+.arch-rge-bottom-actions svg * {
+  stroke: #ffffff !important;
+  color: #ffffff !important;
+  fill: none !important;
 }
 
 /* RGE Floating Rich-Text Formatting Toolbar */
@@ -1737,25 +2151,45 @@ input:checked + .arch-toggle-slider:before {
   color: var(--arch-text-secondary);
 }
 
+.arch-editor input.arch-input,
+.arch-editor textarea.arch-textarea,
+.arch-editor .arch-input,
+.arch-editor .arch-textarea,
 .arch-input,
-.arch-select,
 .arch-textarea {
   width: 100%;
-  padding: 8px 10px;
-  font-size: 13px;
-  border: 1px solid var(--arch-border);
-  border-radius: 6px;
-  color: var(--arch-text-primary);
-  background-color: var(--arch-bg-surface);
-  outline: none;
-  font-family: inherit;
+  padding: 8px 10px !important;
+  margin: 0 !important;
+  font-size: 13px !important;
+  border: 1px solid var(--arch-border, #e2e8f0) !important;
+  border-radius: 6px !important;
+  color: var(--arch-text-primary, #0f172a) !important;
+  background-color: var(--arch-bg-surface, #ffffff) !important;
+  outline: none !important;
+  font-family: inherit !important;
+  box-sizing: border-box !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
 }
 
+.arch-editor input.arch-input:focus,
+.arch-editor textarea.arch-textarea:focus,
+.arch-editor .arch-input:focus,
+.arch-editor .arch-textarea:focus,
 .arch-input:focus,
-.arch-select:focus,
 .arch-textarea:focus {
-  border-color: var(--arch-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  border-color: var(--arch-primary, #2563eb) !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15) !important;
+  outline: none !important;
+}
+
+.arch-editor #inp-doc-bg-url,
+.arch-editor input#inp-doc-bg-url {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  padding: 0 10px !important;
 }
 
 .arch-textarea {

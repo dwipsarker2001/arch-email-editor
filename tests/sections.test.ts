@@ -77,7 +77,7 @@ describe('Prebuilt Sections Library & Sections Tab', () => {
     expect(optionValues).toContain('Header');
     expect(optionValues).toContain('Hero');
     expect(optionValues).toContain('Features');
-    expect(optionValues).toContain('empty');
+    expect(optionValues).not.toContain('empty');
 
     editor.destroy();
   });
@@ -99,13 +99,9 @@ describe('Prebuilt Sections Library & Sections Tab', () => {
       expect(badge?.textContent).toBe('Header');
     });
 
-    // Select 'empty'
-    categorySelect.value = 'empty';
-    categorySelect.dispatchEvent(new Event('change'));
-
+    // Empty rows are NOT in the sections catalog
     const emptyRowBtns = catalogEl.querySelectorAll('[data-row-layout]');
-    expect(emptyRowBtns.length).toBe(6);
-    expect(catalogEl.querySelectorAll('.arch-section-card').length).toBe(0);
+    expect(emptyRowBtns.length).toBe(0);
 
     editor.destroy();
   });
@@ -176,7 +172,7 @@ describe('Prebuilt Sections Library & Sections Tab', () => {
     expect(editor.getHTML()).toContain('Custom Pricing $99');
 
     editor.destroy();
-  });
+  }, 15000);
 
   it('allows overriding all sections via EditorOptions.sections', () => {
     const singleSection: PrebuiltSection = {

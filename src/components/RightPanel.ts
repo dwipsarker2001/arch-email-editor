@@ -431,118 +431,56 @@ export class RightPanel {
         ...sortedCategories.map(
           (cat) =>
             `<option value="${escapeHtml(cat)}"${this.selectedCategory === cat ? ' selected' : ''}>${escapeHtml(cat)} (${categoryCounts.get(cat)})</option>`
-        ),
-        `<option value="empty"${this.selectedCategory === 'empty' ? ' selected' : ''}>Empty Rows (6)</option>`
+        )
       ];
       categorySelect.innerHTML = options.join('');
     }
 
     const query = this.searchQuery.trim().toLowerCase();
-    const isCategoryEmpty = this.selectedCategory === 'empty';
     const isCategoryAll = this.selectedCategory === 'all';
 
-    const emptyRowsHtml = `
-      <div class="arch-rows-list">
-        <button class="arch-row-card" type="button" draggable="true" data-row-layout="1-col" title="1 Column (100%)">
-          <div class="arch-row-silhouette">
-            <div class="arch-col-bar" style="width: 100%;"></div>
-          </div>
-        </button>
-        <button class="arch-row-card" type="button" draggable="true" data-row-layout="2-col-33-67" title="2 Columns (33% / 67%)">
-          <div class="arch-row-silhouette">
-            <div class="arch-col-bar" style="width: 30%;"></div>
-            <div class="arch-col-bar" style="width: 70%;"></div>
-          </div>
-        </button>
-        <button class="arch-row-card" type="button" draggable="true" data-row-layout="2-col-50-50" title="2 Columns (50% / 50%)">
-          <div class="arch-row-silhouette">
-            <div class="arch-col-bar" style="width: 50%;"></div>
-            <div class="arch-col-bar" style="width: 50%;"></div>
-          </div>
-        </button>
-        <button class="arch-row-card" type="button" draggable="true" data-row-layout="2-col-67-33" title="2 Columns (67% / 33%)">
-          <div class="arch-row-silhouette">
-            <div class="arch-col-bar" style="width: 70%;"></div>
-            <div class="arch-col-bar" style="width: 30%;"></div>
-          </div>
-        </button>
-        <button class="arch-row-card" type="button" draggable="true" data-row-layout="3-col" title="3 Columns (33% / 33% / 33%)">
-          <div class="arch-row-silhouette">
-            <div class="arch-col-bar" style="width: 33.33%;"></div>
-            <div class="arch-col-bar" style="width: 33.33%;"></div>
-            <div class="arch-col-bar" style="width: 33.33%;"></div>
-          </div>
-        </button>
-        <button class="arch-row-card" type="button" draggable="true" data-row-layout="4-col" title="4 Columns (25% each)">
-          <div class="arch-row-silhouette">
-            <div class="arch-col-bar" style="width: 25%;"></div>
-            <div class="arch-col-bar" style="width: 25%;"></div>
-            <div class="arch-col-bar" style="width: 25%;"></div>
-            <div class="arch-col-bar" style="width: 25%;"></div>
-          </div>
-        </button>
-      </div>
-    `;
+    const filtered = this.sections.filter((s) => {
+      const matchesCategory = isCategoryAll || (s.category || 'General') === this.selectedCategory;
+      const matchesQuery =
+        !query ||
+        s.name.toLowerCase().includes(query) ||
+        (s.description && s.description.toLowerCase().includes(query)) ||
+        (s.category && s.category.toLowerCase().includes(query));
+      return matchesCategory && matchesQuery;
+    });
 
-    if (isCategoryEmpty) {
+    if (filtered.length === 0) {
       catalogEl.innerHTML = `
-        <div class="arch-editor__section-label" style="margin-bottom: 10px;">Empty Row Layouts</div>
-        ${emptyRowsHtml}
+        <div class="arch-sections-empty-state">
+          <div style="font-weight: 600; font-size: 13px; color: var(--arch-text-primary); margin-bottom: 4px;">No sections found</div>
+          <div style="font-size: 12px; color: var(--arch-text-secondary); line-height: 1.5;">Try searching with different terms or selecting another category.</div>
+        </div>
       `;
     } else {
-      const filtered = this.sections.filter((s) => {
-        const matchesCategory = isCategoryAll || (s.category || 'General') === this.selectedCategory;
-        const matchesQuery =
-          !query ||
-          s.name.toLowerCase().includes(query) ||
-          (s.description && s.description.toLowerCase().includes(query)) ||
-          (s.category && s.category.toLowerCase().includes(query));
-        return matchesCategory && matchesQuery;
-      });
-
-      if (filtered.length === 0) {
-        catalogEl.innerHTML = `
-          <div class="arch-sections-empty-state">
-            <div style="font-weight: 600; font-size: 13px; color: var(--arch-text-primary); margin-bottom: 4px;">No sections found</div>
-            <div style="font-size: 12px; color: var(--arch-text-secondary); line-height: 1.5;">Try searching with different terms or selecting another category.</div>
-          </div>
-        `;
-      } else {
-        const cardsHtml = `
-          <div class="arch-sections-grid">
-            ${filtered
-              .map(
-                (s) => `
-              <div class="arch-section-card" data-section-id="${escapeHtml(s.id)}" draggable="true" title="${escapeHtml(s.description || s.name)}">
-                <div class="arch-section-preview">
-                  ${s.thumbnail ? s.thumbnail : `<div class="arch-section-preview-placeholder">${escapeHtml(s.name)}</div>`}
-                </div>
-                <div class="arch-section-footer-row">
-                  <div class="arch-section-title-wrap">
-                    <div class="arch-section-name">${escapeHtml(s.name)}</div>
-                    <span class="arch-section-badge">${escapeHtml(s.category || 'General')}</span>
-                  </div>
-                  <button type="button" class="arch-section-add-btn" title="Insert into email" data-insert-id="${escapeHtml(s.id)}">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                  </button>
-                </div>
+      catalogEl.innerHTML = `
+        <div class="arch-sections-grid">
+          ${filtered
+            .map(
+              (s) => `
+            <div class="arch-section-card" data-section-id="${escapeHtml(s.id)}" draggable="true" title="${escapeHtml(s.description || s.name)}">
+              <div class="arch-section-preview">
+                ${s.thumbnail ? s.thumbnail : `<div class="arch-section-preview-placeholder">${escapeHtml(s.name)}</div>`}
               </div>
-            `
-              )
-              .join('')}
-          </div>
-        `;
-
-        if (isCategoryAll && !query) {
-          catalogEl.innerHTML = `
-            ${cardsHtml}
-            <div class="arch-editor__section-label" style="margin-top: 20px; margin-bottom: 10px;">Empty Row Layouts</div>
-            ${emptyRowsHtml}
-          `;
-        } else {
-          catalogEl.innerHTML = cardsHtml;
-        }
-      }
+              <div class="arch-section-footer-row">
+                <div class="arch-section-title-wrap">
+                  <div class="arch-section-name">${escapeHtml(s.name)}</div>
+                  <span class="arch-section-badge">${escapeHtml(s.category || 'General')}</span>
+                </div>
+                <button type="button" class="arch-section-add-btn" title="Insert into email" data-insert-id="${escapeHtml(s.id)}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+              </div>
+            </div>
+          `
+            )
+            .join('')}
+        </div>
+      `;
     }
 
     // Bind Section click & dragstart
@@ -559,22 +497,6 @@ export class RightPanel {
         if (e.dataTransfer) {
           e.dataTransfer.setData('text/plain', `section:${section.id}`);
           e.dataTransfer.setData('text/html', section.html);
-          e.dataTransfer.effectAllowed = 'copy';
-        }
-      });
-    });
-
-    // Bind Empty Row layouts click & dragstart inside the sections panel
-    catalogEl.querySelectorAll<HTMLButtonElement>('[data-row-layout]').forEach((btn) => {
-      const layout = btn.getAttribute('data-row-layout') as RowLayoutType;
-
-      btn.addEventListener('click', () => {
-        this.events.onAddRowLayout(layout);
-      });
-
-      btn.addEventListener('dragstart', (e) => {
-        if (e.dataTransfer) {
-          e.dataTransfer.setData('text/plain', `row:${layout}`);
           e.dataTransfer.effectAllowed = 'copy';
         }
       });

@@ -484,6 +484,53 @@ editor.removeCustomButton('preview-modal');
 
 ---
 
+## 🛠️ Show / Hide Default Action Buttons
+
+You can show, hide, or customize any of the default top-right action buttons (**Import HTML**, **Export JSON**, **Export HTML**, **Clear**) via constructor options or at runtime:
+
+### Via Constructor Options
+
+```javascript
+// Method 1: Using the actions configuration object
+const editor = ArchEmailEditor.create('#editor-container', {
+  actions: {
+    importHtml: false, // Hides "Import HTML" button
+    exportJson: false, // Hides "Export JSON" button
+    exportHtml: true,  // Keeps "Export HTML" button (default)
+    clear: false       // Hides "Clear" button
+  },
+  customButtons: [
+    {
+      id: 'save',
+      label: 'Save',
+      icon: '💾',
+      className: 'arch-btn--primary',
+      onClick: (editor) => saveTemplate(editor.getHTML())
+    }
+  ]
+});
+
+// Method 2: Using direct boolean shortcut flags
+const editor = ArchEmailEditor.create('#editor-container', {
+  showImportHtml: false,
+  showExportJson: false,
+  showExportHtml: false,
+  showClear: false
+});
+```
+
+### Via Runtime JS API
+
+```javascript
+// Dynamically toggle buttons at runtime
+editor.setActions({
+  importHtml: true,
+  clear: true
+});
+```
+
+---
+
 ## 🏷️ Template Name Controls
 
 Manage and display template names directly in the header toolbar:
@@ -530,6 +577,11 @@ Initializes and mounts the editor.
 | `editableTemplateName`| `boolean` | `true` | Allows inline click-to-edit rename in the toolbar. |
 | `onTemplateNameChange`| `(name: string) => void` | `undefined` | Callback fired when the template name changes. |
 | `customButtons` | `ToolbarCustomButton[]` | `[]` | Array of custom buttons in the top-right toolbar. |
+| `actions` | `ToolbarActionsOptions` | All true | Toggles default buttons: `{ importHtml, exportJson, exportHtml, clear }`. |
+| `showImportHtml` | `boolean` | `true` | Shortcut to toggle "Import HTML" button. |
+| `showExportHtml` | `boolean` | `true` | Shortcut to toggle "Export HTML" button. |
+| `showExportJson` | `boolean` | `true` | Shortcut to toggle "Export JSON" button. |
+| `showClear` | `boolean` | `true` | Shortcut to toggle "Clear" button. |
 | `sections` | `PrebuiltSection[]` | Built-in sections | Custom modular sections catalog (replaces defaults). |
 | `customSections` | `PrebuiltSection[]` | `[]` | Additional modular sections appended to the catalog. |
 | `theme` | `'light' \| 'dark'` | `'light'` | UI chrome theme. |
@@ -586,6 +638,7 @@ Initializes and mounts the editor.
 | `getTemplateName()` | `string` | Returns the current template name. |
 | `addCustomButton(button)` | `void` | Adds a custom button to the top-right toolbar. |
 | `removeCustomButton(id)` | `void` | Removes a custom button by its id. |
+| `setActions(actions)` | `void` | Dynamically updates visibility of default action buttons at runtime. |
 | `undo()` | `void` | Reverts the last change. |
 | `redo()` | `void` | Redoes the previously undone change. |
 | `setViewportMode(mode)` | `void` | Changes viewport mode (`'desktop'` \| `'tablet'` \| `'mobile'`). |

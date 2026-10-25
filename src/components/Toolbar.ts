@@ -12,7 +12,7 @@
  * - Clear (to reset template)
  */
 
-import { ToolbarCustomButton, ViewportMode } from '../types';
+import { ToolbarCustomButton, ToolbarActionsOptions, ViewportMode } from '../types';
 
 export interface ToolbarEvents {
   onImportHtml: () => void;
@@ -29,6 +29,7 @@ export interface ToolbarOptions {
   templateName?: string;
   editableTemplateName?: boolean;
   customButtons?: ToolbarCustomButton[];
+  actions?: ToolbarActionsOptions;
   editorInstance?: any;
 }
 
@@ -39,6 +40,7 @@ export class Toolbar {
   private templateName: string = 'Arch Email Editor';
   private editableTemplateName: boolean = true;
   private customButtons: ToolbarCustomButton[] = [];
+  private actions: ToolbarActionsOptions = {};
   private editorInstance?: any;
 
   constructor(events: ToolbarEvents, options: ToolbarOptions = {}) {
@@ -46,6 +48,12 @@ export class Toolbar {
     this.templateName = options.templateName || 'Arch Email Editor';
     this.editableTemplateName = options.editableTemplateName !== false;
     this.customButtons = options.customButtons ? [...options.customButtons] : [];
+    this.actions = {
+      importHtml: options.actions?.importHtml !== false,
+      exportJson: options.actions?.exportJson !== false,
+      exportHtml: options.actions?.exportHtml !== false,
+      clear: options.actions?.clear !== false,
+    };
     this.editorInstance = options.editorInstance;
 
     this.element = document.createElement('div');
@@ -77,6 +85,11 @@ export class Toolbar {
       this.customButtons.push(button);
     }
     this.renderCustomButtons();
+  }
+
+  public setActions(actions: Partial<ToolbarActionsOptions>): void {
+    this.actions = { ...this.actions, ...actions };
+    this.render();
   }
 
   public removeCustomButton(buttonId: string): void {
@@ -217,7 +230,7 @@ export class Toolbar {
         </div>
       </div>
       <div class="arch-editor__actions">
-        <div class="arch-custom-buttons"></div>
+        ${this.actions.importHtml ? `
         <button class="arch-btn arch-btn--import-html" type="button" title="Load a prebuilt HTML newsletter">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -225,21 +238,24 @@ export class Toolbar {
             <line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
           <span>Import HTML</span>
-        </button>
+        </button>` : ''}
+        ${this.actions.exportJson ? `
         <button class="arch-btn arch-btn--export-json" type="button" title="Export template as JSON schema">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
             <polyline points="14 2 14 8 20 8"/>
           </svg>
           <span>Export JSON</span>
-        </button>
+        </button>` : ''}
+        ${this.actions.exportHtml ? `
         <button class="arch-btn arch-btn--primary arch-btn--export-html" type="button" title="Export client-safe HTML">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="16 18 22 12 16 6"/>
             <polyline points="8 6 2 12 8 18"/>
           </svg>
           <span>Export HTML</span>
-        </button>
+        </button>` : ''}
+        ${this.actions.clear ? `
         <button class="arch-btn arch-btn--danger arch-btn--clear" type="button" title="Clear all blocks">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 6h18"/>
@@ -247,7 +263,8 @@ export class Toolbar {
             <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
           </svg>
           <span>Clear</span>
-        </button>
+        </button>` : ''}
+        <div class="arch-custom-buttons"></div>
       </div>
     `;
 

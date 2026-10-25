@@ -214,6 +214,13 @@ export class ArchEmailEditor {
   }
 
   /**
+   * Configures visibility of default toolbar action buttons at runtime.
+   */
+  public setActions(actions: Partial<import('./types').ToolbarActionsOptions>): void {
+    this.toolbar?.setActions(actions);
+  }
+
+  /**
    * Returns a copy of the modular sections loaded in the editor's SECTIONS tab.
    */
   public getSections(): PrebuiltSection[] {
@@ -491,6 +498,12 @@ export class ArchEmailEditor {
         templateName: this.options.templateName,
         editableTemplateName: this.options.editableTemplateName,
         customButtons: this.options.customButtons,
+        actions: {
+          importHtml: this.options.showImportHtml !== undefined ? this.options.showImportHtml : (this.options.actions?.importHtml !== false),
+          exportJson: this.options.showExportJson !== undefined ? this.options.showExportJson : (this.options.actions?.exportJson !== false),
+          exportHtml: this.options.showExportHtml !== undefined ? this.options.showExportHtml : (this.options.actions?.exportHtml !== false),
+          clear: this.options.showClear !== undefined ? this.options.showClear : (this.options.actions?.clear !== false)
+        },
         editorInstance: this
       }
     );

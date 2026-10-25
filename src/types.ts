@@ -240,6 +240,20 @@ export interface PrebuiltSection {
 /**
  * Configuration options passed to `ArchEmailEditor.create(target, options)`.
  */
+/**
+ * Configuration options to toggle default action buttons in the top-right toolbar.
+ */
+export interface ToolbarActionsOptions {
+  /** Whether to show the "Import HTML" button (default: true) */
+  importHtml?: boolean;
+  /** Whether to show the "Export JSON" button (default: true) */
+  exportJson?: boolean;
+  /** Whether to show the "Export HTML" button (default: true) */
+  exportHtml?: boolean;
+  /** Whether to show the "Clear" button (default: true) */
+  clear?: boolean;
+}
+
 export interface EditorOptions {
   /** DOM element or selector string to mount the editor into */
   target?: HTMLElement | string;
@@ -257,6 +271,16 @@ export interface EditorOptions {
   onTemplateNameChange?: (name: string) => void;
   /** Custom action buttons added to the top-right toolbar actions bar (e.g. Save, Send) */
   customButtons?: ToolbarCustomButton[];
+  /** Options to toggle visibility of default action buttons in the top-right toolbar */
+  actions?: ToolbarActionsOptions;
+  /** Shortcut to show/hide "Import HTML" button (default: true) */
+  showImportHtml?: boolean;
+  /** Shortcut to show/hide "Export HTML" button (default: true) */
+  showExportHtml?: boolean;
+  /** Shortcut to show/hide "Export JSON" button (default: true) */
+  showExportJson?: boolean;
+  /** Shortcut to show/hide "Clear" button (default: true) */
+  showClear?: boolean;
   /** Prebuilt modular sections library (overrides built-in sections if provided) */
   sections?: PrebuiltSection[];
   /** Custom modular sections array to append to the sections library */
