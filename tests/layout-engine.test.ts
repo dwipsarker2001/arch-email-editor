@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ArchEmailEditor } from '../src/editor';
 import { moveUnitToTarget, removeUnit } from '../src/engine/glue';
 
@@ -1772,6 +1772,119 @@ describe('Figma vertical displacement', () => {
     ifrDoc.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
     expect(row.classList.contains('arch-has-hovered-child')).toBe(false);
     expect(row.classList.contains('arch-selected-element')).toBe(true);
+
+    editor.destroy();
+    container.remove();
+  });
+
+  it('positions resize handles directly on the selected item boundary and restricts column handles to row selection', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    const html = `
+      <table class="row row-1" width="100%">
+        <tr>
+          <td class="column column-1" width="50%">
+            <table class="button_block" width="100%">
+              <tr>
+                <td style="padding: 20px;">
+                  <a class="button" href="https://example.com" style="display: inline-block; width: 140px; height: 40px;">
+                    <span>Click Me</span>
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+          <td class="column column-2" width="50%">
+            <table class="text_block" width="100%">
+              <tr>
+                <td style="padding: 15px;">
+                  <p class="para">Paragraph text here</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    `;
+
+    const editor = new ArchEmailEditor(container);
+    editor.importHTML(html);
+
+    const canvas = (editor as any).canvas;
+    const ifrDoc = canvas.iframe.contentDocument as Document;
+    const overlay = container.querySelector('.arch-canvas-overlay') as HTMLElement;
+
+    const row = ifrDoc.querySelector('.row-1') as HTMLElement;
+    const col1 = ifrDoc.querySelector('.column-1') as HTMLElement;
+    const col2 = ifrDoc.querySelector('.column-2') as HTMLElement;
+    const btn = ifrDoc.querySelector('a.button') as HTMLElement;
+    const p = ifrDoc.querySelector('p.para') as HTMLElement;
+
+    // Mock bounding rects
+    vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      right: 700,
+      top: 50,
+      bottom: 250,
+      width: 600,
+      height: 200,
+      x: 100,
+      y: 50,
+      toJSON: () => {}
+    });
+    vi.spyOn(col1, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      right: 400,
+      top: 50,
+      bottom: 250,
+      width: 300,
+      height: 200,
+      x: 100,
+      y: 50,
+      toJSON: () => {}
+    });
+    vi.spyOn(col2, 'getBoundingClientRect').mockReturnValue({
+      left: 400,
+      right: 700,
+      top: 50,
+      bottom: 250,
+      width: 300,
+      height: 200,
+      x: 400,
+      y: 50,
+      toJSON: () => {}
+    });
+    vi.spyOn(btn, 'getBoundingClientRect').mockReturnValue({
+      left: 120,
+      right: 260,
+      top: 70,
+      bottom: 110,
+      width: 140,
+      height: 40,
+      x: 120,
+      y: 70,
+      toJSON: () => {}
+    });
+
+    // 1. Selecting Row displays column resize handles between column 1 & 2
+    canvas.selectUnit(row, row);
+    expect(overlay.querySelector('.arch-col-resize-handle')).toBeTruthy();
+    expect(overlay.querySelector('.arch-resize-handle')).toBeNull();
+
+    // 2. Selecting a block / button element inside column 1 MUST NOT display column resize handles
+    canvas.selectUnit(btn, btn);
+    expect(overlay.querySelector('.arch-col-resize-handle')).toBeNull();
+
+    // 3. Resize handles for button are positioned on the selected element's boundary
+    const eHandle = overlay.querySelector('.arch-resize-handle--e') as HTMLElement;
+    expect(eHandle).toBeTruthy();
+    expect(btn.classList.contains('arch-selected-element')).toBe(true);
+
+    // 4. Selecting paragraph inside column 2 also does not display column resize handles
+    canvas.selectUnit(p, p);
+    expect(overlay.querySelector('.arch-col-resize-handle')).toBeNull();
+    expect(overlay.querySelector('.arch-resize-handle--e')).toBeTruthy();
 
     editor.destroy();
     container.remove();

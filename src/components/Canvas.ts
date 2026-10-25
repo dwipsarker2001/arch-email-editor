@@ -2518,7 +2518,11 @@ export class Canvas {
             e.preventDefault();
             e.stopPropagation();
 
-            const rect = resizableTarget!.getBoundingClientRect();
+            const selectedEl =
+              this.iframe.contentDocument?.querySelector<HTMLElement>('.arch-selected-element') ||
+              this.activeMoveableUnit ||
+              unit;
+            const targetElRect = selectedEl ? selectedEl.getBoundingClientRect() : resizableTarget!.getBoundingClientRect();
             const colCell = resizableTarget!.closest('td, th') as HTMLElement | null;
             const colWidth = colCell?.getBoundingClientRect().width || 0;
             const maxWidth = colWidth > 40 ? Math.round(colWidth) : 600;
@@ -2533,7 +2537,7 @@ export class Canvas {
               parsedHeight =
                 parseInt(ImageAdapter.getHeight(resizableTarget!, unit), 10) ||
                 parseInt(resizableTarget!.getAttribute('height') || '', 10) ||
-                (rect.height > 0 ? Math.round(rect.height) : 150);
+                (targetElRect.height > 0 ? Math.round(targetElRect.height) : 150);
             } else if (resizableKind === 'button') {
               parsedWidth =
                 parseInt(ButtonAdapter.getWidth(resizableTarget!, unit), 10) ||
@@ -2545,7 +2549,7 @@ export class Canvas {
                 colWidth ||
                 300;
             }
-            const startWidth = rect.width > 0 ? rect.width : parsedWidth;
+            const startWidth = targetElRect.width > 0 ? targetElRect.width : (resizableTarget!.getBoundingClientRect().width > 0 ? resizableTarget!.getBoundingClientRect().width : parsedWidth);
 
             this.activeElementResize = {
               kind: resizableKind!,
@@ -2554,7 +2558,7 @@ export class Canvas {
               startX: e.clientX,
               startY: e.clientY,
               startWidth,
-              startHeight: rect.height > 0 ? rect.height : (resizableKind === 'image' ? parsedHeight : 40),
+              startHeight: targetElRect.height > 0 ? targetElRect.height : (resizableKind === 'image' ? parsedHeight : 40),
               maxWidth: Math.max(maxWidth, Math.round(startWidth)),
               dirX: def.dirX,
               dirY: def.dirY,
@@ -2572,8 +2576,8 @@ export class Canvas {
       }
     }
 
-    // 5. Column Resize Handles (when row has >= 2 columns in desktop mode)
-    if (this.viewportMode !== 'mobile') {
+    // 5. Column Resize Handles (only when row or column itself is selected)
+    if (this.viewportMode !== 'mobile' && (isRowElement(unit) || isColumnElement(unit))) {
       const row = isRowElement(unit)
         ? unit
         : (unit.closest('table.row, table.row-content, tr, section') as HTMLElement | null);
@@ -2723,10 +2727,16 @@ export class Canvas {
       }
     }
 
+    const selectedEl =
+      this.iframe.contentDocument?.querySelector<HTMLElement>('.arch-selected-element') ||
+      this.activeMoveableUnit ||
+      unit;
     const targetRect =
-      targetNode && targetNode.getBoundingClientRect().width > 0
-        ? targetNode.getBoundingClientRect()
-        : unitRect;
+      selectedEl && selectedEl.getBoundingClientRect().width > 0
+        ? selectedEl.getBoundingClientRect()
+        : (targetNode && targetNode.getBoundingClientRect().width > 0
+            ? targetNode.getBoundingClientRect()
+            : unitRect);
 
     for (const handle of this.resizeHandles) {
       const side = handle.dataset.side || handle.dataset.corner;
@@ -2759,11 +2769,13 @@ export class Canvas {
       handle.style.left = `${hLeft}px`;
     }
 
-    // 5. Column resize handles
+    // 5. Column resize handles (only when row or column itself is selected)
     if (this.columnResizeHandles.length > 0) {
-      const row = isRowElement(unit)
-        ? unit
-        : (unit.closest('table.row, table.row-content, tr, section') as HTMLElement | null);
+      const row = (isRowElement(unit) || isColumnElement(unit))
+        ? (isRowElement(unit)
+            ? unit
+            : (unit.closest('table.row, table.row-content, tr, section') as HTMLElement | null))
+        : null;
       if (row) {
         const cols = ColumnLayoutAdapter.getColumnsInRow(row);
         for (const handle of this.columnResizeHandles) {
