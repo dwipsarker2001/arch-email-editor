@@ -1844,6 +1844,16 @@ input:checked + .arch-toggle-slider:before {
   z-index: 20;
 }
 
+/* Low-opacity selection overlay for selected elements (Figma style) */
+.arch-selection-overlay {
+  position: absolute;
+  background-color: rgba(119, 71, 255, 0.08);
+  pointer-events: none !important;
+  z-index: 5;
+  box-sizing: border-box;
+  transition: opacity 0.12s ease;
+}
+
 
 /* Unlayer-style Bottom Action Bar (Attached to bottom-left corner of selected item) */
 .arch-editor .arch-rge-bottom-actions,

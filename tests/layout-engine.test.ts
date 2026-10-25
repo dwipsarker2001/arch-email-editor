@@ -1931,12 +1931,16 @@ describe('Figma vertical displacement', () => {
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(row);
     // On parent click, child text element does NOT show resize options
     expect(overlay.querySelector('.arch-resize-handle')).toBeNull();
+    // Low-opacity selection overlay is visible on select
+    expect(overlay.querySelector('.arch-selection-overlay')).not.toBeNull();
+    expect((overlay.querySelector('.arch-selection-overlay') as HTMLElement).style.display).not.toBe('none');
 
     // 3. First double-click drills down to parent block (.text_block)
     p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(textBlock);
     // While on parent block, child text element still does NOT show resize options
     expect(overlay.querySelector('.arch-resize-handle')).toBeNull();
+    expect(overlay.querySelector('.arch-selection-overlay')).not.toBeNull();
 
     // 4. Second double-click drills down to select the text element itself (<p>)
     p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
@@ -1944,6 +1948,17 @@ describe('Figma vertical displacement', () => {
     // THIS TIME, text element is selected and shows resize options
     expect(overlay.querySelector('.arch-resize-handle--e')).toBeTruthy();
     expect(overlay.querySelector('.arch-resize-handle--se')).toBeTruthy();
+    expect(overlay.querySelector('.arch-selection-overlay')).not.toBeNull();
+
+    // 5. Next double-click enters inline text edit mode: low opacity overlay is GONE on text edit mode!
+    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(canvas.isEditingText).toBe(true);
+    expect(overlay.querySelector('.arch-selection-overlay')).toBeNull();
+
+    // 6. Exiting text edit mode (e.g. Escape key): low opacity overlay returns on select
+    ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(canvas.isEditingText).toBe(false);
+    expect(overlay.querySelector('.arch-selection-overlay')).not.toBeNull();
 
     editor.destroy();
     container.remove();

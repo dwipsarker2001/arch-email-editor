@@ -102,6 +102,7 @@ export class Canvas {
   private bottomActions: HTMLElement | null = null;
   private textToolbar: HTMLElement | null = null;
   private dimensionsBadge: HTMLElement | null = null;
+  private selectionOverlay: HTMLElement | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private dropIndicatorEl: HTMLElement | null = null;
   private dragGhostEl: HTMLElement | null = null;
@@ -634,6 +635,10 @@ export class Canvas {
       this.dimensionsBadge.remove();
       this.dimensionsBadge = null;
     }
+    if (this.selectionOverlay) {
+      this.selectionOverlay.remove();
+      this.selectionOverlay = null;
+    }
 
     this.selectUnit(state.target, state.unit);
     this.adjustHeight();
@@ -698,6 +703,10 @@ export class Canvas {
     if (this.dimensionsBadge) {
       this.dimensionsBadge.remove();
       this.dimensionsBadge = null;
+    }
+    if (this.selectionOverlay) {
+      this.selectionOverlay.remove();
+      this.selectionOverlay = null;
     }
 
     const ifrDoc = this.iframe.contentDocument;
@@ -2262,6 +2271,14 @@ export class Canvas {
     const editableHost = findEditableTextHost(innerTarget || this.selectedElement || unit, unit);
     const ifrDoc = this.iframe.contentDocument;
 
+    // 0. Low-opacity selection overlay (visible on select, completely gone during text edit mode)
+    if (!this.selectionOverlay && !this.isEditingText) {
+      const selOverlay = document.createElement('div');
+      selOverlay.className = 'arch-selection-overlay';
+      this.overlayLayer.prepend(selOverlay);
+      this.selectionOverlay = selOverlay;
+    }
+
     // 1. Bottom Action Bar (Comment, Delete, Duplicate Attached to Bottom Edge)
     const bottomActions = document.createElement('div');
     bottomActions.className = 'arch-rge-bottom-actions';
@@ -2733,24 +2750,46 @@ export class Canvas {
         (isTextLeafElement(selectedEl) && (unit === selectedEl || unit.contains(selectedEl))));
 
     let targetNode: HTMLElement | null = null;
-    if (this.resizeHandles.length > 0) {
-      if (targetImg) {
-        targetNode = targetImg;
-      } else if (isButton) {
-        targetNode = resolveButtonAnatomy(selectedEl, unit).anchor;
-      } else if (isDirectTextSelected) {
-        targetNode = TextAdapter.getTextHost(selectedEl, unit) || selectedEl;
-      }
+    if (targetImg) {
+      targetNode = targetImg;
+    } else if (isButton) {
+      targetNode = resolveButtonAnatomy(selectedEl, unit).anchor;
+    } else if (isDirectTextSelected) {
+      targetNode = TextAdapter.getTextHost(selectedEl, unit) || selectedEl;
     }
 
-    const effectiveTargetEl = (isDirectTextSelected && targetNode) ? targetNode : selectedEl;
+    const effectiveTargetEl = targetNode || selectedEl;
 
     const targetRect =
       effectiveTargetEl && effectiveTargetEl.getBoundingClientRect().width > 0
         ? effectiveTargetEl.getBoundingClientRect()
-        : (targetNode && targetNode.getBoundingClientRect().width > 0
-            ? targetNode.getBoundingClientRect()
-            : unitRect);
+        : unitRect;
+
+    // 5. Selection overlay (Low-opacity tint over selected element; hidden during inline text editing)
+    if (this.selectionOverlay) {
+      if (this.isEditingText || effectiveTargetEl?.classList?.contains('arch-has-hovered-child')) {
+        this.selectionOverlay.style.display = 'none';
+      } else {
+        const width = targetRect.width > 0 ? `${targetRect.width}px` : '100%';
+        const height = targetRect.height > 0 ? `${targetRect.height}px` : 'auto';
+        this.selectionOverlay.style.display = 'block';
+        this.selectionOverlay.style.top = `${offsetY + targetRect.top}px`;
+        this.selectionOverlay.style.left = `${offsetX + targetRect.left}px`;
+        this.selectionOverlay.style.width = width;
+        this.selectionOverlay.style.height = height;
+
+        try {
+          const comp = this.iframe.contentWindow?.getComputedStyle(effectiveTargetEl);
+          if (comp && comp.borderRadius && comp.borderRadius !== '0px') {
+            this.selectionOverlay.style.borderRadius = comp.borderRadius;
+          } else {
+            this.selectionOverlay.style.borderRadius = '0px';
+          }
+        } catch {
+          this.selectionOverlay.style.borderRadius = '0px';
+        }
+      }
+    }
 
     for (const handle of this.resizeHandles) {
       const side = handle.dataset.side || handle.dataset.corner;
@@ -2829,6 +2868,10 @@ export class Canvas {
     if (this.dimensionsBadge) {
       this.dimensionsBadge.remove();
       this.dimensionsBadge = null;
+    }
+    if (this.selectionOverlay) {
+      this.selectionOverlay.remove();
+      this.selectionOverlay = null;
     }
     if (this.resizeHandles.length > 0) {
       this.resizeHandles.forEach((h) => h.remove());
