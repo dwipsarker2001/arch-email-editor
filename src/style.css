@@ -2950,3 +2950,28 @@ input:checked + .arch-toggle-slider:before {
   background: #f3f4f6 !important;
   color: #111827 !important;
 }
+
+
+/* Upload Warning Notice on top of image preview */
+.arch-editor .arch-img-upload-notice,
+.arch-img-upload-notice {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  background: #fef2f2 !important;
+  border: 1px solid #fecaca !important;
+  border-radius: 5px !important;
+  padding: 8px 10px !important;
+  margin-bottom: 10px !important;
+  color: #dc2626 !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  line-height: 1.35 !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-img-upload-notice svg,
+.arch-img-upload-notice svg {
+  color: #ef4444 !important;
+  flex-shrink: 0 !important;
+}

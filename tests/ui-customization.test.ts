@@ -149,6 +149,20 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
       srcInput.dispatchEvent(new Event('input'));
       expect(previewTag.src).toBe('https://example.com/new-photo.jpg');
     }
+
+    // Verify upload notice appears if upload system is not configured
+    const fileInput = container.querySelector<HTMLInputElement>('#inp-img-file-upload');
+    const notice = container.querySelector<HTMLElement>('#arch-img-upload-notice');
+    expect(notice).not.toBeNull();
+
+    const dummyFile = new File(['test'], 'photo.png', { type: 'image/png' });
+    Object.defineProperty(fileInput, 'files', {
+      value: [dummyFile],
+      configurable: true
+    });
+    fileInput?.dispatchEvent(new Event('change'));
+    expect(notice?.style.display).toBe('flex');
+    expect(notice?.textContent).toContain('Upload is not setup yet, check documentation.');
   });
 
 });

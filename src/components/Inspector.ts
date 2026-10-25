@@ -1068,6 +1068,16 @@ export class Inspector {
   }
 
   
+  
+  public showUploadNotice(msg = 'Upload is not setup yet, check documentation.'): void {
+    const notice = this.element.querySelector<HTMLElement>('#arch-img-upload-notice');
+    if (notice) {
+      const span = notice.querySelector('span');
+      if (span) span.textContent = msg;
+      notice.style.display = 'flex';
+    }
+  }
+
   public openAssetsPanel(onSelect: (url: string, name?: string, size?: string) => void): void {
     const existing = this.element.querySelector('.arch-assets-sidepanel');
     if (existing) existing.remove();
@@ -1144,24 +1154,26 @@ export class Inspector {
       const file = uploadInput.files?.[0];
       if (!file) return;
 
+      if (!this.events.onUploadImage) {
+        closePanel();
+        this.showUploadNotice('Upload is not setup yet, check documentation.');
+        uploadInput.value = '';
+        return;
+      }
+
       const formattedKb = ((file.size / 1024).toFixed(2)) + 'kb';
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        if (dataUrl) {
-          const newAsset: DummyAsset = {
-            id: 'asset-' + Date.now(),
-            name: file.name,
-            url: dataUrl,
-            size: formattedKb
-          };
-          DUMMY_ASSETS.unshift(newAsset);
-          renderGrid(DUMMY_ASSETS);
-          onSelect(dataUrl, file.name, formattedKb);
-          closePanel();
-        }
-      };
-      reader.readAsDataURL(file);
+      this.events.onUploadImage(file, (url: string) => {
+        const newAsset: DummyAsset = {
+          id: 'asset-' + Date.now(),
+          name: file.name,
+          url: url,
+          size: formattedKb
+        };
+        DUMMY_ASSETS.unshift(newAsset);
+        renderGrid(DUMMY_ASSETS);
+        onSelect(url, file.name, formattedKb);
+        closePanel();
+      });
       uploadInput.value = '';
     });
 
@@ -1238,6 +1250,16 @@ export class Inspector {
 
     container.innerHTML = `
       <div class="arch-inspector-img-preview-wrap">
+        <!-- Upload warning notice -->
+        <div class="arch-img-upload-notice" id="arch-img-upload-notice" style="display: none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span>Upload is not setup yet, check documentation.</span>
+        </div>
+
         <div class="arch-inspector-img-preview-box ${src ? 'has-image' : 'is-empty'}" id="arch-img-preview-box">
           <img id="arch-img-preview-tag" src="${src}" alt="${alt}" />
           <div class="arch-inspector-img-preview-empty" id="arch-img-preview-empty">
@@ -1433,6 +1455,8 @@ export class Inspector {
       }
 
       if (cleanUrl) {
+        const notice = this.element.querySelector<HTMLElement>('#arch-img-upload-notice');
+        if (notice) notice.style.display = 'none';
         if (previewImg) previewImg.src = cleanUrl;
         previewBox?.classList.add('has-image');
         previewBox?.classList.remove('is-empty');
@@ -1516,17 +1540,15 @@ export class Inspector {
       const file = fileInput.files?.[0];
       if (!file) return;
 
-      const formattedKb = formatKb(file.size);
-      if (this.events.onUploadImage) {
-        this.events.onUploadImage(file, (url: string) => applySelectedUrl(url, file.name, file.size));
-      } else {
-        const reader = new FileReader();
-        reader.onload = (re) => {
-          const res = re.target?.result as string;
-          if (res) applySelectedUrl(res, file.name, file.size);
-        };
-        reader.readAsDataURL(file);
+      if (!this.events.onUploadImage) {
+        this.showUploadNotice('Upload is not setup yet, check documentation.');
+        fileInput.value = '';
+        return;
       }
+
+      this.events.onUploadImage(file, (url: string) => {
+        applySelectedUrl(url, file.name, file.size);
+      });
       fileInput.value = '';
     });
 
