@@ -1964,7 +1964,7 @@ describe('Figma vertical displacement', () => {
     container.remove();
   });
 
-  it('drag and drop displays low-opacity overlay color on drop target and selects dropped element with overlay color', () => {
+  it('drag and drop does not color surrounding top/bottom items, and selects dropped element with overlay color', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
 
@@ -1992,10 +1992,10 @@ describe('Figma vertical displacement', () => {
     const overlay = container.querySelector('.arch-canvas-overlay') as HTMLElement;
     const row = ifrDoc.querySelector('.row-1') as HTMLElement;
 
-    // 1. During drag & drop: hovering a drop target shows the drop zone overlay color
+    // 1. During move: moving past surrounding items shows crisp insertion line without coloring top/bottom items with background color
     canvas.updateDropTargetForElement(row, 200, 100);
-    expect(overlay.querySelector('.arch-figma-drop-target-overlay')).not.toBeNull();
-    expect(row.classList.contains('arch-drop-hover')).toBe(true);
+    expect(overlay.querySelector('.arch-figma-drop-target-overlay')).toBeNull();
+    expect(row.classList.contains('arch-drop-hover')).toBe(false);
 
     // 2. On drop: inserting a new block selects the new block with the selection overlay color
     canvas.insertBlock('button', row, 'after');

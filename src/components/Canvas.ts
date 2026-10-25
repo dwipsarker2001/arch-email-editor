@@ -105,7 +105,6 @@ export class Canvas {
   private selectionOverlay: HTMLElement | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private dropIndicatorEl: HTMLElement | null = null;
-  private dropTargetOverlayEl: HTMLElement | null = null;
   private dragGhostEl: HTMLElement | null = null;
   private events: CanvasEvents;
 
@@ -891,9 +890,12 @@ export class Canvas {
     const ifrDoc = this.iframe.contentDocument;
     if (ifrDoc) {
       ifrDoc.querySelectorAll('.arch-drop-hover').forEach((el) => el.classList.remove('arch-drop-hover'));
-      targetUnit.classList.add('arch-drop-hover');
-      const ph = targetUnit.querySelector<HTMLElement>('.arch-empty-col-placeholder');
-      if (ph) ph.classList.add('arch-drop-hover');
+      if (targetUnit.classList.contains('arch-empty-col-placeholder')) {
+        targetUnit.classList.add('arch-drop-hover');
+      } else {
+        const ph = targetUnit.querySelector<HTMLElement>('.arch-empty-col-placeholder');
+        if (ph) ph.classList.add('arch-drop-hover');
+      }
     }
 
     this.renderFigmaDropIndicator(targetUnit, rect, isBefore, isHorizontal);
@@ -1150,18 +1152,6 @@ export class Canvas {
 
     this.overlayLayer.appendChild(ind);
     this.dropIndicatorEl = ind;
-
-    // Render Figma drop target zone overlay with low opacity
-    if (!this.dropTargetOverlayEl) {
-      const dropOverlay = document.createElement('div');
-      dropOverlay.className = 'arch-figma-drop-target-overlay';
-      this.overlayLayer.appendChild(dropOverlay);
-      this.dropTargetOverlayEl = dropOverlay;
-    }
-    this.dropTargetOverlayEl.style.top = `${offsetY + unitRect.top}px`;
-    this.dropTargetOverlayEl.style.left = `${offsetX + unitRect.left}px`;
-    this.dropTargetOverlayEl.style.width = `${Math.max(20, unitRect.width)}px`;
-    this.dropTargetOverlayEl.style.height = `${Math.max(20, unitRect.height)}px`;
   }
 
   /**
@@ -1389,13 +1379,10 @@ export class Canvas {
         box-shadow: 0 8px 20px rgba(119, 71, 255, 0.22) !important;
       }
       .arch-drop-line-top {
-        box-shadow: inset 0 3px 0 0 #7747ff, inset 0 0 0 9999px rgba(119, 71, 255, 0.08) !important;
+        box-shadow: inset 0 3px 0 0 #7747ff !important;
       }
       .arch-drop-line-bottom {
-        box-shadow: inset 0 -3px 0 0 #7747ff, inset 0 0 0 9999px rgba(119, 71, 255, 0.08) !important;
-      }
-      .arch-drop-hover {
-        background-color: rgba(119, 71, 255, 0.08) !important;
+        box-shadow: inset 0 -3px 0 0 #7747ff !important;
       }
       table.row-content {
         height: 100% !important;
@@ -1468,7 +1455,7 @@ export class Canvas {
       .arch-empty-col-placeholder.arch-hover-element,
       .arch-empty-col-placeholder.arch-drop-hover {
         border-color: #7747ff !important;
-        background-color: rgba(119, 71, 255, 0.08) !important;
+        background-color: #f5f3ff !important;
       }
       .arch-empty-col-placeholder.arch-drop-hover svg,
       .arch-empty-col-placeholder:hover svg {
@@ -3121,10 +3108,6 @@ export class Canvas {
     if (this.dropIndicatorEl) {
       this.dropIndicatorEl.remove();
       this.dropIndicatorEl = null;
-    }
-    if (this.dropTargetOverlayEl) {
-      this.dropTargetOverlayEl.remove();
-      this.dropTargetOverlayEl = null;
     }
     if (!skipDisplacementClear) {
       this.clearColumnDisplacementPreview(keepDisplacementTransition);
