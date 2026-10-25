@@ -14,7 +14,14 @@
  */
 
 import { BlockType, RowLayoutType, ViewportMode } from '../types';
-import { isRowElement, isGutterCell, isOuterWrapperTable } from './units';
+import {
+  isRowElement,
+  isGutterCell,
+  isOuterWrapperTable,
+  isEditorHelperNode,
+  isHiddenBlockElement,
+  getColumnSlotContainer
+} from './units';
 import { setResponsiveStyle } from './cssScope';
 
 /**
@@ -602,11 +609,11 @@ export const ColumnLayoutAdapter = {
     const parentTr = cols[0].parentElement;
     if (!parentTr) return;
 
-    // If we need more columns than currently exist, clone the last column shell (with an empty placeholder paragraph)
+    // If we need more columns than currently exist, clone the last column shell (with an empty placeholder drop area)
     while (cols.length < targetWidths.length) {
       const templateCol = cols[cols.length - 1];
       const newCol = templateCol.cloneNode(false) as HTMLElement;
-      newCol.innerHTML = `<table class="text_block" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation"><tbody><tr><td class="pad" style="padding:12px 16px;"><p style="margin:0;font-family:Arial,sans-serif;font-size:15px;color:#475569;">Column ${cols.length + 1}</p></td></tr></tbody></table>`;
+      newCol.innerHTML = buildEmptyColumnPlaceholderHtml();
       parentTr.appendChild(newCol);
       cols.push(newCol);
     }
@@ -712,6 +719,51 @@ function getRawBlockInnerMarkup(type: BlockType): string {
 /**
  * Inserts a new multi-column Row Section into the document.
  */
+export function buildEmptyColumnPlaceholderHtml(isNarrow = false): string {
+  const narrowClass = isNarrow ? ' arch-empty-col-narrow' : '';
+  const textHtml = isNarrow
+    ? ''
+    : `<span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 500; color: #64748b; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: block;">No content here. Drag content from the right.</span>`;
+
+  return `<div class="arch-empty-col-placeholder${narrowClass}" data-arch-placeholder="true" title="No content here. Drag content from the right." style="box-sizing: border-box; border: 2px dashed #cbd5e1; background-color: #f8fafc; border-radius: 6px; padding: ${isNarrow ? '14px 8px' : '20px 12px'}; text-align: center; cursor: pointer; user-select: none; -webkit-user-select: none; min-height: ${isNarrow ? '48px' : '64px'}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; overflow: hidden;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="2 2" style="display: block; flex-shrink: 0;">
+      <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+      <line x1="12" y1="8" x2="12" y2="16" stroke-dasharray="none"></line>
+      <line x1="8" y1="12" x2="16" y2="12" stroke-dasharray="none"></line>
+    </svg>
+    ${textHtml}
+  </div>`;
+}
+
+export function ensureEmptyColumnPlaceholders(root: Document | HTMLElement): void {
+  const columns = root.querySelectorAll<HTMLElement>('td.column, th.column, div.column');
+  columns.forEach((col) => {
+    if (isGutterCell(col) || isEditorHelperNode(col)) return;
+
+    const slot = getColumnSlotContainer(col);
+    const visibleBlocks = Array.from(slot.children).filter((c) => {
+      if (isEditorHelperNode(c)) return false;
+      if (c.classList.contains('arch-empty-col-placeholder') || c.hasAttribute('data-arch-placeholder')) return false;
+      if (isHiddenBlockElement(c as HTMLElement)) return false;
+      const tag = c.tagName.toLowerCase();
+      if (tag === 'style' || tag === 'script' || tag === 'br') return false;
+      return true;
+    });
+
+    if (visibleBlocks.length === 0) {
+      const existing = slot.querySelector('.arch-empty-col-placeholder, [data-arch-placeholder="true"]');
+      if (!existing) {
+        const wAttr = col.getAttribute('width') || col.style?.width || '';
+        const wVal = parseFloat(wAttr);
+        const isNarrow = !isNaN(wVal) && wVal <= 35;
+        slot.insertAdjacentHTML('beforeend', buildEmptyColumnPlaceholderHtml(isNarrow));
+      }
+    } else {
+      slot.querySelectorAll('.arch-empty-col-placeholder, [data-arch-placeholder="true"]').forEach((el) => el.remove());
+    }
+  });
+}
+
 export function buildRowLayoutHtml(layout: RowLayoutType, wrapInTr: boolean): string {
   const widthsMap: Record<RowLayoutType, number[]> = {
     '1-col': [100],
@@ -727,15 +779,7 @@ export function buildRowLayoutHtml(layout: RowLayoutType, wrapInTr: boolean): st
     .map(
       (w, idx) => `
       <td class="column column-${idx + 1}" width="${w}%" valign="top" style="box-sizing: border-box; padding: 10px; vertical-align: top;">
-        <table class="text_block" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation">
-          <tbody>
-            <tr>
-              <td class="pad" style="padding: 10px;">
-                <p style="margin: 0; font-family: Arial, sans-serif; font-size: 15px; color: #334155; line-height: 1.5;">Column ${idx + 1} content</p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        ${buildEmptyColumnPlaceholderHtml(w <= 35)}
       </td>`
     )
     .join('');

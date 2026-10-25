@@ -29,8 +29,25 @@ export function getVisibleText(el: Node | null): string {
 export function isEditorHelperNode(el: Element): boolean {
   return (
     el.id === 'arch-canvas-editor-style' ||
-    el.classList.contains('arch-floating-toolbar')
+    el.classList.contains('arch-floating-toolbar') ||
+    el.classList.contains('arch-empty-col-placeholder') ||
+    el.hasAttribute('data-arch-placeholder')
   );
+}
+
+/**
+ * Checks if an element is hidden via `display: none` or `.desktop_hide` (e.g. mobile-only duplicate blocks).
+ */
+export function isHiddenBlockElement(el: HTMLElement): boolean {
+  if (!el || !el.classList) return false;
+  if (el.classList.contains('desktop_hide') || el.classList.contains('arch-hide-desktop')) {
+    return true;
+  }
+  const inlineDisplay = (el.style?.display || '').trim().toLowerCase();
+  if (inlineDisplay === 'none') {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -387,6 +404,16 @@ export function resolveUnit(target: HTMLElement): HTMLElement {
   // If the caller explicitly targeted a Row or Column (e.g. via Breadcrumb, Layer Tree, or Select Parent)
   if (isRowElement(target) || isColumnElement(target)) {
     return target;
+  }
+
+  // If the user clicked/hovered directly on an empty column placeholder, resolve to enclosing Column
+  const placeholder = target.closest<HTMLElement>('.arch-empty-col-placeholder, [data-arch-placeholder]');
+  if (placeholder) {
+    const parentCol = findEnclosingColumn(placeholder);
+    if (parentCol) {
+      return parentCol;
+    }
+    return placeholder;
   }
 
   // If the user clicked/hovered directly on a structural slot wrapper (`div.border` or `table.row-content`)

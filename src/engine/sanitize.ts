@@ -187,8 +187,12 @@ export function serializeCleanDocument(
 ): string {
   const clone = ifrDoc.documentElement.cloneNode(true) as HTMLElement;
 
-  // Remove any internal editor style tags or helper nodes if present
-  clone.querySelectorAll('#arch-canvas-editor-style, .arch-floating-toolbar').forEach((el) => el.remove());
+  // Remove any internal editor style tags, helper nodes, or empty-column drop placeholders
+  clone
+    .querySelectorAll(
+      '#arch-canvas-editor-style, .arch-floating-toolbar, .arch-empty-col-placeholder, [data-arch-placeholder]'
+    )
+    .forEach((el) => el.remove());
 
   // Strip temporary editor classes and attributes
   clone

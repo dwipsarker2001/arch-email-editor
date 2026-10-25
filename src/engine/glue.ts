@@ -22,6 +22,7 @@ import {
   isColumnElement,
   isEditorHelperNode,
   isGutterCell,
+  isHiddenBlockElement,
   isRowElement,
   isStructuralSlotWrapper,
   resolveUnit
@@ -39,19 +40,7 @@ export interface UnitEnvelope {
   trailingNodes: Node[];
 }
 
-/**
- * Checks if an element is hidden via `display: none` or `.desktop_hide` (e.g. mobile-only duplicate blocks).
- */
-export function isHiddenBlockElement(el: HTMLElement): boolean {
-  if (el.classList.contains('desktop_hide') || el.classList.contains('arch-hide-desktop')) {
-    return true;
-  }
-  const inlineDisplay = (el.style?.display || '').trim().toLowerCase();
-  if (inlineDisplay === 'none') {
-    return true;
-  }
-  return false;
-}
+export { isHiddenBlockElement };
 
 /**
  * Checks if a comment node is an MSO ghost-table column separator (`</td>...<td`).
@@ -493,6 +482,7 @@ export function moveUnitToTarget(
   // redirect targetUnit to the last/first child inside `getColumnSlotContainer(targetUnit)` (or append into slot if empty!)
   if (!isRowElement(sourceUnit) && !isColumnElement(sourceUnit) && (isColumnElement(targetUnit) || isStructuralSlotWrapper(targetUnit))) {
     const slot = getColumnSlotContainer(targetUnit);
+    slot.querySelectorAll('.arch-empty-col-placeholder, [data-arch-placeholder]').forEach((p) => p.remove());
     const slotChildren = Array.from(slot.children).filter(
       (c) => !isEditorHelperNode(c) && !isHiddenBlockElement(c as HTMLElement)
     ) as HTMLElement[];

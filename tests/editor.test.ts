@@ -163,7 +163,30 @@ describe('ArchEmailEditor Core Engine', () => {
     (canvas as any).hoveredDropPosition = 'before';
     canvas.executeDrop('row:2-col-50-50');
 
-    expect(imageUnit.previousElementSibling?.innerHTML).toContain('Column 1 content');
+    const insertedRow = imageUnit.previousElementSibling as HTMLElement;
+    expect(insertedRow).toBeTruthy();
+    expect(insertedRow.querySelectorAll('.arch-empty-col-placeholder').length).toBe(2);
+    expect(insertedRow.textContent).toContain('No content here. Drag content from the right.');
+
+    // 5. Dropping a content block into the empty column replaces the drop area with that block
+    const col1 = insertedRow.querySelector('td.column') as HTMLElement;
+    expect(col1).toBeTruthy();
+    (canvas as any).hoveredDropTarget = col1;
+    (canvas as any).hoveredDropPosition = 'after';
+    canvas.executeDrop('heading');
+
+    expect(col1.querySelector('.arch-empty-col-placeholder')).toBeNull();
+    expect(col1.querySelector('h1, h2, h3, h4, h5, h6, table.heading_block, table.text_block')).toBeTruthy();
+
+    // 6. Dropping a 3-column row layout uses compact drop areas without overflowing text in narrow columns
+    (canvas as any).hoveredDropTarget = imageUnit;
+    (canvas as any).hoveredDropPosition = 'before';
+    canvas.executeDrop('row:3-col');
+    const threeColRow = imageUnit.previousElementSibling as HTMLElement;
+    expect(threeColRow).toBeTruthy();
+    const narrowPh = threeColRow.querySelector('.arch-empty-col-placeholder.arch-empty-col-narrow');
+    expect(narrowPh).toBeTruthy();
+    expect(narrowPh?.querySelector('span')).toBeNull();
 
     editor.destroy();
   });

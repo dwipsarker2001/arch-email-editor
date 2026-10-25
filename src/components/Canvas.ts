@@ -57,6 +57,7 @@ import {
   buildContextAwareBlockHtml,
   buildRowLayoutHtml,
   ButtonAdapter,
+  ensureEmptyColumnPlaceholders,
   findPrimaryContentContainer,
   ImageAdapter
 } from '../engine/adapters';
@@ -633,6 +634,17 @@ export class Canvas {
       }
     }
 
+    const ifrDoc = this.iframe.contentDocument;
+    if (ifrDoc) {
+      ifrDoc.querySelectorAll('.arch-drop-hover').forEach((el) => el.classList.remove('arch-drop-hover'));
+      if (targetUnit.classList.contains('arch-empty-col-placeholder')) {
+        targetUnit.classList.add('arch-drop-hover');
+      } else {
+        const ph = targetUnit.querySelector<HTMLElement>('.arch-empty-col-placeholder');
+        if (ph) ph.classList.add('arch-drop-hover');
+      }
+    }
+
     this.renderFigmaDropIndicator(targetUnit, rect, isBefore, isHorizontal);
   }
 
@@ -866,7 +878,10 @@ export class Canvas {
     const rowLabel = parentRow ? describeUnitForLayer(parentRow).label : '';
     const colLabel = parentCol ? describeUnitForLayer(parentCol).label : '';
     const contextPath = [rowLabel, colLabel].filter(Boolean).join(' › ');
-    const pillText = `${isBefore ? 'Before' : 'After'} ${desc.label}${contextPath ? ` in ${contextPath}` : ''}`;
+    const isColumnSlot = isColumnElement(targetUnit) || targetUnit.classList.contains('arch-empty-col-placeholder');
+    const pillText = isColumnSlot
+      ? `Drop into ${colLabel || desc.label}`
+      : `${isBefore ? 'Before' : 'After'} ${desc.label}${contextPath ? ` in ${contextPath}` : ''}`;
 
     ind.innerHTML = `<span class="arch-figma-drop-pill">${pillText}</span>`;
 
@@ -1094,6 +1109,77 @@ export class Canvas {
       .arch-drop-line-bottom {
         box-shadow: inset 0 -3px 0 0 #7747ff !important;
       }
+      .arch-empty-col-placeholder {
+        container-type: inline-size;
+        box-sizing: border-box !important;
+        border: 2px dashed #cbd5e1 !important;
+        background-color: #f8fafc !important;
+        border-radius: 6px !important;
+        padding: 18px 12px !important;
+        text-align: center !important;
+        cursor: pointer !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+        min-height: 58px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        margin: 4px 0 !important;
+        overflow: hidden !important;
+        transition: border-color 0.15s ease, background-color 0.15s ease !important;
+      }
+      .arch-empty-col-placeholder span {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        color: #64748b !important;
+        line-height: 1.3 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 100% !important;
+        padding: 0 4px !important;
+      }
+      .arch-empty-col-placeholder.arch-empty-col-narrow,
+      td[width*="25%"] .arch-empty-col-placeholder,
+      td[width*="33%"] .arch-empty-col-placeholder,
+      td[width*="30%"] .arch-empty-col-placeholder {
+        padding: 12px 6px !important;
+        min-height: 46px !important;
+        gap: 0 !important;
+      }
+      .arch-empty-col-placeholder.arch-empty-col-narrow span,
+      td[width*="25%"] .arch-empty-col-placeholder span,
+      td[width*="33%"] .arch-empty-col-placeholder span,
+      td[width*="30%"] .arch-empty-col-placeholder span {
+        display: none !important;
+      }
+      @container (max-width: 250px) {
+        .arch-empty-col-placeholder span {
+          display: none !important;
+        }
+        .arch-empty-col-placeholder {
+          padding: 12px 6px !important;
+          min-height: 46px !important;
+          gap: 0 !important;
+        }
+      }
+      .arch-empty-col-placeholder:hover,
+      .arch-empty-col-placeholder.arch-hover-element,
+      .arch-empty-col-placeholder.arch-drop-hover {
+        border-color: #7747ff !important;
+        background-color: #f5f3ff !important;
+      }
+      .arch-empty-col-placeholder.arch-drop-hover svg,
+      .arch-empty-col-placeholder:hover svg {
+        stroke: #7747ff !important;
+      }
+      .arch-empty-col-placeholder.arch-drop-hover span,
+      .arch-empty-col-placeholder:hover span {
+        color: #7747ff !important;
+      }
     `;
     (doc.head || doc.documentElement).appendChild(styleEl);
   }
@@ -1105,6 +1191,8 @@ export class Canvas {
    */
   public enableDirectEditing(doc: Document): void {
     if (!doc.body) return;
+
+    ensureEmptyColumnPlaceholders(doc);
 
     doc.body.querySelectorAll('[contenteditable]').forEach((el) => {
       el.removeAttribute('contenteditable');
@@ -2402,8 +2490,8 @@ export class Canvas {
     }
     const ifrDoc = this.iframe.contentDocument;
     if (ifrDoc) {
-      ifrDoc.querySelectorAll('.arch-drop-line-top, .arch-drop-line-bottom').forEach((el) => {
-        el.classList.remove('arch-drop-line-top', 'arch-drop-line-bottom');
+      ifrDoc.querySelectorAll('.arch-drop-line-top, .arch-drop-line-bottom, .arch-drop-hover').forEach((el) => {
+        el.classList.remove('arch-drop-line-top', 'arch-drop-line-bottom', 'arch-drop-hover');
       });
     }
   }
@@ -2423,8 +2511,20 @@ export class Canvas {
     let insertedEl: HTMLElement | null = null;
 
     if (refUnit && refUnit.parentElement && refUnit !== ifrDoc.body) {
-      if (isColumnElement(refUnit)) {
+      const placeholder =
+        refUnit.classList?.contains('arch-empty-col-placeholder') || refUnit.hasAttribute?.('data-arch-placeholder')
+          ? refUnit
+          : refUnit.closest<HTMLElement>('.arch-empty-col-placeholder, [data-arch-placeholder]');
+
+      if (placeholder && placeholder.parentElement) {
+        const slot = placeholder.parentElement;
+        const snippet = buildContextAwareBlockHtml(type, slot.tagName.toLowerCase());
+        placeholder.insertAdjacentHTML('afterend', snippet);
+        insertedEl = placeholder.nextElementSibling as HTMLElement;
+        placeholder.remove();
+      } else if (isColumnElement(refUnit)) {
         const slot = getColumnSlotContainer(refUnit);
+        slot.querySelectorAll('.arch-empty-col-placeholder, [data-arch-placeholder]').forEach((p) => p.remove());
         const snippet = buildContextAwareBlockHtml(type, slot.tagName.toLowerCase());
         const insertPosition = position === 'before' ? 'afterbegin' : 'beforeend';
         slot.insertAdjacentHTML(insertPosition, snippet);
