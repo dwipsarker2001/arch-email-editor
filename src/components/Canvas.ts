@@ -2861,6 +2861,11 @@ export class Canvas {
       width = ImageAdapter.getWidth(el, targetUnit);
     }
 
+    const padCell =
+      el.closest<HTMLElement>('td.pad') ||
+      targetUnit.querySelector<HTMLElement>(':scope > tbody > tr > td.pad, :scope > tr > td.pad, td.pad');
+    const effectivePadEl = padCell || targetUnit;
+
     return {
       tagName: el.tagName.toLowerCase(),
       type,
@@ -2874,7 +2879,7 @@ export class Canvas {
       backgroundColor: bg,
       fontSize: style.fontSize || computed?.fontSize || '',
       textAlign: (style.textAlign || computed?.textAlign || '') as any,
-      padding: targetUnit.style.padding || style.padding || computed?.padding || '',
+      padding: effectivePadEl.style.padding || targetUnit.style.padding || style.padding || computed?.padding || '',
       width,
       borderRadius,
       canMoveUp: canUp,

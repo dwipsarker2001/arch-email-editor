@@ -115,6 +115,90 @@ export class Inspector {
   }
 
   /**
+   * Resolves the actual DOM container holding padding for an email element.
+   * For table-based blocks (Image, Button, Text, etc.), resolves to `<td class="pad">` or inner `<td>`.
+   * For rows, resolves to `.row-content`. For columns/divs, resolves to the unit itself.
+   */
+  private resolvePaddingTarget(unit: HTMLElement, element?: HTMLElement, isRow = false, isCol = false): HTMLElement {
+    if (isRow) {
+      return unit.querySelector<HTMLElement>('.row-content') || unit;
+    }
+    if (isCol) {
+      return unit;
+    }
+    let blockPadCell: HTMLElement | null = null;
+    if (element) {
+      if (element.classList.contains('pad') && element.tagName.toLowerCase() === 'td') {
+        blockPadCell = element;
+      } else {
+        blockPadCell = element.closest<HTMLElement>('td.pad');
+      }
+    }
+    if (!blockPadCell && unit) {
+      blockPadCell = unit.querySelector<HTMLElement>(':scope > tbody > tr > td.pad, :scope > tr > td.pad, td.pad');
+      if (!blockPadCell && unit.tagName.toLowerCase() === 'table') {
+        blockPadCell = unit.querySelector<HTMLElement>(':scope > tbody > tr > td, :scope > tr > td, td');
+      }
+    }
+    return blockPadCell || unit || element;
+  }
+
+  /**
+   * Parses individual padding values (top, right, bottom, left) from inline styles or shorthand.
+   */
+  private getPaddingBox(el: HTMLElement, isRow = false): { top: number; right: number; bottom: number; left: number; all: number } {
+    const parseVal = (str?: string | null): number | null => {
+      if (!str || str.trim() === '') return null;
+      const num = parseInt(str, 10);
+      return isNaN(num) ? null : num;
+    };
+
+    let top = parseVal(el.style.paddingTop);
+    let right = parseVal(el.style.paddingRight);
+    let bottom = parseVal(el.style.paddingBottom);
+    let left = parseVal(el.style.paddingLeft);
+
+    if (top === null || right === null || bottom === null || left === null) {
+      const raw = (el.style.padding || '').trim();
+      if (raw) {
+        const parts = raw.split(/\s+/).map((p) => parseInt(p, 10)).filter((n) => !isNaN(n));
+        if (parts.length === 1) {
+          if (top === null) top = parts[0];
+          if (right === null) right = parts[0];
+          if (bottom === null) bottom = parts[0];
+          if (left === null) left = parts[0];
+        } else if (parts.length === 2) {
+          if (top === null) top = parts[0];
+          if (right === null) right = parts[1];
+          if (bottom === null) bottom = parts[0];
+          if (left === null) left = parts[1];
+        } else if (parts.length === 3) {
+          if (top === null) top = parts[0];
+          if (right === null) right = parts[1];
+          if (bottom === null) bottom = parts[2];
+          if (left === null) left = parts[1];
+        } else if (parts.length >= 4) {
+          if (top === null) top = parts[0];
+          if (right === null) right = parts[1];
+          if (bottom === null) bottom = parts[2];
+          if (left === null) left = parts[3];
+        }
+      }
+    }
+
+    const defaultVal = isRow ? 0 : 20;
+    const finalTop = top !== null ? top : defaultVal;
+    const finalRight = right !== null ? right : defaultVal;
+    const finalBottom = bottom !== null ? bottom : defaultVal;
+    const finalLeft = left !== null ? left : defaultVal;
+    const all = (finalTop === finalRight && finalRight === finalBottom && finalBottom === finalLeft)
+      ? finalTop
+      : finalTop;
+
+    return { top: finalTop, right: finalRight, bottom: finalBottom, left: finalLeft, all };
+  }
+
+  /**
    * Renders controls for a live clicked DOM element inside the email template.
    */
   private renderElementSettings(info: SelectedElementInfo): void {
@@ -143,15 +227,15 @@ export class Inspector {
 
     const targetUnit = info.unit || info.element;
     const isRow = info.type === 'row' || info.type === 'section';
-    const rowContent = isRow ? (targetUnit.querySelector<HTMLElement>('.row-content') || targetUnit) : null;
-    const padTarget = rowContent || targetUnit;
+    const isCol = info.type === 'column';
+    const padTarget = this.resolvePaddingTarget(targetUnit, info.element, isRow, isCol);
 
-    const fallbackPad = isRow ? '0' : '20';
-    const computedPad = parseInt(padTarget.style.padding || info.element.style.padding || fallbackPad, 10) || (isRow ? 0 : 20);
-    const padTop = parseInt(padTarget.style.paddingTop || (padTarget.style.padding ? padTarget.style.padding : fallbackPad), 10) || (isRow ? 0 : 20);
-    const padRight = parseInt(padTarget.style.paddingRight || (padTarget.style.padding ? padTarget.style.padding : fallbackPad), 10) || (isRow ? 0 : 20);
-    const padBottom = parseInt(padTarget.style.paddingBottom || (padTarget.style.padding ? padTarget.style.padding : fallbackPad), 10) || (isRow ? 0 : 20);
-    const padLeft = parseInt(padTarget.style.paddingLeft || (padTarget.style.padding ? padTarget.style.padding : fallbackPad), 10) || (isRow ? 0 : 20);
+    const padBox = this.getPaddingBox(padTarget, isRow);
+    const computedPad = padBox.all;
+    const padTop = padBox.top;
+    const padRight = padBox.right;
+    const padBottom = padBox.bottom;
+    const padLeft = padBox.left;
     const padMoreExpanded = this.padMoreExpanded && this.padMoreUnit === targetUnit;
 
     this.element.innerHTML = `
@@ -280,22 +364,37 @@ export class Inspector {
 
     this.bindStepper(this.element, 'stp-pad-all', (val) => {
       padTarget.style.padding = `${val}px`;
+      if (targetUnit !== padTarget && targetUnit.tagName.toLowerCase() === 'table') {
+        targetUnit.style.padding = '';
+      }
       this.events.onChange();
     });
     this.bindStepper(this.element, 'stp-pad-top', (val) => {
       padTarget.style.paddingTop = `${val}px`;
+      if (targetUnit !== padTarget && targetUnit.tagName.toLowerCase() === 'table') {
+        targetUnit.style.padding = '';
+      }
       this.events.onChange();
     });
     this.bindStepper(this.element, 'stp-pad-right', (val) => {
       padTarget.style.paddingRight = `${val}px`;
+      if (targetUnit !== padTarget && targetUnit.tagName.toLowerCase() === 'table') {
+        targetUnit.style.padding = '';
+      }
       this.events.onChange();
     });
     this.bindStepper(this.element, 'stp-pad-bottom', (val) => {
       padTarget.style.paddingBottom = `${val}px`;
+      if (targetUnit !== padTarget && targetUnit.tagName.toLowerCase() === 'table') {
+        targetUnit.style.padding = '';
+      }
       this.events.onChange();
     });
     this.bindStepper(this.element, 'stp-pad-left', (val) => {
       padTarget.style.paddingLeft = `${val}px`;
+      if (targetUnit !== padTarget && targetUnit.tagName.toLowerCase() === 'table') {
+        targetUnit.style.padding = '';
+      }
       this.events.onChange();
     });
 
