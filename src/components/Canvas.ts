@@ -104,6 +104,8 @@ export class Canvas {
   private dimensionsBadge: HTMLElement | null = null;
   private selectionOverlay: HTMLElement | null = null;
   private resizeObserver: ResizeObserver | null = null;
+  private contentResizeObserver: ResizeObserver | null = null;
+  private iframeMutationObserver: MutationObserver | null = null;
   private dropIndicatorEl: HTMLElement | null = null;
   private dragGhostEl: HTMLElement | null = null;
   private events: CanvasEvents;
@@ -302,8 +304,21 @@ export class Canvas {
    * relative to the currently active or hovered unit.
    */
   public syncHUDPosition(): void {
-    const target = this.activeMoveableUnit || this.hoveredUnit;
-    if (target && (this.floatingToolbar || this.bottomActions || this.columnResizeHandles.length > 0)) {
+    const ifrDoc = this.iframe.contentDocument;
+    const selectedInDoc = ifrDoc?.querySelector<HTMLElement>('.arch-selected-element, .arch-editing-text');
+    const target =
+      (this.activeMoveableUnit && ifrDoc?.body?.contains(this.activeMoveableUnit) ? this.activeMoveableUnit : null) ||
+      (selectedInDoc && ifrDoc?.body?.contains(selectedInDoc) ? selectedInDoc : null) ||
+      (this.selectedElement && ifrDoc?.body?.contains(this.selectedElement) ? this.selectedElement : null) ||
+      this.hoveredUnit;
+    if (
+      target &&
+      (this.floatingToolbar ||
+        this.bottomActions ||
+        this.selectionOverlay ||
+        this.resizeHandles.length > 0 ||
+        this.columnResizeHandles.length > 0)
+    ) {
       this.positionFloatingToolbar(target, this.floatingToolbar || undefined);
     }
   }
@@ -1301,6 +1316,13 @@ export class Canvas {
         caret-color: #000000 !important;
         outline: 2px solid #7747ff !important;
         outline-offset: -2px;
+        min-height: 1.2em !important;
+        display: block;
+      }
+      [contenteditable="true"]:empty {
+        min-height: 1.2em !important;
+        display: inline-block;
+        min-width: 20px;
       }
       .arch-editing-text *:not(.arch-selected-element),
       [contenteditable="true"].arch-editing-text *:not(.arch-selected-element) {
@@ -1666,9 +1688,60 @@ export class Canvas {
         this.lastRenderedHtml = cleanHtml;
         this.events.onContentChange(cleanHtml);
         this.emitLayersUpdate();
+        this.syncHUDPosition();
       },
       { signal }
     );
+
+    doc.addEventListener(
+      'keyup',
+      () => {
+        this.syncHUDPosition();
+      },
+      { signal }
+    );
+
+    doc.addEventListener(
+      'cut',
+      () => {
+        setTimeout(() => this.syncHUDPosition(), 0);
+      },
+      { signal }
+    );
+
+    doc.addEventListener(
+      'paste',
+      () => {
+        setTimeout(() => this.syncHUDPosition(), 0);
+      },
+      { signal }
+    );
+
+    if (this.iframeMutationObserver) {
+      this.iframeMutationObserver.disconnect();
+      this.iframeMutationObserver = null;
+    }
+    if (typeof MutationObserver !== 'undefined' && doc.body) {
+      this.iframeMutationObserver = new MutationObserver(() => {
+        this.syncHUDPosition();
+      });
+      this.iframeMutationObserver.observe(doc.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
+    }
+
+    if (this.contentResizeObserver) {
+      this.contentResizeObserver.disconnect();
+      this.contentResizeObserver = null;
+    }
+    if (typeof ResizeObserver !== 'undefined' && doc.body) {
+      this.contentResizeObserver = new ResizeObserver(() => {
+        this.syncHUDPosition();
+      });
+      this.contentResizeObserver.observe(doc.body);
+    }
 
     doc.addEventListener(
       'keydown',
@@ -1819,6 +1892,10 @@ export class Canvas {
     if (host.getAttribute('contenteditable') !== 'true') {
       host.setAttribute('contenteditable', 'true');
       host.setAttribute('spellcheck', 'false');
+    }
+
+    if (this.contentResizeObserver && host) {
+      this.contentResizeObserver.observe(host);
     }
 
     // Adaptive contrast: if the text or background is very dark and text is light, adapt caret to match text
@@ -2130,6 +2207,13 @@ export class Canvas {
     resolvedUnit.classList.add('arch-selected-element');
 
     this.renderFloatingToolbar(resolvedUnit, effectiveSelectable);
+
+    if (this.contentResizeObserver) {
+      if (resolvedUnit) this.contentResizeObserver.observe(resolvedUnit);
+      if (effectiveSelectable && effectiveSelectable !== resolvedUnit) {
+        this.contentResizeObserver.observe(effectiveSelectable);
+      }
+    }
 
     const info = this.extractElementInfo(effectiveSelectable, resolvedUnit);
     this.events.onSelectElement(info);
@@ -2719,9 +2803,10 @@ export class Canvas {
 
     const effectiveTargetEl = targetNode || selectedEl;
 
+    const elRect = effectiveTargetEl?.getBoundingClientRect();
     const targetRect =
-      effectiveTargetEl && effectiveTargetEl.getBoundingClientRect().width > 0
-        ? effectiveTargetEl.getBoundingClientRect()
+      elRect && (elRect.width > 0 || elRect.height > 0)
+        ? elRect
         : unitRect;
 
     // 2. Bottom-left action bar (attached directly to the bottom-left corner of the selected item)
@@ -2739,13 +2824,18 @@ export class Canvas {
     // 3. Floating rich-text toolbar
     const tb = this.textToolbar || toolbar;
     if (tb) {
+      const tbUnit =
+        (this.isEditingText && this.iframe.contentDocument?.querySelector<HTMLElement>('.arch-editing-text')) ||
+        effectiveTargetEl ||
+        unit;
+      const tbRect = tbUnit.getBoundingClientRect();
       const tbWidth = tb.offsetWidth || 340;
       const tbHeight = tb.offsetHeight || 60;
-      const fitsAbove = offsetY + unitRect.top >= tbHeight + 8;
+      const fitsAbove = offsetY + tbRect.top >= tbHeight + 8;
       const top = fitsAbove
-        ? Math.max(4, offsetY + unitRect.top - tbHeight - 6)
-        : Math.min(containerRect.height - tbHeight - 4, offsetY + unitRect.bottom + 32);
-      const left = Math.max(4, Math.min(offsetX + unitRect.left, containerRect.width - tbWidth - 4));
+        ? Math.max(4, offsetY + tbRect.top - tbHeight - 6)
+        : Math.min(containerRect.height - tbHeight - 4, offsetY + tbRect.bottom + 32);
+      const left = Math.max(4, Math.min(offsetX + tbRect.left, containerRect.width - tbWidth - 4));
       tb.style.top = `${top}px`;
       tb.style.left = `${left}px`;
     }
@@ -3324,6 +3414,10 @@ export class Canvas {
   public destroy(): void {
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.contentResizeObserver?.disconnect();
+    this.contentResizeObserver = null;
+    this.iframeMutationObserver?.disconnect();
+    this.iframeMutationObserver = null;
     this.removeFloatingToolbar();
     this.removeDragGhost();
     this.clearDropIndicators();

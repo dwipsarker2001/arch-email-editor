@@ -888,6 +888,71 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     editor.destroy();
   });
 
+  it('updates bottom action options and overlay height in real-time when text is deleted or content height changes', () => {
+    const editor = ArchEmailEditor.create(container);
+    const html = `<!DOCTYPE html>
+<html>
+<body>
+  <table class="nl-container" width="100%">
+    <tbody><tr><td>
+      <table class="row row-1" width="100%">
+        <tbody><tr>
+          <td class="column column-1" width="100%">
+            <table class="text_block" width="100%">
+              <tr><td><p class="test-p">Line 1<br>Line 2<br>Line 3<br>Line 4<br>Line 5<br>Line 6</p></td></tr>
+            </table>
+          </td>
+        </tr></tbody>
+      </table>
+    </td></tr></tbody>
+  </table>
+</body>
+</html>`;
+    editor.importHTML(html);
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+    const p = ifrDoc.querySelector('p.test-p') as HTMLElement;
+
+    const canvas = (editor as any).canvas;
+    const containerEl = canvas.containerElement as HTMLElement;
+    containerEl.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 800, height: 800, right: 800, bottom: 800 }) as DOMRect;
+    iframe.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 800, height: 800, right: 800, bottom: 800 }) as DOMRect;
+
+    let pHeight = 240;
+    p.getBoundingClientRect = () =>
+      ({
+        left: 50,
+        right: 450,
+        width: 400,
+        top: 60,
+        bottom: 60 + pHeight,
+        height: pHeight,
+      }) as DOMRect;
+
+    // Drill down to select <p> directly
+    p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
+
+    const bottomActions = container.querySelector('.arch-rge-bottom-actions') as HTMLElement;
+    expect(bottomActions).toBeTruthy();
+    // Initially when there is a lot of text, bottomActions is placed at bottom (60 + 240 = 300)
+    expect(parseFloat(bottomActions.style.top)).toBe(300);
+
+    // Now simulate deleting almost all text, shrinking height from 240px to 30px
+    pHeight = 30;
+    p.innerHTML = 'Short';
+    ifrDoc.dispatchEvent(new Event('input', { bubbles: true }));
+
+    // Bottom actions must have immediately moved up to match the new content height (60 + 30 = 90)
+    expect(parseFloat(bottomActions.style.top)).toBe(90);
+
+    editor.destroy();
+  });
+
   it('drills down past <td> into inner <a> tags and smoothly reorders 3-column rows horizontally while preserving divider borders', () => {
     const editor = ArchEmailEditor.create(container);
     const threeColHtml = `<!DOCTYPE html>
