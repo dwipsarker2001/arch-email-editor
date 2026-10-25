@@ -191,20 +191,6 @@ export class Toolbar {
         <span class="arch-size-badge" title="Email HTML size (Gmail limit: 102 KB)">0.0 KB</span>
       </div>
       <div class="arch-toolbar-center">
-        <div class="arch-btn-group">
-          <button class="arch-btn arch-btn--icon arch-btn--undo" type="button" title="Undo (Ctrl+Z)" disabled>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 14 4 9l5-5"/>
-              <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/>
-            </svg>
-          </button>
-          <button class="arch-btn arch-btn--icon arch-btn--redo" type="button" title="Redo (Ctrl+Y)" disabled>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m15 14 5-5-5-5"/>
-              <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13"/>
-            </svg>
-          </button>
-        </div>
         <div class="arch-btn-group arch-viewport-switcher">
           <button class="arch-btn arch-btn--viewport is-active" type="button" data-viewport="desktop" title="Desktop View (100%)">
             <svg class="arch-btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -267,14 +253,6 @@ export class Toolbar {
 
     this.renderCustomButtons();
     this.bindTemplateNameEditing();
-
-    this.element.querySelector('.arch-btn--undo')?.addEventListener('click', () => {
-      this.events.onUndo?.();
-    });
-
-    this.element.querySelector('.arch-btn--redo')?.addEventListener('click', () => {
-      this.events.onRedo?.();
-    });
 
     this.element.querySelectorAll<HTMLButtonElement>('[data-viewport]').forEach((btn) => {
       btn.addEventListener('click', () => {
