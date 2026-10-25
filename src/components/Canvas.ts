@@ -83,6 +83,15 @@ export interface CanvasEvents {
   onRedo?: () => void;
 }
 
+function isTextLeafElement(el: HTMLElement | null): boolean {
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName.toLowerCase();
+  return (
+    /^(p|h[1-6]|blockquote|li)$/.test(tag) ||
+    el.classList.contains('arch-editing-text')
+  );
+}
+
 export class Canvas {
   private element: HTMLElement;
   private containerElement: HTMLElement;
@@ -2407,31 +2416,34 @@ export class Canvas {
       this.floatingToolbar = textToolbar;
     }
 
-    // 4. Element Resize Handles (Corner & Side Handles for Image, Button, Text Block)
+    // 4. Element Resize Handles (Corner & Side Handles for Image, Button, Text Element)
     if (this.activeMoveableUnit === unit && !isRowElement(unit) && !isColumnElement(unit)) {
-      const targetEl = innerTarget || this.selectedElement || unit;
+      const selectedEl =
+        this.iframe.contentDocument?.querySelector<HTMLElement>('.arch-selected-element') ||
+        this.selectedElement ||
+        unit;
+      const targetEl = innerTarget || selectedEl || unit;
 
       const isDirectImageSelected =
         unit.tagName.toLowerCase() === 'img' ||
-        (targetEl.tagName.toLowerCase() === 'img' && targetEl !== unit);
-      const targetImg = isDirectImageSelected ? ImageAdapter.findImage(targetEl, unit) : null;
+        (selectedEl.tagName.toLowerCase() === 'img' && targetEl !== unit);
+      const targetImg = isDirectImageSelected ? ImageAdapter.findImage(selectedEl, unit) : null;
 
       const isButton =
         !targetImg &&
-        (isButtonComponent(targetEl) ||
+        (isButtonComponent(selectedEl) ||
           (isButtonComponent(unit) && !unit.classList.contains('image_block')));
-      const targetBtn = isButton ? resolveButtonAnatomy(targetEl, unit).anchor : null;
+      const targetBtn = isButton ? resolveButtonAnatomy(selectedEl, unit).anchor : null;
 
-      const isText =
+      // Only show text resize handles when the text element itself is directly selected (double-clicked),
+      // NEVER when only the parent block/row is clicked!
+      const isDirectTextSelected =
         !targetImg &&
         !isButton &&
         !this.isEditingText &&
-        (unit.classList.contains('paragraph_block') ||
-          unit.classList.contains('heading_block') ||
-          unit.classList.contains('text_block') ||
-          /^(h[1-6]|p|blockquote)$/i.test(targetEl.tagName) ||
-          /^(h[1-6]|p|blockquote)$/i.test(unit.tagName));
-      const targetText = isText ? TextAdapter.getTextHost(targetEl, unit) || targetEl : null;
+        (isTextLeafElement(unit) ||
+          (isTextLeafElement(selectedEl) && (unit === selectedEl || unit.contains(selectedEl))));
+      const targetText = isDirectTextSelected ? (TextAdapter.getTextHost(selectedEl, unit) || selectedEl) : null;
 
       let resizableTarget: HTMLElement | null = null;
       let resizableKind: 'image' | 'button' | 'text' | null = null;
@@ -2690,54 +2702,48 @@ export class Canvas {
       tb.style.left = `${left}px`;
     }
 
-    // 4. Element resize handles (Image, Button, Text Block)
-    const targetEl = this.selectedElement || unit;
+    // 4. Element resize handles (Image, Button, Text Element)
     const isRowOrCol = isRowElement(unit) || isColumnElement(unit);
-
-    const isDirectImageSelected =
-      !isRowOrCol &&
-      (unit.tagName.toLowerCase() === 'img' ||
-        (targetEl.tagName.toLowerCase() === 'img' && targetEl !== unit));
-    const targetImg = isDirectImageSelected ? ImageAdapter.findImage(targetEl, unit) : null;
-
-    const isButton =
-      !isRowOrCol &&
-      !targetImg &&
-      (isButtonComponent(targetEl) ||
-        (isButtonComponent(unit) && !unit.classList.contains('image_block')));
-
-    const isText =
-      !isRowOrCol &&
-      !targetImg &&
-      !isButton &&
-      !this.isEditingText &&
-      (unit.classList.contains('paragraph_block') ||
-        unit.classList.contains('heading_block') ||
-        unit.classList.contains('text_block') ||
-        /^(h[1-6]|p|blockquote)$/i.test(targetEl.tagName) ||
-        /^(h[1-6]|p|blockquote)$/i.test(unit.tagName));
-
-    let targetNode: HTMLElement | null = null;
-    if (this.resizeHandles.length > 0) {
-      if (targetImg) {
-        targetNode = targetImg;
-      } else if (isButton) {
-        targetNode = resolveButtonAnatomy(targetEl, unit).anchor;
-      } else if (isText) {
-        targetNode = TextAdapter.getTextHost(targetEl, unit) || targetEl;
-      }
-    }
-
     const selectedEl =
       (this.selectedElement && this.selectedElement !== this.iframe.contentDocument?.body && this.selectedElement.classList?.contains('arch-selected-element') ? this.selectedElement : null) ||
       this.iframe.contentDocument?.querySelector<HTMLElement>('.arch-selected-element') ||
       this.activeMoveableUnit ||
       unit;
 
-    // For text: if targetNode (e.g. <p>) is selected, attach handles to the text element itself so parent never shows handles
-    const effectiveTargetEl = (isText && targetNode && (selectedEl === targetNode || targetEl === targetNode))
-      ? targetNode
-      : selectedEl;
+    const isDirectImageSelected =
+      !isRowOrCol &&
+      (unit.tagName.toLowerCase() === 'img' ||
+        (selectedEl.tagName.toLowerCase() === 'img' && selectedEl !== unit));
+    const targetImg = isDirectImageSelected ? ImageAdapter.findImage(selectedEl, unit) : null;
+
+    const isButton =
+      !isRowOrCol &&
+      !targetImg &&
+      (isButtonComponent(selectedEl) ||
+        (isButtonComponent(unit) && !unit.classList.contains('image_block')));
+
+    // Only show text resize handles when the text element itself is directly selected (double-clicked),
+    // NEVER when only the parent block/row is clicked!
+    const isDirectTextSelected =
+      !isRowOrCol &&
+      !targetImg &&
+      !isButton &&
+      !this.isEditingText &&
+      (isTextLeafElement(unit) ||
+        (isTextLeafElement(selectedEl) && (unit === selectedEl || unit.contains(selectedEl))));
+
+    let targetNode: HTMLElement | null = null;
+    if (this.resizeHandles.length > 0) {
+      if (targetImg) {
+        targetNode = targetImg;
+      } else if (isButton) {
+        targetNode = resolveButtonAnatomy(selectedEl, unit).anchor;
+      } else if (isDirectTextSelected) {
+        targetNode = TextAdapter.getTextHost(selectedEl, unit) || selectedEl;
+      }
+    }
+
+    const effectiveTargetEl = (isDirectTextSelected && targetNode) ? targetNode : selectedEl;
 
     const targetRect =
       effectiveTargetEl && effectiveTargetEl.getBoundingClientRect().width > 0

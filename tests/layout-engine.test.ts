@@ -1889,4 +1889,63 @@ describe('Figma vertical displacement', () => {
     editor.destroy();
     container.remove();
   });
+
+  it('Figma model: hovering hovers parent element, single-click selects parent item (no child resize options), double-click selects text element and shows resize options', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    const html = `
+      <table class="row row-1" width="100%">
+        <tr>
+          <td class="column column-1" width="100%">
+            <table class="text_block" width="100%">
+              <tr>
+                <td style="padding: 15px;">
+                  <p class="para-item">Figma drill-down text</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    `;
+
+    const editor = new ArchEmailEditor(container);
+    editor.importHTML(html);
+
+    const canvas = (editor as any).canvas;
+    const ifrDoc = canvas.iframe.contentDocument as Document;
+    const overlay = container.querySelector('.arch-canvas-overlay') as HTMLElement;
+
+    const row = ifrDoc.querySelector('.row-1') as HTMLElement;
+    const textBlock = ifrDoc.querySelector('.text_block') as HTMLElement;
+    const p = ifrDoc.querySelector('.para-item') as HTMLElement;
+
+    // 1. Hovering text: only the first parent structural element hovers (.text_block), child does not hover
+    p.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(textBlock.classList.contains('arch-hover-element')).toBe(true);
+    expect(p.classList.contains('arch-hover-element')).toBe(false);
+
+    // 2. Single click on text selects parent item (Row Frame / parent container)
+    p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(row);
+    // On parent click, child text element does NOT show resize options
+    expect(overlay.querySelector('.arch-resize-handle')).toBeNull();
+
+    // 3. First double-click drills down to parent block (.text_block)
+    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(textBlock);
+    // While on parent block, child text element still does NOT show resize options
+    expect(overlay.querySelector('.arch-resize-handle')).toBeNull();
+
+    // 4. Second double-click drills down to select the text element itself (<p>)
+    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
+    // THIS TIME, text element is selected and shows resize options
+    expect(overlay.querySelector('.arch-resize-handle--e')).toBeTruthy();
+    expect(overlay.querySelector('.arch-resize-handle--se')).toBeTruthy();
+
+    editor.destroy();
+    container.remove();
+  });
 });
