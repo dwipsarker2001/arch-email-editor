@@ -1634,4 +1634,71 @@ describe('Figma vertical displacement', () => {
 
     editor.destroy();
   });
+  it('reduces image block padding from properties sidebar options live on the enclosing td.pad', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+
+    const imageBlockHtml = `<!DOCTYPE html>
+<html>
+<body>
+  <table class="nl-container" width="100%" role="presentation">
+    <tbody><tr><td>
+      <table class="image_block block-1" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation">
+        <tbody>
+          <tr>
+            <td class="pad" style="padding: 12px 20px;">
+              <div class="alignment" align="center">
+                <img src="https://example.com/banner.jpg" width="244" alt="Banner visual" />
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </td></tr></tbody>
+  </table>
+</body>
+</html>`;
+
+    editor.importHTML(imageBlockHtml);
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+
+    const img = ifrDoc.querySelector('img') as HTMLElement;
+    const padTd = ifrDoc.querySelector('td.pad') as HTMLElement;
+    expect(img).toBeTruthy();
+    expect(padTd).toBeTruthy();
+
+    // 1. Select the image element
+    img.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    // 2. The Inspector must read the actual padding from td.pad (12px 20px -> top/all 12px)
+    const allPadInp = container.querySelector('#stp-pad-all') as HTMLInputElement;
+    expect(allPadInp).toBeTruthy();
+    expect(allPadInp.value).toBe('12');
+
+    // 3. Changing #stp-pad-all to 4px updates the enclosing td.pad padding live
+    allPadInp.value = '4';
+    allPadInp.dispatchEvent(new Event('change'));
+
+    expect(padTd.style.padding).toBe('4px');
+
+    // 4. Switching to More options shows per-side controls
+    const moreChk = container.querySelector('#chk-pad-more') as HTMLInputElement;
+    moreChk.checked = true;
+    moreChk.dispatchEvent(new Event('change'));
+
+    const topPadInp = container.querySelector('#stp-pad-top') as HTMLInputElement;
+    expect(topPadInp).toBeTruthy();
+    expect(topPadInp.value).toBe('4');
+
+    // 5. Changing top padding to 0px updates td.pad paddingTop without resetting to default 20px
+    topPadInp.value = '0';
+    topPadInp.dispatchEvent(new Event('change'));
+
+    expect(padTd.style.paddingTop).toBe('0px');
+
+    editor.destroy();
+    container.remove();
+  });
 });
