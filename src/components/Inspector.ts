@@ -56,6 +56,9 @@ export class Inspector {
   private element: HTMLElement;
   private events: InspectorEvents;
   private viewportMode: ViewportMode = 'desktop';
+  /** UI-only state: per-side padding inputs stay expanded across inspector re-renders. */
+  private padMoreExpanded = false;
+  private padMoreUnit: HTMLElement | null = null;
 
   constructor(events: InspectorEvents) {
     this.events = events;
@@ -127,6 +130,7 @@ export class Inspector {
     const padRight = parseInt(targetUnit.style.paddingRight || '20', 10) || 20;
     const padBottom = parseInt(targetUnit.style.paddingBottom || '20', 10) || 20;
     const padLeft = parseInt(targetUnit.style.paddingLeft || '20', 10) || 20;
+    const padMoreExpanded = this.padMoreExpanded && this.padMoreUnit === targetUnit;
 
     this.element.innerHTML = `
       <div class="arch-prop-header">
@@ -147,13 +151,6 @@ export class Inspector {
         </div>
       </div>
 
-      <div class="arch-ai-bar">
-        <button type="button" class="arch-ai-btn" id="btn-write-ai">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
-          Write with AI
-        </button>
-      </div>
-
       <div id="inspector-element-fields"></div>
 
       <div class="arch-accordion-header" id="hdr-block-options">
@@ -166,13 +163,13 @@ export class Inspector {
           <div style="display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 11px; color: #6b7280;">More options</span>
             <label class="arch-toggle-switch">
-              <input type="checkbox" id="chk-pad-more" />
+              <input type="checkbox" id="chk-pad-more" ${padMoreExpanded ? 'checked' : ''} />
               <span class="arch-toggle-slider"></span>
             </label>
           </div>
         </div>
 
-        <div class="arch-rge-row" id="row-pad-single">
+        <div class="arch-rge-row" id="row-pad-single" style="${padMoreExpanded ? 'display: none;' : ''}">
           <span class="arch-rge-label">All sides</span>
           <div style="display: flex; align-items: center; gap: 12px;">
             ${this.renderStepper('stp-pad-all', computedPad, 0, 100, 5)}
@@ -185,7 +182,7 @@ export class Inspector {
           </div>
         </div>
 
-        <div id="row-pad-multi" style="display: none;">
+        <div id="row-pad-multi" style="display: ${padMoreExpanded ? 'block' : 'none'};">
           <div class="arch-rge-row">
             <span class="arch-rge-label">Top</span>
             ${this.renderStepper('stp-pad-top', padTop, 0, 100, 5)}
@@ -253,6 +250,8 @@ export class Inspector {
     const rowPadMulti = this.element.querySelector<HTMLElement>('#row-pad-multi');
     padMoreChk?.addEventListener('change', () => {
       const isMulti = padMoreChk.checked;
+      this.padMoreExpanded = isMulti;
+      this.padMoreUnit = targetUnit;
       if (rowPadSingle) rowPadSingle.style.display = isMulti ? 'none' : 'flex';
       if (rowPadMulti) rowPadMulti.style.display = isMulti ? 'block' : 'none';
     });

@@ -947,7 +947,7 @@ input:checked + .arch-toggle-slider:before {
   transform: translateX(16px);
 }
 
-/* Element Properties Header & AI Button */
+/* Element Properties Header */
 .arch-prop-header {
   display: flex;
   justify-content: space-between;
@@ -1038,36 +1038,6 @@ input:checked + .arch-toggle-slider:before {
   z-index: 20;
 }
 
-/* RGE Move Handle (Centered on right border of selected block) */
-.arch-rge-move-handle {
-  position: absolute;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #7747ff;
-  color: #ffffff;
-  border: 2px solid #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  z-index: 45;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
-  transform: translate(-50%, -50%);
-  padding: 0;
-  pointer-events: auto;
-  user-select: none;
-  transition: transform 0.15s ease, background 0.12s ease;
-}
-
-.arch-rge-move-handle:hover {
-  background: #6336e0;
-  transform: translate(-50%, -50%) scale(1.08);
-}
-
-.arch-rge-move-handle:active {
-  cursor: grabbing;
-}
 
 /* RGE Bottom Action Bar (Attached to bottom edge of selected block) */
 .arch-rge-bottom-actions {

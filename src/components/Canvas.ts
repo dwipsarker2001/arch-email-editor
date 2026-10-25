@@ -85,7 +85,6 @@ export class Canvas {
   private iframe: HTMLIFrameElement;
   private overlayLayer: HTMLElement;
   private floatingToolbar: HTMLElement | null = null;
-  private moveHandle: HTMLElement | null = null;
   private bottomActions: HTMLElement | null = null;
   private textToolbar: HTMLElement | null = null;
   private dimensionsBadge: HTMLElement | null = null;
@@ -2086,56 +2085,7 @@ export class Canvas {
     const editableHost = findEditableTextHost(innerTarget || this.selectedElement || unit, unit);
     const ifrDoc = this.iframe.contentDocument;
 
-    // 1. RGE Move Handle (Right Edge Purple Circle ✥)
-    const moveHandle = document.createElement('div');
-    moveHandle.className = 'arch-rge-move-handle';
-    moveHandle.setAttribute('draggable', 'true');
-    moveHandle.title = 'Drag to reorder';
-    moveHandle.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <polyline points="5 9 2 12 5 15"></polyline>
-        <polyline points="9 5 12 2 15 5"></polyline>
-        <polyline points="15 19 12 22 9 19"></polyline>
-        <polyline points="19 9 22 12 19 15"></polyline>
-        <line x1="2" y1="12" x2="22" y2="12"></line>
-        <line x1="12" y1="2" x2="12" y2="22"></line>
-      </svg>
-    `;
-
-    moveHandle.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-      this.pointerDragCandidate = {
-        unit,
-        startTarget: unit,
-        startX: e.clientX,
-        startY: e.clientY,
-        active: false
-      };
-    });
-
-    moveHandle.addEventListener('dragstart', (e) => {
-      if (e.dataTransfer) {
-        e.dataTransfer.setData('text/plain', 'arch-move-unit');
-        e.dataTransfer.effectAllowed = 'move';
-      }
-      this.draggedUnit = unit;
-      requestAnimationFrame(() => {
-        this.overlayLayer.style.pointerEvents = 'auto';
-      });
-    });
-
-    moveHandle.addEventListener('dragend', () => {
-      this.draggedUnit = null;
-      this.overlayLayer.style.pointerEvents = 'none';
-      this.clearDropIndicators();
-    });
-
-    this.overlayLayer.appendChild(moveHandle);
-    this.moveHandle = moveHandle;
-
-    // 2. RGE Bottom Action Bar (Comment, Delete, Duplicate Attached to Bottom Edge)
+    // 1. Bottom Action Bar (Comment, Delete, Duplicate Attached to Bottom Edge)
     const bottomActions = document.createElement('div');
     bottomActions.className = 'arch-rge-bottom-actions';
     bottomActions.innerHTML = `
@@ -2525,15 +2475,7 @@ export class Canvas {
     const offsetX = iframeRect.left - containerRect.left;
     const offsetY = iframeRect.top - containerRect.top;
 
-    // 1. Right edge move handle (vertically centered on right border)
-    if (this.moveHandle) {
-      const handleTop = offsetY + unitRect.top + unitRect.height / 2;
-      const handleLeft = offsetX + unitRect.right;
-      this.moveHandle.style.top = `${handleTop}px`;
-      this.moveHandle.style.left = `${handleLeft}px`;
-    }
-
-    // 2. Bottom-left action bar (attached directly below the bottom edge)
+    // 1. Bottom-left action bar (attached directly below the bottom edge)
     if (this.bottomActions) {
       const actionsTop = offsetY + unitRect.bottom;
       const actionsLeft = offsetX + unitRect.left;
@@ -2653,10 +2595,6 @@ export class Canvas {
   }
 
   private removeFloatingToolbar(): void {
-    if (this.moveHandle) {
-      this.moveHandle.remove();
-      this.moveHandle = null;
-    }
     if (this.bottomActions) {
       this.bottomActions.remove();
       this.bottomActions = null;

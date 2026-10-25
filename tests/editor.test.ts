@@ -564,6 +564,8 @@ describe('ArchEmailEditor Core Engine', () => {
     canvas.selectUnit(btn, btn);
 
     const overlay = container.querySelector('.arch-canvas-overlay') as HTMLElement;
+    // Verify right-side drag icon is removed so it does not block the right resize handle
+    expect(overlay.querySelector('.arch-rge-move-handle')).toBeNull();
     const eHandle = overlay.querySelector('.arch-resize-handle--e') as HTMLElement;
     expect(eHandle).toBeTruthy();
 
@@ -610,6 +612,8 @@ describe('ArchEmailEditor Core Engine', () => {
     canvas.selectUnit(p, p);
 
     const overlay = container.querySelector('.arch-canvas-overlay') as HTMLElement;
+    // Verify right-side drag icon is removed so it does not block the right resize handle
+    expect(overlay.querySelector('.arch-rge-move-handle')).toBeNull();
     const eHandle = overlay.querySelector('.arch-resize-handle--e') as HTMLElement;
     const seHandle = overlay.querySelector('.arch-resize-handle--se') as HTMLElement;
     expect(eHandle).toBeTruthy();
