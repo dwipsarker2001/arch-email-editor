@@ -41,7 +41,7 @@ describe('Prebuilt Sections Library & Sections Tab', () => {
     const sectionsTabBtn = container.querySelector<HTMLButtonElement>('[data-tab="sections"]');
 
     expect(sectionsTabBtn).toBeTruthy();
-    expect(sectionsTabBtn?.textContent?.trim()).toContain('SECTIONS');
+    expect(sectionsTabBtn?.textContent?.trim().toUpperCase()).toContain('SECTIONS');
     expect(sectionsTabBtn?.querySelector('svg')).toBeTruthy();
 
     editor.destroy();

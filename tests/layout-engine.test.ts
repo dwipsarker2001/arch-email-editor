@@ -608,7 +608,7 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     const rightPanelTabs = Array.from(container.querySelectorAll('.arch-right-tab')).map((t) =>
       (t.textContent || '').trim()
     );
-    expect(rightPanelTabs).toEqual(['CONTENT', 'SECTIONS', 'SETTINGS']);
+    expect(rightPanelTabs).toEqual(['Content', 'Sections', 'Settings']);
 
     // 6. Exported HTML must not leak draggable="true"
     const exported = editor.getHTML();

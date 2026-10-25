@@ -1032,8 +1032,12 @@ export class Inspector {
     const existing = this.element.querySelector('.arch-assets-sidepanel');
     if (existing) existing.remove();
 
+    this.element.style.overflow = 'hidden';
+
+    const isEmpty = this.customAssets.length === 0;
+
     const panel = document.createElement('div');
-    panel.className = 'arch-assets-sidepanel';
+    panel.className = `arch-assets-sidepanel ${isEmpty ? 'is-empty-assets' : ''}`;
     panel.innerHTML = `
       <div class="arch-prop-header arch-assets-header">
         <div class="arch-prop-title">Assets</div>
@@ -1058,20 +1062,21 @@ export class Inspector {
       </div>
       <input type="file" id="inp-assets-upload-file" accept="image/*" style="display: none;" />
 
-      <div class="arch-assets-search-wrap ${this.customAssets.length === 0 ? 'is-collapsed' : ''}" id="arch-assets-search-wrap">
+      <div class="arch-assets-search-wrap ${isEmpty ? 'is-collapsed' : ''}" id="arch-assets-search-wrap">
         <div class="arch-assets-search-box">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           <input type="text" class="arch-assets-search-input" id="inp-assets-search" placeholder="Search images..." />
         </div>
       </div>
 
-      <div class="arch-assets-body">
+      <div class="arch-assets-body ${isEmpty ? 'is-empty-assets' : ''}">
         <div class="arch-assets-masonry" id="arch-assets-grid"></div>
       </div>
     `;
 
     this.element.appendChild(panel);
 
+    const body = panel.querySelector<HTMLElement>('.arch-assets-body')!;
     const grid = panel.querySelector<HTMLElement>('#arch-assets-grid')!;
     const searchInp = panel.querySelector<HTMLInputElement>('#inp-assets-search')!;
     const closeBtn = panel.querySelector<HTMLButtonElement>('#btn-assets-close')!;
@@ -1123,6 +1128,9 @@ export class Inspector {
           size: formattedKb
         };
         this.customAssets.unshift(newAsset);
+        panel.classList.remove('is-empty-assets');
+        body.classList.remove('is-empty-assets');
+        body.classList.remove('is-empty-search');
         searchWrap?.classList.remove('is-collapsed');
         renderGrid(this.customAssets);
         onSelect(url, file.name, formattedKb);
@@ -1142,6 +1150,9 @@ export class Inspector {
     const renderGrid = (items: AssetItem[]) => {
       // If no assets sources configured/added, show empty state design
       if (this.customAssets.length === 0) {
+        panel.classList.add('is-empty-assets');
+        body.classList.add('is-empty-assets');
+        body.classList.remove('is-empty-search');
         grid.innerHTML = `
           <div class="arch-assets-empty-state" id="arch-assets-empty-state">
             <div class="arch-assets-empty-icon">
@@ -1170,10 +1181,16 @@ export class Inspector {
         return;
       }
 
+      panel.classList.remove('is-empty-assets');
+      body.classList.remove('is-empty-assets');
+
       // If assets exist but search yields 0 matches
       if (items.length === 0) {
-        grid.innerHTML = '<div style="column-span: all; text-align: center; color: #94a3b8; font-size: 12px; padding: 40px 10px;">No matching assets found</div>';
+        body.classList.add('is-empty-search');
+        grid.innerHTML = '<div class="arch-assets-no-match">No matching assets found</div>';
         return;
+      } else {
+        body.classList.remove('is-empty-search');
       }
 
       grid.innerHTML = items.map(asset => `
@@ -1431,10 +1448,10 @@ export class Inspector {
       testImg.src = cleanUrl;
     };
 
-    const updatePreview = (url: string, explicitName?: string, fileSize?: number) => {
+    const updatePreview = (url: string, explicitName?: string, fileSize?: number | string) => {
       const cleanUrl = (url || '').trim();
       if (fileSize !== undefined) {
-        currentKnownFileSize = formatBytes(fileSize);
+        currentKnownFileSize = typeof fileSize === "number" ? formatKb(fileSize) : (fileSize || "");
       } else if (!cleanUrl) {
         currentKnownFileSize = '';
       }
@@ -1509,7 +1526,7 @@ export class Inspector {
     };
     document.addEventListener('click', onDocClick);
 
-    const applySelectedUrl = (url: string, explicitName?: string, fileSize?: number) => {
+    const applySelectedUrl = (url: string, explicitName?: string, fileSize?: number | string) => {
       const srcInp = container.querySelector<HTMLInputElement>('#inp-img-src');
       if (srcInp) srcInp.value = url;
       updatePreview(url, explicitName, fileSize);

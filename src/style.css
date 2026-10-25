@@ -540,16 +540,6 @@
   width: 0;
   padding: 0;
   overflow: visible;
-  border: none;
-  background: transparent;
-}
-
-.arch-editor__right-panel.is-collapsed .arch-right-panel-toggle {
-  position: absolute;
-  left: -36px;
-  top: 10px;
-  z-index: 50;
-  transform: rotate(180deg);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
@@ -588,17 +578,21 @@
   background: #6336e0;
 }
 
+.arch-editor button.arch-right-tab,
+.arch-editor .arch-right-tab,
 .arch-right-tab {
   height: 100%;
   background: transparent;
   border: none;
   border-right: 1px solid #e2e5e9;
-  padding: 0 8px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #64748b;
+  padding: 0 10px;
+  font-family: inherit;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  color: #64748b !important;
   cursor: pointer;
   text-align: center;
   border-radius: 0;
@@ -607,26 +601,38 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+  line-height: 1 !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
+.arch-editor button.arch-right-tab:last-child,
+.arch-editor .arch-right-tab:last-child,
 .arch-right-tab:last-child {
   border-right: none;
 }
 
+.arch-editor button.arch-right-tab:hover,
+.arch-editor .arch-right-tab:hover,
 .arch-right-tab:hover {
-  color: #1e293b;
+  color: #1e293b !important;
   background: #e4e7eb;
 }
 
+.arch-editor button.arch-right-tab.is-active,
+.arch-editor .arch-right-tab.is-active,
 .arch-right-tab.is-active {
-  color: #111827;
-  background: #ffffff;
-  font-weight: 700;
+  color: #111827 !important;
+  background: #ffffff !important;
+  font-weight: 600 !important;
   box-shadow: none;
+  border-bottom: 2px solid #7747ff !important;
 }
 
+.arch-editor button.arch-right-tab.is-active .arch-tab-icon,
+.arch-editor .arch-right-tab.is-active .arch-tab-icon,
 .arch-right-tab.is-active .arch-tab-icon {
-  color: #7747ff;
+  color: #7747ff !important;
 }
 
 .arch-tab-icon {
@@ -2983,6 +2989,46 @@ input:checked + .arch-toggle-slider:before {
 
 
 /* Assets Empty State Design */
+.arch-editor .arch-assets-sidepanel.is-empty-assets,
+.arch-assets-sidepanel.is-empty-assets,
+.arch-editor .arch-assets-sidepanel.is-empty-assets .arch-assets-body,
+.arch-assets-sidepanel.is-empty-assets .arch-assets-body,
+.arch-editor .arch-assets-body.is-empty-assets,
+.arch-assets-body.is-empty-assets,
+.arch-editor .arch-assets-body.is-empty-search,
+.arch-assets-body.is-empty-search {
+  overflow: hidden !important;
+  overflow-y: hidden !important;
+}
+
+.arch-editor .arch-assets-sidepanel.is-empty-assets .arch-assets-body,
+.arch-assets-sidepanel.is-empty-assets .arch-assets-body,
+.arch-editor .arch-assets-body.is-empty-assets,
+.arch-assets-body.is-empty-assets {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+.arch-editor .arch-assets-sidepanel.is-empty-assets .arch-assets-masonry,
+.arch-assets-sidepanel.is-empty-assets .arch-assets-masonry {
+  column-count: 1 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
 .arch-editor .arch-assets-empty-state,
 .arch-assets-empty-state {
   display: flex !important;
@@ -2990,11 +3036,21 @@ input:checked + .arch-toggle-slider:before {
   align-items: center !important;
   justify-content: center !important;
   text-align: center !important;
-  padding: 50px 20px !important;
-  min-height: 280px !important;
-  height: 100% !important;
+  padding: 24px 16px !important;
   box-sizing: border-box !important;
   column-span: all !important;
+  width: 100% !important;
+  max-width: 270px !important;
+  margin: auto !important;
+}
+
+.arch-editor .arch-assets-no-match,
+.arch-assets-no-match {
+  column-span: all !important;
+  text-align: center !important;
+  color: #94a3b8 !important;
+  font-size: 12px !important;
+  padding: 40px 10px !important;
 }
 
 .arch-editor .arch-assets-empty-icon,
