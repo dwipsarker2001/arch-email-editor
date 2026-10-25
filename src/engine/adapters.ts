@@ -418,6 +418,40 @@ export const ImageAdapter = {
     }
   },
 
+  getHeight(el: HTMLElement, unit?: HTMLElement): string {
+    const { img, sizeWrapper } = resolveImageAnatomy(el, unit);
+    if (sizeWrapper && sizeWrapper.style.height && sizeWrapper.style.height !== 'auto') return sizeWrapper.style.height;
+    if (img.style.height && img.style.height !== 'auto') return img.style.height;
+    const hAttr = img.getAttribute('height');
+    if (hAttr && hAttr !== 'auto') return hAttr.endsWith('%') || hAttr.endsWith('px') ? hAttr : (hAttr + 'px');
+    return '';
+  },
+
+  setDimensions(el: HTMLElement, widthPx: number, heightPx: number, unit?: HTMLElement): void {
+    const { img, sizeWrapper } = resolveImageAnatomy(el, unit);
+    const w = Math.round(Math.max(20, widthPx));
+    const h = Math.round(Math.max(20, heightPx));
+
+    img.setAttribute('width', String(w));
+    img.setAttribute('height', String(h));
+    img.style.objectFit = 'cover';
+
+    if (sizeWrapper) {
+      sizeWrapper.style.maxWidth = w + 'px';
+      sizeWrapper.style.width = w + 'px';
+      sizeWrapper.style.height = h + 'px';
+      sizeWrapper.style.overflow = 'hidden';
+      img.style.maxWidth = w + 'px';
+      img.style.maxHeight = h + 'px';
+      img.style.width = '100%';
+      img.style.height = '100%';
+    } else {
+      img.style.maxWidth = w + 'px';
+      img.style.width = w + 'px';
+      img.style.height = h + 'px';
+    }
+  },
+
   getAlignment(el: HTMLElement, unit?: HTMLElement): string {
     const { alignWrapper, padCell } = resolveImageAnatomy(el, unit);
     return (

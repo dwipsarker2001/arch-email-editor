@@ -2295,6 +2295,13 @@ input:checked + .arch-toggle-slider:before {
   border-radius: 4px;
 }
 
+.arch-resize-handle--s {
+  cursor: ns-resize;
+  width: 18px;
+  height: 8px;
+  border-radius: 4px;
+}
+
 .arch-img-resize-row {
   display: flex;
   align-items: center;

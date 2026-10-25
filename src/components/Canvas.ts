@@ -570,11 +570,16 @@ export class Canvas {
     }
 
     if (state.kind === 'image') {
-      const nextWidth = Math.round(Math.max(24, Math.min(state.maxWidth, state.startWidth + deltaX)));
-      ImageAdapter.setWidth(state.target, `${nextWidth}px`, state.unit);
-      const rect = state.target.getBoundingClientRect();
-      const h = rect.height > 0 ? Math.round(rect.height) : Math.round(nextWidth);
-      this.dimensionsBadge.textContent = `${nextWidth} × ${h}`;
+      const nextWidth = state.dirX !== 0
+        ? Math.round(Math.max(24, Math.min(state.maxWidth, state.startWidth + deltaX)))
+        : Math.round(state.startWidth);
+
+      const nextHeight = state.dirY !== 0
+        ? Math.round(Math.max(20, state.startHeight + deltaY))
+        : Math.round(state.startHeight);
+
+      ImageAdapter.setDimensions(state.target, nextWidth, nextHeight, state.unit);
+      this.dimensionsBadge.textContent = `${nextWidth} × ${nextHeight}`;
     } else if (state.kind === 'button') {
       const nextWidth = Math.round(Math.max(40, Math.min(state.maxWidth, state.startWidth + deltaX)));
       ButtonAdapter.setWidth(state.target, `${nextWidth}px`, state.unit);
@@ -2396,7 +2401,7 @@ export class Canvas {
 
       if (resizableTarget && resizableKind) {
         const handleDefs: Array<{
-          side: 'nw' | 'ne' | 'sw' | 'se' | 'e' | 'w';
+          side: 'nw' | 'ne' | 'sw' | 'se' | 'e' | 'w' | 's';
           dirX: number;
           dirY: number;
           mode: 'box' | 'font';
@@ -2443,6 +2448,13 @@ export class Canvas {
             dirY: 0,
             mode: 'box',
             title: `Drag to resize ${resizableKind} width`
+          },
+          {
+            side: 's',
+            dirX: 0,
+            dirY: 1,
+            mode: 'box',
+            title: `Drag to resize ${resizableKind} height`
           }
         ];
 
@@ -2464,11 +2476,16 @@ export class Canvas {
             const maxWidth = colWidth > 40 ? Math.round(colWidth) : 600;
 
             let parsedWidth = 120;
+            let parsedHeight = 80;
             if (resizableKind === 'image') {
               parsedWidth =
                 parseInt(ImageAdapter.getWidth(resizableTarget!, unit), 10) ||
                 parseInt(resizableTarget!.getAttribute('width') || '', 10) ||
                 200;
+              parsedHeight =
+                parseInt(ImageAdapter.getHeight(resizableTarget!, unit), 10) ||
+                parseInt(resizableTarget!.getAttribute('height') || '', 10) ||
+                (rect.height > 0 ? Math.round(rect.height) : 150);
             } else if (resizableKind === 'button') {
               parsedWidth =
                 parseInt(ButtonAdapter.getWidth(resizableTarget!, unit), 10) ||
@@ -2489,7 +2506,7 @@ export class Canvas {
               startX: e.clientX,
               startY: e.clientY,
               startWidth,
-              startHeight: rect.height > 0 ? rect.height : 40,
+              startHeight: rect.height > 0 ? rect.height : (resizableKind === 'image' ? parsedHeight : 40),
               maxWidth: Math.max(maxWidth, Math.round(startWidth)),
               dirX: def.dirX,
               dirY: def.dirY,
@@ -2674,6 +2691,8 @@ export class Canvas {
         hTop = offsetY + targetRect.bottom - 5;
       } else if (side === 'e' || side === 'w') {
         hTop = offsetY + targetRect.top + targetRect.height / 2 - 9;
+      } else if (side === 's') {
+        hTop = offsetY + targetRect.bottom - 4;
       }
 
       if (side === 'nw' || side === 'sw') {
@@ -2684,6 +2703,8 @@ export class Canvas {
         hLeft = offsetX + targetRect.right - 4;
       } else if (side === 'w') {
         hLeft = offsetX + targetRect.left - 4;
+      } else if (side === 's') {
+        hLeft = offsetX + targetRect.left + targetRect.width / 2 - 9;
       }
 
       handle.style.top = `${hTop}px`;
