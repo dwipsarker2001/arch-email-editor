@@ -57,6 +57,7 @@ import {
   buildContextAwareBlockHtml,
   buildRowLayoutHtml,
   ButtonAdapter,
+  ColumnLayoutAdapter,
   ensureEmptyColumnPlaceholders,
   findPrimaryContentContainer,
   ImageAdapter
@@ -125,6 +126,20 @@ export class Canvas {
     startWidth: number;
     maxWidth: number;
     dir: 1 | -1;
+  } | null = null;
+  private columnResizeHandles: HTMLElement[] = [];
+  private activeColumnResize: {
+    handle: HTMLElement;
+    row: HTMLElement;
+    leftCol: HTMLElement;
+    rightCol: HTMLElement;
+    startX: number;
+    leftStartWidth: number;
+    rightStartWidth: number;
+    pairTotalWidth: number;
+    leftStartPct: number;
+    rightStartPct: number;
+    pairTotalPct: number;
   } | null = null;
 
   constructor(events: CanvasEvents) {
@@ -200,8 +215,8 @@ export class Canvas {
    */
   public syncHUDPosition(): void {
     const target = this.activeMoveableUnit || this.hoveredUnit;
-    if (target && this.floatingToolbar) {
-      this.positionFloatingToolbar(target, this.floatingToolbar);
+    if (target && (this.floatingToolbar || this.columnResizeHandles.length > 0)) {
+      this.positionFloatingToolbar(target, this.floatingToolbar || undefined);
     }
   }
 
@@ -254,6 +269,10 @@ export class Canvas {
     // Parent window pointermove/mouseup listeners for 60fps custom Figma Pointer Drag & Image Resize
     // Coalesce mousemove to at most one drag update per animation frame (no redundant work at 120Hz+ mice)
     window.addEventListener('mousemove', (e) => {
+      if (this.activeColumnResize) {
+        this.handleColumnResizeMove(e.clientX);
+        return;
+      }
       if (this.activeImageResize) {
         this.handleImageResizeMove(e.clientX);
         return;
@@ -269,6 +288,10 @@ export class Canvas {
     });
 
     window.addEventListener('mouseup', () => {
+      if (this.activeColumnResize) {
+        this.finishColumnResize();
+        return;
+      }
       if (this.activeImageResize) {
         this.finishImageResize();
         return;
@@ -462,6 +485,76 @@ export class Canvas {
     this.suppressNextClick = true;
     this.overlayLayer.style.pointerEvents = 'none';
     this.selectUnit(state.img, state.unit);
+    this.adjustHeight();
+    this.onStructureChanged();
+  }
+
+  /**
+   * Resizes two adjacent columns live as the user drags a column boundary `.arch-col-resize-handle`.
+   */
+  private handleColumnResizeMove(clientX: number): void {
+    const state = this.activeColumnResize;
+    if (!state) return;
+
+    const deltaX = clientX - state.startX;
+    const minWidthPx = 35;
+
+    let nextLeftWidth = state.leftStartWidth + deltaX;
+    let nextRightWidth = state.rightStartWidth - deltaX;
+
+    if (nextLeftWidth < minWidthPx) {
+      nextLeftWidth = minWidthPx;
+      nextRightWidth = state.pairTotalWidth - minWidthPx;
+    } else if (nextRightWidth < minWidthPx) {
+      nextRightWidth = minWidthPx;
+      nextLeftWidth = state.pairTotalWidth - minWidthPx;
+    }
+
+    const ratio = nextLeftWidth / state.pairTotalWidth;
+    const newLeftPct = Math.round(ratio * state.pairTotalPct * 10) / 10;
+    const newRightPct = Math.round((state.pairTotalPct - newLeftPct) * 10) / 10;
+
+    ColumnLayoutAdapter.setColumnPairWidths(state.leftCol, state.rightCol, newLeftPct, newRightPct);
+
+    this.positionFloatingToolbar(state.row);
+
+    if (!this.dimensionsBadge) {
+      const dim = document.createElement('div');
+      dim.className = 'arch-dimensions-pill';
+      this.overlayLayer.appendChild(dim);
+      this.dimensionsBadge = dim;
+    }
+
+    this.dimensionsBadge.textContent = `${Math.round(newLeftPct)}% | ${Math.round(newRightPct)}%`;
+    const handleRect = state.handle.getBoundingClientRect();
+    const containerRect = this.containerElement.getBoundingClientRect();
+    this.dimensionsBadge.style.left = `${handleRect.left - containerRect.left + handleRect.width / 2}px`;
+    this.dimensionsBadge.style.top = `${Math.max(4, handleRect.top - containerRect.top - 24)}px`;
+  }
+
+  /**
+   * Commits an interactive column resize operation and syncs empty column placeholders & history.
+   */
+  private finishColumnResize(): void {
+    const state = this.activeColumnResize;
+    if (!state) return;
+
+    state.handle.classList.remove('active');
+    this.activeColumnResize = null;
+    this.suppressNextClick = true;
+    this.overlayLayer.style.pointerEvents = 'none';
+
+    if (this.dimensionsBadge) {
+      this.dimensionsBadge.remove();
+      this.dimensionsBadge = null;
+    }
+
+    const ifrDoc = this.iframe.contentDocument;
+    if (ifrDoc) {
+      ensureEmptyColumnPlaceholders(ifrDoc);
+    }
+
+    this.selectUnit(state.leftCol, state.row);
     this.adjustHeight();
     this.onStructureChanged();
   }
@@ -1310,6 +1403,10 @@ export class Canvas {
       'mousemove',
       (e: MouseEvent) => {
         const iframeRect = this.iframe.getBoundingClientRect();
+        if (this.activeColumnResize) {
+          this.handleColumnResizeMove(iframeRect.left + e.clientX);
+          return;
+        }
         if (this.activeImageResize) {
           this.handleImageResizeMove(iframeRect.left + e.clientX);
           return;
@@ -1323,6 +1420,10 @@ export class Canvas {
     doc.addEventListener(
       'mouseup',
       () => {
+        if (this.activeColumnResize) {
+          this.finishColumnResize();
+          return;
+        }
         if (this.activeImageResize) {
           this.finishImageResize();
           return;
@@ -2193,6 +2294,75 @@ export class Canvas {
       }
     }
 
+    // 5. Column Resize Handles (when row has >= 2 columns in desktop mode)
+    if (this.viewportMode !== 'mobile') {
+      const row = isRowElement(unit)
+        ? unit
+        : (unit.closest('table.row, table.row-content, tr, section') as HTMLElement | null);
+      if (row) {
+        const cols = ColumnLayoutAdapter.getColumnsInRow(row);
+        if (cols.length >= 2) {
+          for (let i = 0; i < cols.length - 1; i++) {
+            const handle = document.createElement('div');
+            handle.className = 'arch-col-resize-handle';
+            handle.title = 'Drag to resize columns';
+            handle.dataset.colIndex = String(i);
+
+            const grip = document.createElement('div');
+            grip.className = 'arch-col-resize-grip';
+            handle.appendChild(grip);
+
+            handle.addEventListener('mousedown', (e) => {
+              if (e.button !== 0) return;
+              e.preventDefault();
+              e.stopPropagation();
+
+              const leftCol = cols[i];
+              const rightCol = cols[i + 1];
+              const leftRect = leftCol.getBoundingClientRect();
+              const rightRect = rightCol.getBoundingClientRect();
+
+              const leftWidth = leftRect.width;
+              const rightWidth = rightRect.width;
+              const pairTotalWidth = leftWidth + rightWidth;
+
+              let p1 = parseFloat(leftCol.getAttribute('width') || leftCol.style.width || '');
+              let p2 = parseFloat(rightCol.getAttribute('width') || rightCol.style.width || '');
+
+              if (isNaN(p1) || isNaN(p2) || p1 <= 0 || p2 <= 0) {
+                const table = leftCol.closest('table.row-content, table.row') as HTMLElement | null;
+                const tableWidth = table?.getBoundingClientRect().width || row.getBoundingClientRect().width;
+                p1 = tableWidth > 0 ? (leftWidth / tableWidth) * 100 : 50;
+                p2 = tableWidth > 0 ? (rightWidth / tableWidth) * 100 : 50;
+              }
+
+              const pairTotalPct = p1 + p2;
+
+              this.activeColumnResize = {
+                handle,
+                row,
+                leftCol,
+                rightCol,
+                startX: e.clientX,
+                leftStartWidth: leftWidth,
+                rightStartWidth: rightWidth,
+                pairTotalWidth,
+                leftStartPct: p1,
+                rightStartPct: p2,
+                pairTotalPct
+              };
+
+              handle.classList.add('active');
+              this.overlayLayer.style.pointerEvents = 'auto';
+            });
+
+            this.overlayLayer.appendChild(handle);
+            this.columnResizeHandles.push(handle);
+          }
+        }
+      }
+    }
+
     this.positionFloatingToolbar(unit);
   }
 
@@ -2259,6 +2429,33 @@ export class Canvas {
       handle.style.top = `${hTop}px`;
       handle.style.left = `${hLeft}px`;
     }
+
+    // 5. Column resize handles
+    if (this.columnResizeHandles.length > 0) {
+      const row = isRowElement(unit)
+        ? unit
+        : (unit.closest('table.row, table.row-content, tr, section') as HTMLElement | null);
+      if (row) {
+        const cols = ColumnLayoutAdapter.getColumnsInRow(row);
+        for (const handle of this.columnResizeHandles) {
+          const idx = parseInt(handle.dataset.colIndex || '-1', 10);
+          if (idx >= 0 && idx < cols.length - 1) {
+            const leftCol = cols[idx];
+            const rightCol = cols[idx + 1];
+            const leftRect = leftCol.getBoundingClientRect();
+            const rightRect = rightCol.getBoundingClientRect();
+
+            const boundaryX = offsetX + (leftRect.right + rightRect.left) / 2;
+            const topY = offsetY + Math.min(leftRect.top, rightRect.top);
+            const height = Math.max(leftRect.height, rightRect.height);
+
+            handle.style.left = `${boundaryX}px`;
+            handle.style.top = `${topY}px`;
+            handle.style.height = `${height}px`;
+          }
+        }
+      }
+    }
   }
 
   private removeFloatingToolbar(): void {
@@ -2286,7 +2483,11 @@ export class Canvas {
       this.resizeHandles.forEach((h) => h.remove());
       this.resizeHandles = [];
     }
-    if (!this.pointerDragCandidate?.active && !this.activeImageResize) {
+    if (this.columnResizeHandles.length > 0) {
+      this.columnResizeHandles.forEach((h) => h.remove());
+      this.columnResizeHandles = [];
+    }
+    if (!this.pointerDragCandidate?.active && !this.activeImageResize && !this.activeColumnResize) {
       this.overlayLayer.style.pointerEvents = 'none';
     }
   }

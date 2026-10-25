@@ -1585,3 +1585,67 @@ input:checked + .arch-toggle-slider:before {
   flex-shrink: 0;
 }
 
+/* Figma Column Resize Seam Handle */
+.arch-col-resize-handle {
+  position: absolute;
+  width: 14px;
+  margin-left: -7px;
+  cursor: col-resize;
+  z-index: 38;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.arch-col-resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  left: 6px;
+  background-color: transparent;
+  transition: background-color 0.15s ease;
+  pointer-events: none;
+}
+
+.arch-col-resize-handle:hover::before,
+.arch-col-resize-handle.active::before {
+  background-color: #0d99ff;
+}
+
+.arch-col-resize-grip {
+  position: relative;
+  width: 8px;
+  height: 28px;
+  border-radius: 4px;
+  background-color: #ffffff;
+  border: 1px solid #0d99ff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.arch-col-resize-grip::before,
+.arch-col-resize-grip::after {
+  content: '';
+  width: 1px;
+  height: 12px;
+  background-color: #0d99ff;
+  margin: 0 1px;
+}
+
+.arch-col-resize-handle:hover .arch-col-resize-grip,
+.arch-col-resize-handle.active .arch-col-resize-grip {
+  opacity: 1;
+}
+
+

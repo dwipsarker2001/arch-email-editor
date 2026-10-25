@@ -573,18 +573,61 @@ export const ColumnLayoutAdapter = {
   getColumnsInRow(elOrRow: HTMLElement): HTMLElement[] {
     const row = isRowElement(elOrRow)
       ? elOrRow
-      : (elOrRow.closest('table.row, tr, section') as HTMLElement | null) || elOrRow;
+      : (elOrRow.closest('table.row, table.row-content, tr, section') as HTMLElement | null) || elOrRow;
 
-    // Look for `td.column` inside `table.row-content` or direct `<td>` children of `<tr>`
-    const tr = row.tagName.toLowerCase() === 'tr' ? row : row.querySelector('tr');
-    if (tr) {
-      const cells = Array.from(tr.children).filter(
-        (c) => (c.tagName.toLowerCase() === 'td' || c.tagName.toLowerCase() === 'th') && !isGutterCell(c as HTMLElement)
+    // 1. Direct td.column or .column query inside row
+    const explicitCols = Array.from(row.querySelectorAll<HTMLElement>('td.column, th.column, div.column')).filter(
+      (c) => !isGutterCell(c) && !isEditorHelperNode(c)
+    );
+    if (explicitCols.length >= 1) {
+      const parent = explicitCols[0].parentElement;
+      if (parent) {
+        return Array.from(parent.children).filter(
+          (c) =>
+            (c.tagName.toLowerCase() === 'td' || c.tagName.toLowerCase() === 'th' || c.classList.contains('column')) &&
+            !isGutterCell(c as HTMLElement) &&
+            !isEditorHelperNode(c as HTMLElement)
+        ) as HTMLElement[];
+      }
+      return explicitCols;
+    }
+
+    // 2. Look for inner `table.row-content tr`
+    const contentTr = row.querySelector('table.row-content tr') || (row.tagName.toLowerCase() === 'tr' ? row : null);
+    if (contentTr) {
+      const cells = Array.from(contentTr.children).filter(
+        (c) => (c.tagName.toLowerCase() === 'td' || c.tagName.toLowerCase() === 'th') && !isGutterCell(c as HTMLElement) && !isEditorHelperNode(c as HTMLElement)
       ) as HTMLElement[];
       if (cells.length >= 1) return cells;
     }
 
-    return Array.from(row.children).filter((c) => !isGutterCell(c as HTMLElement)) as HTMLElement[];
+    // 3. Fallback tr query
+    const tr = row.tagName.toLowerCase() === 'tr' ? row : row.querySelector('tr');
+    if (tr) {
+      const cells = Array.from(tr.children).filter(
+        (c) => (c.tagName.toLowerCase() === 'td' || c.tagName.toLowerCase() === 'th') && !isGutterCell(c as HTMLElement) && !isEditorHelperNode(c as HTMLElement)
+      ) as HTMLElement[];
+      if (cells.length >= 1) return cells;
+    }
+
+    return Array.from(row.children).filter((c) => !isGutterCell(c as HTMLElement) && !isEditorHelperNode(c as HTMLElement)) as HTMLElement[];
+  },
+
+  /**
+   * Resizes two adjacent columns given their new percentage widths.
+   * Ensures email-compatible width attributes, inline styles, and strict rounding.
+   */
+  setColumnPairWidths(leftCol: HTMLElement, rightCol: HTMLElement, leftPct: number, rightPct: number): void {
+    const formatPct = (val: number) => {
+      const rounded = Math.round(val * 10) / 10;
+      return `${rounded}%`;
+    };
+    const leftStr = formatPct(leftPct);
+    const rightStr = formatPct(rightPct);
+    leftCol.setAttribute('width', leftStr);
+    leftCol.style.width = leftStr;
+    rightCol.setAttribute('width', rightStr);
+    rightCol.style.width = rightStr;
   },
 
   /**

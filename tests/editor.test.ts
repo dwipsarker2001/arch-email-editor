@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ArchEmailEditor } from '../src/editor';
 import { EmailDocument } from '../src/types';
+import { ColumnLayoutAdapter, buildRowLayoutHtml } from '../src/engine/adapters';
 
 describe('ArchEmailEditor Core Engine', () => {
   let container: HTMLDivElement;
@@ -450,6 +451,103 @@ describe('ArchEmailEditor Core Engine', () => {
       expect(canvas.isEditingText).toBe(true);
       expect(sel.isCollapsed).toBe(false);
     }
+
+    editor.destroy();
+  });
+
+  it('supports interactive column drag resize, live percentage badge, and clean email export', () => {
+    const editor = ArchEmailEditor.create(container);
+    const canvas = (editor as any).canvas;
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+
+    // 1. Insert a 2-column layout into the email body
+    const rowHtml = buildRowLayoutHtml('2-col-50-50', false);
+    ifrDoc.body.insertAdjacentHTML('beforeend', rowHtml);
+    canvas.onStructureChanged();
+
+    const row = ifrDoc.querySelector('table.row') as HTMLElement;
+    expect(row).toBeTruthy();
+
+    const cols = ColumnLayoutAdapter.getColumnsInRow(row);
+    expect(cols.length).toBe(2);
+    expect(cols[0].getAttribute('width')).toBe('50%');
+    expect(cols[1].getAttribute('width')).toBe('50%');
+
+    // 2. Select the row to show HUD & column resize handle
+    canvas.selectUnit(row, row);
+
+    const overlay = container.querySelector('.arch-canvas-overlay') as HTMLElement;
+    const handle = overlay.querySelector('.arch-col-resize-handle') as HTMLElement;
+    expect(handle).toBeTruthy();
+
+    // Mock bounding client rects for columns in test environment
+    vi.spyOn(cols[0], 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      right: 400,
+      top: 50,
+      bottom: 250,
+      width: 300,
+      height: 200,
+      x: 100,
+      y: 50,
+      toJSON: () => {}
+    });
+    vi.spyOn(cols[1], 'getBoundingClientRect').mockReturnValue({
+      left: 400,
+      right: 700,
+      top: 50,
+      bottom: 250,
+      width: 300,
+      height: 200,
+      x: 400,
+      y: 50,
+      toJSON: () => {}
+    });
+    vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      right: 700,
+      top: 50,
+      bottom: 250,
+      width: 600,
+      height: 200,
+      x: 100,
+      y: 50,
+      toJSON: () => {}
+    });
+
+    // 3. Start drag on the resize handle
+    handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 400, button: 0 }));
+    expect(handle.classList.contains('active')).toBe(true);
+
+    // 4. Drag right by +60px (making left column 360px and right column 240px -> 60% / 40%)
+    window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 460 }));
+
+    expect(cols[0].getAttribute('width')).toBe('60%');
+    expect(cols[0].style.width).toBe('60%');
+    expect(cols[1].getAttribute('width')).toBe('40%');
+    expect(cols[1].style.width).toBe('40%');
+
+    const badge = overlay.querySelector('.arch-dimensions-pill');
+    expect(badge).toBeTruthy();
+    expect(badge?.textContent).toBe('60% | 40%');
+
+    // 5. Release mouse
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    expect(handle.classList.contains('active')).toBe(false);
+    expect(overlay.querySelector('.arch-dimensions-pill')).toBeNull();
+
+    // 6. Verify exported email HTML contains updated percentages and ZERO resize handles
+    const cleanHtml = editor.getHTML();
+    expect(cleanHtml).toContain('width="60%"');
+    expect(cleanHtml).toContain('width="40%"');
+    expect(cleanHtml).not.toContain('arch-col-resize-handle');
+    expect(cleanHtml).not.toContain('arch-col-resize-grip');
+
+    // 7. Verify Undo reverts widths back to 50% / 50%
+    editor.undo();
+    const cleanHtmlAfterUndo = editor.getHTML();
+    expect(cleanHtmlAfterUndo).toContain('width="50%"');
 
     editor.destroy();
   });
