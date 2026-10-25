@@ -105,6 +105,21 @@ export class ArchEmailEditor {
     return new ArchEmailEditor(target, options);
   }
 
+  
+  /**
+   * Sets or replaces the available assets in the media browser panel.
+   */
+  public setAssets(assets: any[]): void {
+    this.rightPanel?.setAssets(assets);
+  }
+
+  /**
+   * Returns the currently loaded media assets.
+   */
+  public getAssets(): any[] {
+    return this.rightPanel?.getAssets() || [];
+  }
+
   public getOptions(): EditorOptions {
     return this.options;
   }

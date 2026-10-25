@@ -13,6 +13,42 @@
  */
 
 import { ToolbarCustomButton, ToolbarActionsOptions, ViewportMode } from '../types';
+import { icons } from 'lucide';
+
+/**
+ * Resolves an icon representation into an HTML string.
+ * Supports:
+ * - Lucide icon names: e.g. 'chevron-left', 'chevronLeft', 'ChevronLeft', 'save', 'eye', etc.
+ * - Raw SVG strings: '<svg>...</svg>'
+ * - Plain emoji/text: '💾', '✉️', etc.
+ */
+function resolveButtonIcon(icon?: string, size = 14): string {
+  if (!icon) return '';
+  const trimmed = icon.trim();
+  if (trimmed.startsWith('<svg') || trimmed.startsWith('<span') || trimmed.startsWith('<i')) {
+    return trimmed;
+  }
+
+  // Convert kebab-case, snake_case, or lowercase into PascalCase (e.g. 'chevron-left' -> 'ChevronLeft')
+  const pascalName = trimmed
+    .replace(/[-_ ]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ''))
+    .replace(/^(.)/, (c) => c.toUpperCase());
+
+  const iconNode = (icons as any)[pascalName] || (icons as any)[trimmed];
+  if (Array.isArray(iconNode)) {
+    const inner = iconNode
+      .map(([tag, attrs]) => {
+        const attrStr = Object.entries(attrs || {})
+          .map(([k, v]) => `${k}="${v}"`)
+          .join(' ');
+        return `<${tag} ${attrStr}></${tag}>`;
+      })
+      .join('');
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="arch-btn-icon-svg">${inner}</svg>`;
+  }
+
+  return trimmed;
+}
 
 export interface ToolbarEvents {
   onImportHtml: () => void;
@@ -129,7 +165,9 @@ export class Toolbar {
       btn.id = `arch-custom-btn-${btnDef.id}`;
       btn.className = `arch-btn arch-btn--custom ${btnDef.className || ''}`.trim();
       if (btnDef.title) btn.title = btnDef.title;
-      btn.innerHTML = `${btnDef.icon ? `<span class="arch-btn-icon">${btnDef.icon}</span> ` : ''}<span>${btnDef.label}</span>`;
+      const iconHtml = resolveButtonIcon(btnDef.icon);
+      const labelHtml = btnDef.label ? `<span>${btnDef.label}</span>` : '';
+      btn.innerHTML = `${iconHtml ? `<span class="arch-btn-icon">${iconHtml}</span> ` : ''}${labelHtml}`.trim();
       btn.addEventListener('click', (e) => {
         btnDef.onClick(this.editorInstance, e);
       });

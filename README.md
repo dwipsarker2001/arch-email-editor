@@ -557,6 +557,123 @@ editor.setTemplateName('Black Friday VIP Launch');
 
 ---
 
+## 🖼️ Media & Image Assets Management
+
+Arch Email Editor includes a built-in media picker and image upload handler. When an image block is selected, users can:
+- Directly upload an image from their local machine (via the Image Inspector's **Replace > Upload** dropdown or from inside the Media Picker).
+- Browse and select existing images from your media library (**Replace > Browse media**).
+- Uploaded images are **directly applied** to the email canvas with immediate visual feedback (animated upload spinner and progress overlay).
+
+### 1. Configuration & Upload Hook (`onUploadImage`)
+
+When initializing the editor, supply `assets` and the `onUploadImage` callback:
+
+```javascript
+const editor = ArchEmailEditor.create('#editor', {
+  // Preload existing assets
+  assets: [
+    { id: 1, name: 'Brand Logo', url: 'https://yourdomain.com/uploads/logo.png', size: '32kb' },
+    { id: 2, name: 'Promo Banner', url: 'https://yourdomain.com/uploads/banner.jpg', size: '120kb' }
+  ],
+
+  // Hook triggered when user selects a file to upload
+  onUploadImage: (file, callback) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    fetch('/controller.php?action=upload_asset', {
+      method: 'POST',
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      // Pass the public image URL to callback; the editor immediately updates the canvas <img>
+      if (data.status === 'success' && data.url) {
+        callback(data.url);
+      }
+    })
+    .catch(err => console.error('Upload failed:', err));
+  }
+});
+```
+
+### 2. Runtime Asset Methods (`setAssets` & `getAssets`)
+
+Dynamically update or inspect loaded assets at any time:
+
+```javascript
+// Dynamically refresh or load assets from your server
+editor.setAssets([
+  { id: 1, name: 'Summer Hero', url: 'https://yourdomain.com/uploads/hero.png' },
+  { id: 2, name: 'Footer Icon', url: 'https://yourdomain.com/uploads/icon.png' }
+]);
+
+// Or pass simple URL strings:
+editor.setAssets([
+  'https://yourdomain.com/uploads/hero.png',
+  'https://yourdomain.com/uploads/icon.png'
+]);
+
+// Retrieve the currently active asset list
+const currentAssets = editor.getAssets();
+```
+
+### 3. Backend Specification (Minimal & Storage-Agnostic)
+
+Users can store uploaded images anywhere (AWS S3, Cloudflare R2, Google Cloud, or standard local disk `uploads/`). The backend contract is kept **ultra-minimal**:
+
+#### A. Upload Endpoint Response (`POST ?action=upload_asset`)
+```json
+{
+  "status": "success",
+  "id": 1,
+  "url": "https://yourdomain.com/uploads/image.png"
+}
+```
+- `url`: Public image URL directly inserted into the email template.
+- `id`: Unique asset ID recorded in database for future management / deletion.
+
+#### B. Assets List Endpoint Response (`GET ?action=get_assets`)
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": 1,
+      "name": "banner.png",
+      "url": "https://yourdomain.com/uploads/banner.png"
+    }
+  ]
+}
+```
+
+#### C. Delete Endpoint (`POST ?action=delete_asset`)
+```json
+{
+  "status": "success",
+  "id": 1
+}
+```
+
+#### D. MySQL Schema (`email-assets` Table)
+```sql
+CREATE TABLE IF NOT EXISTS `email-assets` (
+    `id` int(11) NOT NULL AUTO_INCREMENT,
+    `name` varchar(255) NOT NULL,
+    `original_name` varchar(255) DEFAULT '',
+    `src` text NOT NULL,
+    `file_size` varchar(50) DEFAULT '',
+    `mime_type` varchar(100) DEFAULT '',
+    `created_at` datetime DEFAULT NULL,
+    `updated_at` datetime DEFAULT NULL,
+    `status` tinyint(1) DEFAULT 1,
+    PRIMARY KEY (`id`),
+    KEY `status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+```
+
+---
+
 ## 📖 API Reference
 
 ### `ArchEmailEditor.create(target, options)`
@@ -588,6 +705,9 @@ Initializes and mounts the editor.
 | `readOnly` | `boolean` | `false` | Disables editing mode. |
 | `onChange` | `(doc: EmailDocument) => void` | `undefined` | Fired when any content or structure changes. |
 | `onSelectBlock` | `(block: BlockNode \| null) => void` | `undefined` | Fired when an element or block is selected. |
+| `assets` | `(AssetItem \| string)[]` | `[]` | Media library assets available for image picker. |
+| `onUploadImage` | `(file: File, callback: (url: string) => void) => void` | `undefined` | Hook called when user uploads an image file. |
+| `onBrowseMedia` | `((callback: (url: string) => void) => void)` | `undefined` | Optional override hook for custom browse modal. |
 
 ---
 
@@ -617,6 +737,17 @@ Initializes and mounts the editor.
 
 ---
 
+### `AssetItem`
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `id` | `string \| number` *(optional)* | Unique identifier for tracking and future deletion. |
+| `name` | `string` *(optional)* | Display name shown on the asset card. |
+| `url` | `string` | Public URL of the image. |
+| `size` | `string` *(optional)* | Human-readable file size (e.g., '45.2kb'). |
+
+---
+
 ### Instance Methods
 
 | Method | Return Type | Description |
@@ -643,6 +774,8 @@ Initializes and mounts the editor.
 | `redo()` | `void` | Redoes the previously undone change. |
 | `setViewportMode(mode)` | `void` | Changes viewport mode (`'desktop'` \| `'tablet'` \| `'mobile'`). |
 | `destroy()` | `void` | Unbinds all listeners and removes the editor from DOM. |
+| `setAssets(assets)` | `void` | Updates the media gallery assets catalog dynamically. |
+| `getAssets()` | `AssetItem[]` | Returns the currently loaded media library assets array. |
 
 ---
 

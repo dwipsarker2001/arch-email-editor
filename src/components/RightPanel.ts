@@ -108,6 +108,10 @@ export class RightPanel {
     this.elementInspector.setAssets(assets);
   }
 
+  public getAssets(): any[] {
+    return this.elementInspector.getAssets();
+  }
+
   public getInspector(): Inspector {
     return this.elementInspector;
   }

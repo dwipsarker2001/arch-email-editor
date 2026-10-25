@@ -1119,22 +1119,44 @@ export class Inspector {
         return;
       }
 
+      const origBtnHtml = uploadBtn ? uploadBtn.innerHTML : '';
+      if (uploadBtn) {
+        uploadBtn.classList.add('is-loading');
+        uploadBtn.setAttribute('disabled', 'true');
+        uploadBtn.innerHTML = `
+          <svg class="arch-spinner" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+          </svg>
+          <span>Uploading...</span>
+        `;
+      }
+
       const formattedKb = ((file.size / 1024).toFixed(2)) + 'kb';
       this.events.onUploadImage(file, (url: string) => {
-        const newAsset: AssetItem = {
-          id: 'asset-' + Date.now(),
-          name: file.name,
-          url: url,
-          size: formattedKb
-        };
-        this.customAssets.unshift(newAsset);
-        panel.classList.remove('is-empty-assets');
-        body.classList.remove('is-empty-assets');
-        body.classList.remove('is-empty-search');
-        searchWrap?.classList.remove('is-collapsed');
-        renderGrid(this.customAssets);
-        onSelect(url, file.name, formattedKb);
-        closePanel();
+        if (uploadBtn) {
+          uploadBtn.classList.remove('is-loading');
+          uploadBtn.removeAttribute('disabled');
+          if (origBtnHtml) uploadBtn.innerHTML = origBtnHtml;
+        }
+
+        if (url) {
+          const newAsset: AssetItem = {
+            id: 'asset-' + Date.now(),
+            name: file.name,
+            url: url,
+            size: formattedKb
+          };
+          this.customAssets.unshift(newAsset);
+          panel.classList.remove('is-empty-assets');
+          body.classList.remove('is-empty-assets');
+          body.classList.remove('is-empty-search');
+          searchWrap?.classList.remove('is-collapsed');
+          renderGrid(this.customAssets);
+          // Directly select the uploaded image into the template canvas
+          onSelect(url, file.name, formattedKb);
+          closePanel();
+        }
       });
       uploadInput.value = '';
     });
@@ -1557,8 +1579,23 @@ export class Inspector {
         return;
       }
 
+      const previewBox = container.querySelector<HTMLElement>('#arch-img-preview-box');
+      previewBox?.classList.add('is-uploading');
+
+      const formattedKb = ((file.size / 1024).toFixed(2)) + 'kb';
       this.events.onUploadImage(file, (url: string) => {
-        applySelectedUrl(url, file.name, file.size);
+        previewBox?.classList.remove('is-uploading');
+        if (url) {
+          const newAsset: AssetItem = {
+            id: 'asset-' + Date.now(),
+            name: file.name,
+            url: url,
+            size: formattedKb
+          };
+          this.customAssets.unshift(newAsset);
+          // Directly select and apply the uploaded image to the template canvas
+          applySelectedUrl(url, file.name, file.size);
+        }
       });
       fileInput.value = '';
     });
