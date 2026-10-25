@@ -8,15 +8,30 @@
  * 3. Settings: Global email document settings (Content width, alignment, colors, fonts, preheader).
  */
 
-import { BlockType, RowLayoutType, ViewportMode, EmailDocument, SelectedElementInfo } from '../types';
+import { BlockType, RowLayoutType, ViewportMode, EmailDocument, SelectedElementInfo, PrebuiltSection } from '../types';
 import { Inspector, InspectorEvents } from './Inspector';
+import { getDefaultSections } from '../engine/sections';
 
 export type RightPanelTab = 'content' | 'rows' | 'settings' | 'blocks' | 'sections';
 
 export interface RightPanelEvents extends InspectorEvents {
   onAddBlock: (type: BlockType) => void;
   onAddRowLayout: (layout: RowLayoutType) => void;
+  onInsertSection?: (section: PrebuiltSection) => void;
   onDeselect?: () => void;
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (m) => {
+    switch (m) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+      default: return m;
+    }
+  });
 }
 
 export class RightPanel {
@@ -32,8 +47,17 @@ export class RightPanel {
   // Document inspector displays in the Settings tab for global design settings
   private documentInspector: Inspector;
 
-  constructor(events: RightPanelEvents) {
+  // Prebuilt & custom modular sections catalog
+  private sections: PrebuiltSection[] = [];
+  private selectedCategory: string = 'all';
+  private searchQuery: string = '';
+
+  constructor(events: RightPanelEvents, initialSections: PrebuiltSection[] = []) {
     this.events = events;
+    this.sections = initialSections && initialSections.length > 0
+      ? [...initialSections]
+      : getDefaultSections();
+
     this.element = document.createElement('div');
     this.element.className = 'arch-editor__right-panel';
 
@@ -144,12 +168,13 @@ export class RightPanel {
           </svg>
           CONTENT
         </button>
-        <button type="button" class="arch-right-tab" data-tab="sections" data-tab-name="rows" title="Rows & Column Layouts">
-          <svg class="arch-tab-icon" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="1" y="2" width="14" height="4" rx="1"/>
-            <rect x="1" y="10" width="14" height="4" rx="1"/>
+        <button type="button" class="arch-right-tab" data-tab="sections" data-tab-name="sections" title="Prebuilt Modular Sections">
+          <svg class="arch-tab-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="18" x="3" y="3" rx="2"/>
+            <path d="M3 9h18"/>
+            <path d="M9 21V9"/>
           </svg>
-          ROWS
+          SECTIONS
         </button>
         <button type="button" class="arch-right-tab" data-tab="settings" title="Global Email Settings">
           <svg class="arch-tab-icon" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
@@ -276,75 +301,21 @@ export class RightPanel {
           </div>
         </div>
 
-        <!-- Tab 2: Rows & Sections -->
+        <!-- Tab 2: Modular Sections & Row Layouts -->
         <div class="arch-tab-panel arch-tab-panel--sections is-hidden" id="arch-panel-sections">
-          <div class="arch-form-group">
-            <select class="arch-select" id="sel-section-category">
-              <option value="empty">Empty Rows</option>
-              <option value="all">All Categories</option>
-              <option value="headers">Headers</option>
-              <option value="footers">Footers</option>
-              <option value="hero">Hero Sections</option>
-              <option value="cta">Call to Action</option>
-            </select>
+          <div class="arch-sections-header-controls">
+            <div class="arch-sections-search-wrap">
+              <svg class="arch-sections-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" class="arch-sections-search-input" id="arch-sections-search-input" placeholder="Search sections..." />
+            </div>
+            <div class="arch-form-group" style="margin-bottom: 0;">
+              <select class="arch-select" id="sel-section-category">
+                <option value="all">All Categories</option>
+              </select>
+            </div>
           </div>
 
-          <div class="arch-rows-list" id="arch-rows-tab-list">
-            <button class="arch-row-card" type="button" draggable="true" data-row-layout="1-col" title="1 Column (100%)">
-              <div class="arch-row-silhouette">
-                <div class="arch-col-bar" style="width: 100%;"></div>
-              </div>
-            </button>
-            <button class="arch-row-card" type="button" draggable="true" data-row-layout="2-col-33-67" title="2 Columns (33% / 67%)">
-              <div class="arch-row-silhouette">
-                <div class="arch-col-bar" style="width: 30%;"></div>
-                <div class="arch-col-bar" style="width: 70%;"></div>
-              </div>
-            </button>
-            <button class="arch-row-card" type="button" draggable="true" data-row-layout="2-col-50-50" title="2 Columns (50% / 50%)">
-              <div class="arch-row-silhouette">
-                <div class="arch-col-bar" style="width: 50%;"></div>
-                <div class="arch-col-bar" style="width: 50%;"></div>
-              </div>
-            </button>
-            <button class="arch-row-card" type="button" draggable="true" data-row-layout="2-col-67-33" title="2 Columns (67% / 33%)">
-              <div class="arch-row-silhouette">
-                <div class="arch-col-bar" style="width: 70%;"></div>
-                <div class="arch-col-bar" style="width: 30%;"></div>
-              </div>
-            </button>
-            <button class="arch-row-card" type="button" draggable="true" data-row-layout="3-col" title="3 Columns (33% / 33% / 33%)">
-              <div class="arch-row-silhouette">
-                <div class="arch-col-bar" style="width: 33.33%;"></div>
-                <div class="arch-col-bar" style="width: 33.33%;"></div>
-                <div class="arch-col-bar" style="width: 33.33%;"></div>
-              </div>
-            </button>
-            <button class="arch-row-card" type="button" draggable="true" data-row-layout="4-col" title="4 Columns (25% each)">
-              <div class="arch-row-silhouette">
-                <div class="arch-col-bar" style="width: 25%;"></div>
-                <div class="arch-col-bar" style="width: 25%;"></div>
-                <div class="arch-col-bar" style="width: 25%;"></div>
-                <div class="arch-col-bar" style="width: 25%;"></div>
-              </div>
-            </button>
-          </div>
-
-          <div class="arch-sections-placeholder" style="margin-top: 16px;">
-            <div class="arch-sections-placeholder-icon">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">
-                <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/>
-                <line x1="3" y1="9" x2="21" y2="9"/>
-                <line x1="3" y1="15" x2="21" y2="15"/>
-              </svg>
-            </div>
-            <div style="font-weight: 600; font-size: 13px; color: var(--arch-text-primary); margin-top: 10px;">
-              Prebuilt Sections Library
-            </div>
-            <div style="font-size: 12px; color: var(--arch-text-secondary); text-align: center; margin-top: 4px; line-height: 1.5; max-width: 240px;">
-              Prebuilt modular section templates will appear here when category is selected.
-            </div>
-          </div>
+          <div class="arch-sections-catalog" id="arch-sections-catalog"></div>
         </div>
 
         <!-- Tab 3: Settings (Global Document Design Settings) -->
@@ -404,8 +375,9 @@ export class RightPanel {
       });
     });
 
-    // Bind Section / Row layout click & dragstart
-    this.element.querySelectorAll<HTMLButtonElement>('[data-row-layout]').forEach((btn) => {
+    // Bind Empty Row Layouts in Content Tab
+    const contentBlocksView = this.element.querySelector<HTMLElement>('#arch-content-blocks-view');
+    contentBlocksView?.querySelectorAll<HTMLButtonElement>('[data-row-layout]').forEach((btn) => {
       const layout = btn.getAttribute('data-row-layout') as RowLayoutType;
 
       btn.addEventListener('click', () => {
@@ -419,6 +391,237 @@ export class RightPanel {
         }
       });
     });
+
+    // Bind Sections filter and search controls
+    const categorySelect = this.element.querySelector<HTMLSelectElement>('#sel-section-category');
+    categorySelect?.addEventListener('change', () => {
+      this.selectedCategory = categorySelect.value;
+      this.renderSectionsCatalog();
+    });
+
+    const searchInput = this.element.querySelector<HTMLInputElement>('#arch-sections-search-input');
+    searchInput?.addEventListener('input', () => {
+      this.searchQuery = searchInput.value;
+      this.renderSectionsCatalog();
+    });
+
+    // Render the initial sections catalog
+    this.renderSectionsCatalog();
+  }
+
+  /**
+   * Renders the modular prebuilt sections catalog into Tab 2 based on category & search filter.
+   */
+  private renderSectionsCatalog(): void {
+    const catalogEl = this.element.querySelector<HTMLElement>('#arch-sections-catalog');
+    if (!catalogEl) return;
+
+    // Update Category Dropdown options if category list changed
+    const categorySelect = this.element.querySelector<HTMLSelectElement>('#sel-section-category');
+    if (categorySelect) {
+      const categoryCounts = new Map<string, number>();
+      this.sections.forEach((s) => {
+        const cat = s.category || 'General';
+        categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1);
+      });
+      const sortedCategories = Array.from(categoryCounts.keys()).sort();
+
+      const options = [
+        `<option value="all"${this.selectedCategory === 'all' ? ' selected' : ''}>All Categories (${this.sections.length})</option>`,
+        ...sortedCategories.map(
+          (cat) =>
+            `<option value="${escapeHtml(cat)}"${this.selectedCategory === cat ? ' selected' : ''}>${escapeHtml(cat)} (${categoryCounts.get(cat)})</option>`
+        ),
+        `<option value="empty"${this.selectedCategory === 'empty' ? ' selected' : ''}>Empty Rows (6)</option>`
+      ];
+      categorySelect.innerHTML = options.join('');
+    }
+
+    const query = this.searchQuery.trim().toLowerCase();
+    const isCategoryEmpty = this.selectedCategory === 'empty';
+    const isCategoryAll = this.selectedCategory === 'all';
+
+    const emptyRowsHtml = `
+      <div class="arch-rows-list">
+        <button class="arch-row-card" type="button" draggable="true" data-row-layout="1-col" title="1 Column (100%)">
+          <div class="arch-row-silhouette">
+            <div class="arch-col-bar" style="width: 100%;"></div>
+          </div>
+        </button>
+        <button class="arch-row-card" type="button" draggable="true" data-row-layout="2-col-33-67" title="2 Columns (33% / 67%)">
+          <div class="arch-row-silhouette">
+            <div class="arch-col-bar" style="width: 30%;"></div>
+            <div class="arch-col-bar" style="width: 70%;"></div>
+          </div>
+        </button>
+        <button class="arch-row-card" type="button" draggable="true" data-row-layout="2-col-50-50" title="2 Columns (50% / 50%)">
+          <div class="arch-row-silhouette">
+            <div class="arch-col-bar" style="width: 50%;"></div>
+            <div class="arch-col-bar" style="width: 50%;"></div>
+          </div>
+        </button>
+        <button class="arch-row-card" type="button" draggable="true" data-row-layout="2-col-67-33" title="2 Columns (67% / 33%)">
+          <div class="arch-row-silhouette">
+            <div class="arch-col-bar" style="width: 70%;"></div>
+            <div class="arch-col-bar" style="width: 30%;"></div>
+          </div>
+        </button>
+        <button class="arch-row-card" type="button" draggable="true" data-row-layout="3-col" title="3 Columns (33% / 33% / 33%)">
+          <div class="arch-row-silhouette">
+            <div class="arch-col-bar" style="width: 33.33%;"></div>
+            <div class="arch-col-bar" style="width: 33.33%;"></div>
+            <div class="arch-col-bar" style="width: 33.33%;"></div>
+          </div>
+        </button>
+        <button class="arch-row-card" type="button" draggable="true" data-row-layout="4-col" title="4 Columns (25% each)">
+          <div class="arch-row-silhouette">
+            <div class="arch-col-bar" style="width: 25%;"></div>
+            <div class="arch-col-bar" style="width: 25%;"></div>
+            <div class="arch-col-bar" style="width: 25%;"></div>
+            <div class="arch-col-bar" style="width: 25%;"></div>
+          </div>
+        </button>
+      </div>
+    `;
+
+    if (isCategoryEmpty) {
+      catalogEl.innerHTML = `
+        <div class="arch-editor__section-label" style="margin-bottom: 10px;">Empty Row Layouts</div>
+        ${emptyRowsHtml}
+      `;
+    } else {
+      const filtered = this.sections.filter((s) => {
+        const matchesCategory = isCategoryAll || (s.category || 'General') === this.selectedCategory;
+        const matchesQuery =
+          !query ||
+          s.name.toLowerCase().includes(query) ||
+          (s.description && s.description.toLowerCase().includes(query)) ||
+          (s.category && s.category.toLowerCase().includes(query));
+        return matchesCategory && matchesQuery;
+      });
+
+      if (filtered.length === 0) {
+        catalogEl.innerHTML = `
+          <div class="arch-sections-empty-state">
+            <div style="font-weight: 600; font-size: 13px; color: var(--arch-text-primary); margin-bottom: 4px;">No sections found</div>
+            <div style="font-size: 12px; color: var(--arch-text-secondary); line-height: 1.5;">Try searching with different terms or selecting another category.</div>
+          </div>
+        `;
+      } else {
+        const cardsHtml = `
+          <div class="arch-sections-grid">
+            ${filtered
+              .map(
+                (s) => `
+              <div class="arch-section-card" data-section-id="${escapeHtml(s.id)}" draggable="true" title="${escapeHtml(s.description || s.name)}">
+                <div class="arch-section-preview">
+                  ${s.thumbnail ? s.thumbnail : `<div class="arch-section-preview-placeholder">${escapeHtml(s.name)}</div>`}
+                </div>
+                <div class="arch-section-footer-row">
+                  <div class="arch-section-title-wrap">
+                    <div class="arch-section-name">${escapeHtml(s.name)}</div>
+                    <span class="arch-section-badge">${escapeHtml(s.category || 'General')}</span>
+                  </div>
+                  <button type="button" class="arch-section-add-btn" title="Insert into email" data-insert-id="${escapeHtml(s.id)}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  </button>
+                </div>
+              </div>
+            `
+              )
+              .join('')}
+          </div>
+        `;
+
+        if (isCategoryAll && !query) {
+          catalogEl.innerHTML = `
+            ${cardsHtml}
+            <div class="arch-editor__section-label" style="margin-top: 20px; margin-bottom: 10px;">Empty Row Layouts</div>
+            ${emptyRowsHtml}
+          `;
+        } else {
+          catalogEl.innerHTML = cardsHtml;
+        }
+      }
+    }
+
+    // Bind Section click & dragstart
+    catalogEl.querySelectorAll<HTMLElement>('.arch-section-card').forEach((card) => {
+      const sectionId = card.getAttribute('data-section-id');
+      const section = this.sections.find((s) => s.id === sectionId);
+      if (!section) return;
+
+      card.addEventListener('click', () => {
+        this.events.onInsertSection?.(section);
+      });
+
+      card.addEventListener('dragstart', (e) => {
+        if (e.dataTransfer) {
+          e.dataTransfer.setData('text/plain', `section:${section.id}`);
+          e.dataTransfer.setData('text/html', section.html);
+          e.dataTransfer.effectAllowed = 'copy';
+        }
+      });
+    });
+
+    // Bind Empty Row layouts click & dragstart inside the sections panel
+    catalogEl.querySelectorAll<HTMLButtonElement>('[data-row-layout]').forEach((btn) => {
+      const layout = btn.getAttribute('data-row-layout') as RowLayoutType;
+
+      btn.addEventListener('click', () => {
+        this.events.onAddRowLayout(layout);
+      });
+
+      btn.addEventListener('dragstart', (e) => {
+        if (e.dataTransfer) {
+          e.dataTransfer.setData('text/plain', `row:${layout}`);
+          e.dataTransfer.effectAllowed = 'copy';
+        }
+      });
+    });
+  }
+
+  /**
+   * Returns a copy of the currently loaded modular sections.
+   */
+  public getSections(): PrebuiltSection[] {
+    return [...this.sections];
+  }
+
+  /**
+   * Finds a loaded section by its unique ID.
+   */
+  public getSectionById(id: string): PrebuiltSection | undefined {
+    return this.sections.find((s) => s.id === id);
+  }
+
+  /**
+   * Replaces the modular sections library and updates the sidebar UI.
+   */
+  public setSections(sections: PrebuiltSection[]): void {
+    this.sections = [...sections];
+    this.renderSectionsCatalog();
+  }
+
+  /**
+   * Dynamically adds or updates a modular section in the library.
+   */
+  public addSection(section: PrebuiltSection): void {
+    const existingIndex = this.sections.findIndex((s) => s.id === section.id);
+    if (existingIndex !== -1) {
+      this.sections[existingIndex] = section;
+    } else {
+      this.sections.push(section);
+    }
+    this.renderSectionsCatalog();
+  }
+
+  /**
+   * Removes a modular section from the library by ID.
+   */
+  public removeSection(id: string): void {
+    this.sections = this.sections.filter((s) => s.id !== id);
+    this.renderSectionsCatalog();
   }
 
   public destroy(): void {

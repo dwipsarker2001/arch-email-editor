@@ -399,6 +399,93 @@ describe('ArchEmailEditor Core Engine', () => {
     editor.destroy();
   });
 
+  it('manages settings tab beautifully matching content text options (stepper, slider, icon align, typography)', () => {
+    const editor = ArchEmailEditor.create(container);
+
+    // Switch to Settings tab
+    const settingsTab = container.querySelector('[data-tab="settings"]') as HTMLButtonElement;
+    settingsTab.click();
+
+    // 1. Verify Header and Badges
+    const propHeader = container.querySelector('.arch-tab-panel--settings .arch-prop-header');
+    expect(propHeader).toBeTruthy();
+    expect(propHeader?.textContent).toContain('DOCUMENT SETTINGS');
+    expect(propHeader?.textContent).toContain('GLOBAL');
+
+    // 2. Verify Accordions (Canvas, Typography, Metadata)
+    const accordions = container.querySelectorAll('.arch-tab-panel--settings .arch-accordion-header');
+    expect(accordions.length).toBe(3);
+    expect(accordions[0].textContent).toContain('EMAIL CANVAS');
+    expect(accordions[1].textContent).toContain('DEFAULT TYPOGRAPHY');
+    expect(accordions[2].textContent).toContain('EMAIL METADATA');
+
+    // 3. Test Width Stepper (+ / -) & Range Slider sync
+    const stpWidthPlus = container.querySelector('.arch-tab-panel--settings [data-stepper-id="stp-doc-width"] button[data-step="10"]') as HTMLButtonElement;
+    expect(stpWidthPlus).toBeTruthy();
+    stpWidthPlus.click();
+
+    let doc = editor.getJSON();
+    expect(doc.settings.contentWidth).toBe('610px');
+
+    const rangeSlider = container.querySelector('#inp-doc-width-range') as HTMLInputElement;
+    expect(rangeSlider).toBeTruthy();
+    rangeSlider.value = '680';
+    rangeSlider.dispatchEvent(new Event('input'));
+
+    doc = editor.getJSON();
+    expect(doc.settings.contentWidth).toBe('680px');
+
+    // 4. Test Alignment Icon Button
+    const alignLeftBtn = container.querySelector('#grp-doc-align [data-align="left"]') as HTMLButtonElement;
+    expect(alignLeftBtn).toBeTruthy();
+    expect(alignLeftBtn.querySelector('svg')).toBeTruthy();
+    alignLeftBtn.click();
+
+    doc = editor.getJSON();
+    expect(doc.settings.contentAlign).toBe('left');
+    expect(alignLeftBtn.classList.contains('is-active')).toBe(true);
+
+    // 5. Test Typography Defaults (Font Family, Text Color, Link Color, Line Height)
+    const fontSel = container.querySelector('#inp-doc-font') as HTMLSelectElement;
+    expect(fontSel).toBeTruthy();
+    expect(fontSel.classList.contains('arch-rge-select')).toBe(true);
+    fontSel.value = 'Georgia, serif';
+    fontSel.dispatchEvent(new Event('change'));
+
+    const textColorSwatch = container.querySelector('#inp-doc-text-color') as HTMLInputElement;
+    expect(textColorSwatch).toBeTruthy();
+    textColorSwatch.value = '#222222';
+    textColorSwatch.dispatchEvent(new Event('input'));
+
+    doc = editor.getJSON();
+    expect(doc.settings.fontFamily).toBe('Georgia, serif');
+    expect(doc.settings.textColor).toBe('#222222');
+
+    // 6. Test Background Image Toggle Switch
+    const bgImgToggle = container.querySelector('#chk-doc-bg-img') as HTMLInputElement;
+    const bgImgUrlRow = container.querySelector('#row-doc-bg-url') as HTMLElement;
+    expect(bgImgToggle).toBeTruthy();
+    expect(bgImgUrlRow).toBeTruthy();
+    expect(bgImgUrlRow.style.display).toBe('none');
+
+    bgImgToggle.checked = true;
+    bgImgToggle.dispatchEvent(new Event('change'));
+    expect(bgImgUrlRow.style.display).toBe('flex');
+
+    // 7. Test Accordion Toggling and Persistence
+    const firstAccordion = accordions[0] as HTMLElement;
+    const firstBody = container.querySelector('#sec-design-settings') as HTMLElement;
+    expect(firstBody.classList.contains('is-hidden')).toBe(false);
+
+    firstAccordion.click();
+    expect(firstBody.classList.contains('is-hidden')).toBe(true);
+
+    firstAccordion.click();
+    expect(firstBody.classList.contains('is-hidden')).toBe(false);
+
+    editor.destroy();
+  });
+
   it('shows floating rich text toolbar only in text edit mode and dismisses on body click', () => {
     const editor = ArchEmailEditor.create(container);
     const canvas = (editor as any).canvas;
