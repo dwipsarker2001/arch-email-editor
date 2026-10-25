@@ -1035,16 +1035,18 @@ export class Canvas {
         caret-color: transparent !important;
       }
       .arch-editing-text,
-      .arch-editing-text *,
-      [contenteditable="true"].arch-editing-text,
-      [contenteditable="true"].arch-editing-text *,
-      [contenteditable="true"] .arch-editing-text,
-      [contenteditable="true"] .arch-editing-text * {
-        outline: none !important;
+      [contenteditable="true"].arch-editing-text {
         cursor: text !important;
         user-select: text !important;
         -webkit-user-select: text !important;
         caret-color: #000000 !important;
+        outline: 2px solid #7747ff !important;
+        outline-offset: -2px;
+      }
+      .arch-editing-text *:not(.arch-selected-element),
+      [contenteditable="true"].arch-editing-text *:not(.arch-selected-element) {
+        outline: none !important;
+        cursor: inherit;
       }
       a.arch-editing-text,
       span.arch-editing-text,
@@ -1401,6 +1403,8 @@ export class Canvas {
 
     this.isEditingText = true;
     host.classList.add('arch-editing-text');
+    host.classList.add('arch-selected-element');
+    activeUnit.classList.add('arch-selected-element');
     if (host.getAttribute('contenteditable') !== 'true') {
       host.setAttribute('contenteditable', 'true');
       host.setAttribute('spellcheck', 'false');
@@ -2189,8 +2193,9 @@ export class Canvas {
 
     const ifrDoc = this.iframe.contentDocument;
     if (ifrDoc) {
-      ifrDoc.querySelectorAll('.arch-selected-element, .arch-hover-element').forEach((el) => {
-        el.classList.remove('arch-selected-element', 'arch-hover-element');
+      ifrDoc.querySelectorAll('.arch-selected-element, .arch-hover-element, .arch-editing-text').forEach((el) => {
+        el.classList.remove('arch-selected-element', 'arch-hover-element', 'arch-editing-text');
+        (el as HTMLElement).style?.removeProperty('caret-color');
       });
     }
   }

@@ -389,10 +389,12 @@ describe('ArchEmailEditor Core Engine', () => {
     const toolbarOnSingleClick = container.querySelector('.arch-rge-text-toolbar');
     expect(toolbarOnSingleClick).toBeNull();
 
-    // 2. Entering text edit mode displays the floating rich text toolbar
+    // 2. Entering text edit mode displays the floating rich text toolbar and retains the blue/purple selection border
     canvas.enterTextEditMode(p);
     const toolbarInEditMode = container.querySelector('.arch-rge-text-toolbar');
     expect(toolbarInEditMode).toBeTruthy();
+    expect(p.classList.contains('arch-selected-element')).toBe(true);
+    expect(p.classList.contains('arch-editing-text')).toBe(true);
 
     // 3. Click the outer body area -> exits edit mode, deselects and hides floating toolbar
     ifrDoc.body.click();
