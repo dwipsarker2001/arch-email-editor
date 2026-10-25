@@ -375,20 +375,26 @@ describe('ArchEmailEditor Core Engine', () => {
     editor.destroy();
   });
 
-  it('shows floating rich text toolbar only for text elements and dismisses on body click', () => {
+  it('shows floating rich text toolbar only in text edit mode and dismisses on body click', () => {
     const editor = ArchEmailEditor.create(container);
+    const canvas = (editor as any).canvas;
     const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
     const ifrDoc = iframe.contentDocument!;
 
-    // 1. Select a paragraph -> floating rich text toolbar appears
+    // 1. Single click on paragraph selects the block, but floating toolbar does NOT show
     const p = ifrDoc.querySelector('p') as HTMLElement;
     expect(p).toBeTruthy();
     p.click();
 
-    const toolbar = container.querySelector('.arch-rge-text-toolbar');
-    expect(toolbar).toBeTruthy();
+    const toolbarOnSingleClick = container.querySelector('.arch-rge-text-toolbar');
+    expect(toolbarOnSingleClick).toBeNull();
 
-    // 2. Click the outer body area -> deselects and hides floating toolbar
+    // 2. Entering text edit mode displays the floating rich text toolbar
+    canvas.enterTextEditMode(p);
+    const toolbarInEditMode = container.querySelector('.arch-rge-text-toolbar');
+    expect(toolbarInEditMode).toBeTruthy();
+
+    // 3. Click the outer body area -> exits edit mode, deselects and hides floating toolbar
     ifrDoc.body.click();
     const toolbarAfterBodyClick = container.querySelector('.arch-rge-text-toolbar');
     expect(toolbarAfterBodyClick).toBeNull();

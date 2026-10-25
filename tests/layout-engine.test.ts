@@ -1494,6 +1494,7 @@ describe('Figma vertical displacement', () => {
       ({ left: 550, top: 10, width: 40, height: 24, right: 590, bottom: 34 } as DOMRect);
 
     canvas.selectUnit(cell, cell);
+    canvas.enterTextEditMode(cell, cell);
     const toolbar = canvas.floatingToolbar as HTMLElement;
     expect(toolbar).toBeTruthy();
 

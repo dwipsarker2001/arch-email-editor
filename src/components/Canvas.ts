@@ -1482,10 +1482,10 @@ export class Canvas {
       if (ifrDoc.activeElement instanceof HTMLElement) {
         ifrDoc.activeElement.blur();
       }
-      const sel = ifrDoc.defaultView?.getSelection();
-      if (sel) {
-        sel.removeAllRanges();
-      }
+      try {
+        const sel = ifrDoc.defaultView?.getSelection();
+        sel?.removeAllRanges();
+      } catch {}
     }
     if (this.activeMoveableUnit) {
       this.renderFloatingToolbar(this.activeMoveableUnit, this.selectedElement || this.activeMoveableUnit);
@@ -1881,9 +1881,7 @@ export class Canvas {
     this.overlayLayer.appendChild(bottomActions);
     this.bottomActions = bottomActions;
 
-    // 3. Floating Rich Text Toolbar (ONLY for editable text / headings / buttons / paragraphs / lists)
-    const targetEl = innerTarget || this.selectedElement || unit;
-    const elemType = classifyElementType(targetEl, unit);
+    // 3. Floating Rich Text Toolbar (ONLY shown when actively in text edit mode)
     const unitRole = classifyUnitRole(unit);
     const isContainer =
       unitRole === 'row' ||
@@ -1893,16 +1891,9 @@ export class Canvas {
       isColumnElement(unit) ||
       isOuterWrapperTable(unit);
 
-    const isTextElement =
-      this.isEditingText ||
-      elemType === 'text' ||
-      elemType === 'heading' ||
-      elemType === 'button' ||
-      elemType === 'list' ||
-      /^(p|h[1-6]|a|li|button|span|strong|em)$/i.test(targetEl.tagName) ||
-      targetEl.getAttribute('contenteditable') === 'true';
+    const showTextToolbar = this.isEditingText && !isContainer && Boolean(editableHost) && Boolean(ifrDoc);
 
-    if (isTextElement && !isContainer && editableHost && ifrDoc) {
+    if (showTextToolbar && editableHost && ifrDoc) {
       const textToolbar = document.createElement('div');
       textToolbar.className = 'arch-rge-text-toolbar';
       textToolbar.innerHTML = `
