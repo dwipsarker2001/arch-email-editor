@@ -63,7 +63,8 @@ import {
   findPrimaryContentContainer,
   ImageAdapter,
   resolveButtonAnatomy,
-  TextAdapter
+  TextAdapter,
+  wrapContextAwareHtmlSnippet
 } from '../engine/adapters';
 import { validateEmailStructure } from '../engine/history';
 
@@ -2889,6 +2890,71 @@ export class Canvas {
       const snippet = buildContextAwareBlockHtml(type, containerTag);
       const insertPosition = position === 'before' ? 'afterbegin' : 'beforeend';
       container.insertAdjacentHTML(insertPosition, snippet);
+      insertedEl = position === 'before'
+        ? (container.firstElementChild as HTMLElement)
+        : (container.lastElementChild as HTMLElement);
+    }
+
+    this.onStructureChanged();
+
+    if (insertedEl) {
+      const unit = resolveEffectiveMoveUnit(insertedEl) || insertedEl;
+      const targetChild = insertedEl.querySelector<HTMLElement>('a, img, h1, h2, h3, h4, p, hr, table, ul, ol') || insertedEl;
+      this.selectUnit(unit, targetChild);
+    }
+  }
+
+  /**
+   * Inserts custom HTML content dynamically into the email template.
+   * Automatically normalizes and wraps markup to preserve email table layout stability.
+   */
+  public insertHTML(
+    htmlSnippet: string,
+    targetElement?: HTMLElement | null,
+    position: 'before' | 'after' = 'after'
+  ): void {
+    const ifrDoc = this.iframe.contentDocument;
+    if (!ifrDoc || !ifrDoc.body) return;
+
+    const refUnit = targetElement || this.activeMoveableUnit;
+    let insertedEl: HTMLElement | null = null;
+
+    if (refUnit && refUnit.parentElement && refUnit !== ifrDoc.body) {
+      const placeholder =
+        refUnit.classList?.contains('arch-empty-col-placeholder') || refUnit.hasAttribute?.('data-arch-placeholder')
+          ? refUnit
+          : refUnit.closest<HTMLElement>('.arch-empty-col-placeholder, [data-arch-placeholder]');
+
+      if (placeholder && placeholder.parentElement) {
+        const slot = placeholder.parentElement;
+        const wrapped = wrapContextAwareHtmlSnippet(htmlSnippet, slot.tagName.toLowerCase());
+        placeholder.insertAdjacentHTML('afterend', wrapped);
+        insertedEl = placeholder.nextElementSibling as HTMLElement;
+        placeholder.remove();
+      } else if (isColumnElement(refUnit)) {
+        const slot = getColumnSlotContainer(refUnit);
+        slot.querySelectorAll('.arch-empty-col-placeholder, [data-arch-placeholder]').forEach((p) => p.remove());
+        const wrapped = wrapContextAwareHtmlSnippet(htmlSnippet, slot.tagName.toLowerCase());
+        const insertPosition = position === 'before' ? 'afterbegin' : 'beforeend';
+        slot.insertAdjacentHTML(insertPosition, wrapped);
+        insertedEl = position === 'before'
+          ? (slot.firstElementChild as HTMLElement)
+          : (slot.lastElementChild as HTMLElement);
+      } else {
+        const parentTag = refUnit.parentElement.tagName.toLowerCase();
+        const wrapped = wrapContextAwareHtmlSnippet(htmlSnippet, parentTag);
+        const insertPosition = position === 'before' ? 'beforebegin' : 'afterend';
+        refUnit.insertAdjacentHTML(insertPosition, wrapped);
+        insertedEl = position === 'before'
+          ? (refUnit.previousElementSibling as HTMLElement)
+          : (refUnit.nextElementSibling as HTMLElement);
+      }
+    } else {
+      const container = findPrimaryContentContainer(ifrDoc);
+      const containerTag = container.tagName.toLowerCase();
+      const wrapped = wrapContextAwareHtmlSnippet(htmlSnippet, containerTag);
+      const insertPosition = position === 'before' ? 'afterbegin' : 'beforeend';
+      container.insertAdjacentHTML(insertPosition, wrapped);
       insertedEl = position === 'before'
         ? (container.firstElementChild as HTMLElement)
         : (container.lastElementChild as HTMLElement);

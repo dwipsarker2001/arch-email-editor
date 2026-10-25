@@ -97,6 +97,57 @@
   color: var(--arch-text-primary);
 }
 
+.arch-template-name {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--arch-text-primary);
+  transition: background-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.arch-template-name:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.arch-btn-rename-icon {
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  color: var(--arch-text-secondary);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.6;
+  line-height: 1;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+
+.arch-btn-rename-icon:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.arch-template-name-input {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border: 1px solid var(--arch-primary);
+  border-radius: 4px;
+  background-color: var(--arch-bg-surface);
+  color: var(--arch-text-primary);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.arch-custom-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .arch-size-badge {
   font-size: 11px;
   font-weight: 600;

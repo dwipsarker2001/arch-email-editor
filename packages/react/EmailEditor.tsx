@@ -12,7 +12,7 @@
 
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { ArchEmailEditor } from '../../src/editor';
-import { EmailDocument, EditorOptions } from '../../src/types';
+import { EmailDocument, EditorOptions, ToolbarCustomButton } from '../../src/types';
 
 export interface ReactEmailEditorProps extends Omit<EditorOptions, 'target'> {
   /** Optional custom CSS class name for the wrapper element */
@@ -28,10 +28,39 @@ export interface ReactEmailEditorRef {
   getJSON: () => EmailDocument | null;
   /** Compiles and returns production email HTML */
   getHTML: () => string;
+  /** Sets and replaces current email content with new HTML */
+  setHTML: (htmlString: string) => void;
+  /** Loads HTML content into the editor */
+  loadHTML: (htmlString: string) => void;
+  /** Inserts custom HTML content dynamically */
+  insertHTML: (htmlSnippet: string, options?: { targetElement?: HTMLElement | null; position?: 'before' | 'after' }) => void;
+  /** Sets the template name in the toolbar */
+  setTemplateName: (name: string) => void;
+  /** Gets the current template name */
+  getTemplateName: () => string;
+  /** Adds a custom button to the top-right toolbar */
+  addCustomButton: (button: ToolbarCustomButton) => void;
+  /** Removes a custom button by id */
+  removeCustomButton: (buttonId: string) => void;
 }
 
 export const ReactEmailEditor = forwardRef<ReactEmailEditorRef, ReactEmailEditorProps>(
-  ({ initialData, theme, readOnly, onChange, onSelectBlock, className, style }, ref) => {
+  (
+    {
+      initialData,
+      theme,
+      readOnly,
+      templateName,
+      editableTemplateName,
+      onTemplateNameChange,
+      customButtons,
+      onChange,
+      onSelectBlock,
+      className,
+      style
+    },
+    ref
+  ) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorInstance = useRef<ArchEmailEditor | null>(null);
 
@@ -42,6 +71,9 @@ export const ReactEmailEditor = forwardRef<ReactEmailEditorRef, ReactEmailEditor
     const onSelectBlockRef = useRef(onSelectBlock);
     onSelectBlockRef.current = onSelectBlock;
 
+    const onTemplateNameChangeRef = useRef(onTemplateNameChange);
+    onTemplateNameChangeRef.current = onTemplateNameChange;
+
     useEffect(() => {
       if (!containerRef.current) return;
 
@@ -50,6 +82,10 @@ export const ReactEmailEditor = forwardRef<ReactEmailEditorRef, ReactEmailEditor
         initialData,
         theme,
         readOnly,
+        templateName,
+        editableTemplateName,
+        customButtons,
+        onTemplateNameChange: (name) => onTemplateNameChangeRef.current?.(name),
         onChange: (doc) => onChangeRef.current?.(doc),
         onSelectBlock: (block) => onSelectBlockRef.current?.(block)
       });
@@ -73,6 +109,27 @@ export const ReactEmailEditor = forwardRef<ReactEmailEditorRef, ReactEmailEditor
       },
       getHTML() {
         return editorInstance.current ? editorInstance.current.getHTML() : '';
+      },
+      setHTML(htmlString: string) {
+        editorInstance.current?.setHTML(htmlString);
+      },
+      loadHTML(htmlString: string) {
+        editorInstance.current?.loadHTML(htmlString);
+      },
+      insertHTML(htmlSnippet: string, options?: { targetElement?: HTMLElement | null; position?: 'before' | 'after' }) {
+        editorInstance.current?.insertHTML(htmlSnippet, options);
+      },
+      setTemplateName(name: string) {
+        editorInstance.current?.setTemplateName(name);
+      },
+      getTemplateName() {
+        return editorInstance.current ? editorInstance.current.getTemplateName() : '';
+      },
+      addCustomButton(button: ToolbarCustomButton) {
+        editorInstance.current?.addCustomButton(button);
+      },
+      removeCustomButton(buttonId: string) {
+        editorInstance.current?.removeCustomButton(buttonId);
       }
     }));
 

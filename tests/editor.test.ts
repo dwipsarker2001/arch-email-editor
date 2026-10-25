@@ -657,4 +657,120 @@ describe('ArchEmailEditor Core Engine', () => {
 
     editor.destroy();
   });
+
+  it('supports setHTML(), loadHTML(), and dynamic insertHTML() via JS API', () => {
+    let changeFired = 0;
+    const editor = ArchEmailEditor.create(container, {
+      onChange: () => {
+        changeFired++;
+      }
+    });
+
+    // 1. setHTML replaces entire email content dynamically
+    const newHtml = `<!DOCTYPE html><html><body><table width="600" class="row"><tr><td><h1>Dynamic Newsletter</h1></td></tr></table></body></html>`;
+    editor.setHTML(newHtml);
+    expect(changeFired).toBeGreaterThan(0);
+    expect(editor.getHTML()).toContain('Dynamic Newsletter');
+
+    // 2. insertHTML dynamically adds a custom HTML snippet into the email
+    editor.insertHTML('<div class="promo-box" style="padding: 15px; background: #e0f2fe;"><p>50% Off Flash Sale!</p></div>');
+    const updatedHtml = editor.getHTML();
+    expect(updatedHtml).toContain('50% Off Flash Sale!');
+
+    editor.destroy();
+  });
+
+  it('supports custom toolbar buttons in top-right corner with click callbacks and dynamic add/remove', () => {
+    let saved = false;
+    let clickedEditorInstance: any = null;
+
+    const editor = ArchEmailEditor.create(container, {
+      customButtons: [
+        {
+          id: 'btn-save-draft',
+          label: 'Save Draft',
+          icon: '💾',
+          className: 'arch-btn--primary',
+          title: 'Save your email template',
+          onClick: (inst) => {
+            saved = true;
+            clickedEditorInstance = inst;
+          }
+        }
+      ]
+    });
+
+    // Verify custom button rendered in top-right actions bar
+    const saveBtn = container.querySelector('#arch-custom-btn-btn-save-draft') as HTMLButtonElement;
+    expect(saveBtn).toBeTruthy();
+    expect(saveBtn.textContent).toContain('Save Draft');
+    expect(saveBtn.textContent).toContain('💾');
+    expect(saveBtn.classList.contains('arch-btn--primary')).toBe(true);
+
+    // Click triggers callback with editor instance
+    saveBtn.click();
+    expect(saved).toBe(true);
+    expect(clickedEditorInstance).toBe(editor);
+
+    // Dynamically add a second button via JS API
+    let published = false;
+    editor.addCustomButton({
+      id: 'btn-publish',
+      label: 'Publish',
+      icon: '🚀',
+      onClick: () => {
+        published = true;
+      }
+    });
+
+    const pubBtn = container.querySelector('#arch-custom-btn-btn-publish') as HTMLButtonElement;
+    expect(pubBtn).toBeTruthy();
+    pubBtn.click();
+    expect(published).toBe(true);
+
+    // Dynamically remove button
+    editor.removeCustomButton('btn-save-draft');
+    expect(container.querySelector('#arch-custom-btn-btn-save-draft')).toBeNull();
+    expect(container.querySelector('#arch-custom-btn-btn-publish')).toBeTruthy();
+
+    editor.destroy();
+  });
+
+  it('supports template name configuration, programmatic updates, and inline rename via toolbar', () => {
+    let renamedTo = '';
+    const editor = ArchEmailEditor.create(container, {
+      templateName: 'Welcome Series 2026',
+      editableTemplateName: true,
+      onTemplateNameChange: (newName) => {
+        renamedTo = newName;
+      }
+    });
+
+    // 1. Check initial name in toolbar
+    const nameEl = container.querySelector('.arch-template-name') as HTMLElement;
+    expect(nameEl).toBeTruthy();
+    expect(nameEl.textContent).toBe('Welcome Series 2026');
+    expect(editor.getTemplateName()).toBe('Welcome Series 2026');
+
+    // 2. Programmatically update template name
+    editor.setTemplateName('Black Friday Campaign');
+    expect(nameEl.textContent).toBe('Black Friday Campaign');
+    expect(editor.getTemplateName()).toBe('Black Friday Campaign');
+    expect(renamedTo).toBe('Black Friday Campaign');
+
+    // 3. Inline click to rename
+    nameEl.click();
+    const input = container.querySelector('.arch-template-name-input') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    expect(input.value).toBe('Black Friday Campaign');
+
+    input.value = 'Cyber Monday Sale';
+    input.dispatchEvent(new Event('blur'));
+
+    const updatedNameEl = container.querySelector('.arch-template-name') as HTMLElement;
+    expect(updatedNameEl.textContent).toBe('Cyber Monday Sale');
+    expect(renamedTo).toBe('Cyber Monday Sale');
+
+    editor.destroy();
+  });
 });

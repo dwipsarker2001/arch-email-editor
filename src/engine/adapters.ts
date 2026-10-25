@@ -800,6 +800,42 @@ export function findPrimaryContentContainer(doc: Document): HTMLElement {
 }
 
 /**
+ * Normalizes and wraps arbitrary custom HTML markup appropriately for the target email table container.
+ * Prevents invalid nesting (such as direct <div> or <p> inside <tbody>) from breaking HTML email layout.
+ */
+export function wrapContextAwareHtmlSnippet(
+  htmlSnippet: string,
+  containerTag: string
+): string {
+  const trimmed = htmlSnippet.trim();
+  const lower = trimmed.toLowerCase();
+
+  // If inserting directly into a `<tbody>` or `<table>`
+  if (containerTag === 'tbody' || containerTag === 'table') {
+    if (lower.startsWith('<tr')) {
+      return trimmed;
+    }
+    if (lower.startsWith('<table')) {
+      return `<tr><td style="padding: 0;">${trimmed}</td></tr>`;
+    }
+    return `<tr><td style="padding: 12px 20px;">${trimmed}</td></tr>`;
+  }
+
+  // Inside a column td, section, or div
+  if (
+    lower.startsWith('<table') ||
+    lower.startsWith('<div') ||
+    lower.startsWith('<tr') ||
+    lower.startsWith('<section')
+  ) {
+    return trimmed;
+  }
+
+  // Raw inline or block text/img snippet into a td column: wrap in a presentation table block for email layout stability
+  return `<table class="html_block" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="mso-table-lspace:0;mso-table-rspace:0;"><tbody><tr><td class="pad" style="padding: 12px 20px;">${trimmed}</td></tr></tbody></table>`;
+}
+
+/**
  * Generates inner HTML for a block type, wrapped appropriately for the destination container (`<tr><td>` vs `<table class="*_block">` vs `<div>`).
  */
 export function buildContextAwareBlockHtml(

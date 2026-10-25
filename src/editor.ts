@@ -23,6 +23,7 @@ import {
   EditorOptions,
   RowLayoutType,
   SelectedElementInfo,
+  ToolbarCustomButton,
   ViewportMode
 } from './types';
 import {
@@ -150,6 +151,64 @@ export class ArchEmailEditor {
     this.updateViews(true);
     this.recordHistory();
     this.emit('change', this.getJSON());
+  }
+
+  /**
+   * Sets/replaces the entire email content with the provided HTML markup.
+   * Standard WYSIWYG counterpart to `getHTML()`.
+   */
+  public setHTML(htmlString: string): void {
+    this.importHTML(htmlString);
+  }
+
+  /**
+   * Loads HTML template content into the editor.
+   * Alias for `setHTML()` / `importHTML()`.
+   */
+  public loadHTML(htmlString: string): void {
+    this.importHTML(htmlString);
+  }
+
+  /**
+   * Injects a custom HTML block or snippet dynamically into the email template.
+   * Automatically normalizes the markup to preserve email table hierarchy.
+   */
+  public insertHTML(
+    htmlSnippet: string,
+    options: { targetElement?: HTMLElement | null; position?: 'before' | 'after' } = {}
+  ): void {
+    this.canvas?.insertHTML(htmlSnippet, options.targetElement, options.position || 'after');
+  }
+
+  /**
+   * Sets the template name displayed in the editor toolbar.
+   */
+  public setTemplateName(name: string): void {
+    this.options.templateName = name;
+    this.toolbar?.setTemplateName(name);
+    this.options.onTemplateNameChange?.(name);
+    this.emit('templateNameChange', name);
+  }
+
+  /**
+   * Gets the current template name.
+   */
+  public getTemplateName(): string {
+    return this.toolbar?.getTemplateName() || this.options.templateName || 'Arch Email Editor';
+  }
+
+  /**
+   * Dynamically adds a custom action button to the top-right toolbar.
+   */
+  public addCustomButton(button: ToolbarCustomButton): void {
+    this.toolbar?.addCustomButton(button);
+  }
+
+  /**
+   * Removes a custom action button from the toolbar by id.
+   */
+  public removeCustomButton(buttonId: string): void {
+    this.toolbar?.removeCustomButton(buttonId);
   }
 
   /**
@@ -362,29 +421,42 @@ export class ArchEmailEditor {
     this.exportModal = new ExportModal();
 
     // 2. Initialize Toolbar
-    this.toolbar = new Toolbar({
-      onImportHtml: () => this.importModal?.open(this.rootElement!),
-      onExportJson: () =>
-        this.exportModal?.open(
-          this.rootElement!,
-          'Exported Template JSON',
-          JSON.stringify(this.getJSON(), null, 2)
-        ),
-      onExportHtml: () =>
-        this.exportModal?.open(this.rootElement!, 'Exported Email HTML', this.getHTML()),
-      onUndo: () => this.undo(),
-      onRedo: () => this.redo(),
-      onViewportChange: (mode) => this.setViewportMode(mode),
-      onClear: () => {
-        this.document.blocks = [];
-        this.document.rawHtml = '';
-        this.selectedBlockId = null;
-        this.selectedElement = null;
-        this.updateViews(true);
-        this.recordHistory();
-        this.emit('change', this.getJSON());
+    this.toolbar = new Toolbar(
+      {
+        onImportHtml: () => this.importModal?.open(this.rootElement!),
+        onExportJson: () =>
+          this.exportModal?.open(
+            this.rootElement!,
+            'Exported Template JSON',
+            JSON.stringify(this.getJSON(), null, 2)
+          ),
+        onExportHtml: () =>
+          this.exportModal?.open(this.rootElement!, 'Exported Email HTML', this.getHTML()),
+        onUndo: () => this.undo(),
+        onRedo: () => this.redo(),
+        onViewportChange: (mode) => this.setViewportMode(mode),
+        onTemplateNameChange: (name) => {
+          this.options.templateName = name;
+          this.options.onTemplateNameChange?.(name);
+          this.emit('templateNameChange', name);
+        },
+        onClear: () => {
+          this.document.blocks = [];
+          this.document.rawHtml = '';
+          this.selectedBlockId = null;
+          this.selectedElement = null;
+          this.updateViews(true);
+          this.recordHistory();
+          this.emit('change', this.getJSON());
+        }
+      },
+      {
+        templateName: this.options.templateName,
+        editableTemplateName: this.options.editableTemplateName,
+        customButtons: this.options.customButtons,
+        editorInstance: this
       }
-    });
+    );
 
     // 3. Initialize Canvas (takes full width on left)
     this.canvas = new Canvas({

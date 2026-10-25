@@ -201,6 +201,24 @@ export interface SelectedElementInfo {
 }
 
 /**
+ * Custom action button definition added to the top-right toolbar.
+ */
+export interface ToolbarCustomButton {
+  /** Unique identifier for the custom action button */
+  id: string;
+  /** Button text label */
+  label: string;
+  /** Optional icon (emoji, HTML/SVG snippet, or text icon) */
+  icon?: string;
+  /** Optional hover tooltip title */
+  title?: string;
+  /** Optional CSS classes (e.g. 'arch-btn--primary') */
+  className?: string;
+  /** Click callback with editor instance and native MouseEvent */
+  onClick: (editor: any, event: MouseEvent) => void;
+}
+
+/**
  * Configuration options passed to `ArchEmailEditor.create(target, options)`.
  */
 export interface EditorOptions {
@@ -212,6 +230,14 @@ export interface EditorOptions {
   theme?: 'light' | 'dark';
   /** Read-only mode */
   readOnly?: boolean;
+  /** Template name / title displayed in the editor toolbar (default: "Arch Email Editor") */
+  templateName?: string;
+  /** Whether the user can click the template name in the toolbar to edit it inline (default: true) */
+  editableTemplateName?: boolean;
+  /** Callback fired when the template name is changed */
+  onTemplateNameChange?: (name: string) => void;
+  /** Custom action buttons added to the top-right toolbar actions bar (e.g. Save, Send) */
+  customButtons?: ToolbarCustomButton[];
   /** Callback fired whenever blocks, content, or settings change */
   onChange?: (doc: EmailDocument) => void;
   /** Callback fired when an element or block is selected */
