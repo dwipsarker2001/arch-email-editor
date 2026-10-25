@@ -198,21 +198,21 @@ export class RowInspector {
     `;
 
     // Row Background Color
-    bindColorPicker(container, 'swatch-row-bg', 'txt-row-bg', (val) => {
+    bindColorPicker(container, 'swatch-row-bg', 'txt-row-bg', (val, isCommit) => {
       targetEl.style.backgroundColor = val;
       if (targetEl.tagName.toLowerCase() === 'table' || targetEl.tagName.toLowerCase() === 'td') {
         targetEl.setAttribute('bgcolor', val);
       }
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
 
     // Content Background Color
-    bindColorPicker(container, 'swatch-row-cnt-bg', 'txt-row-cnt-bg', (val) => {
+    bindColorPicker(container, 'swatch-row-cnt-bg', 'txt-row-cnt-bg', (val, isCommit) => {
       contentTable.style.backgroundColor = val;
       if (contentTable.tagName.toLowerCase() === 'table' || contentTable.tagName.toLowerCase() === 'td') {
         contentTable.setAttribute('bgcolor', val);
       }
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
 
     // Background Image Toggle & URL
@@ -270,7 +270,7 @@ export class RowInspector {
     const borderControls = container.querySelector<HTMLElement>('#row-border-controls');
     const selBorderStyle = container.querySelector<HTMLSelectElement>('#sel-row-border-style');
 
-    const applyBorder = () => {
+    const applyBorder = (shouldCommit = true) => {
       if (chkBorder?.checked) {
         const style = selBorderStyle?.value || 'solid';
         const wInp = container.querySelector<HTMLInputElement>('#stp-row-border-w');
@@ -281,24 +281,26 @@ export class RowInspector {
       } else {
         contentTable.style.border = 'none';
       }
-      this.events.onChange();
+      if (shouldCommit) {
+        this.events.onChange();
+      }
     };
 
     chkBorder?.addEventListener('change', () => {
       if (borderControls) borderControls.style.display = chkBorder.checked ? 'block' : 'none';
-      applyBorder();
+      applyBorder(true);
     });
 
     selBorderStyle?.addEventListener('change', () => {
-      if (chkBorder?.checked) applyBorder();
+      if (chkBorder?.checked) applyBorder(true);
     });
 
     bindStepper(container, 'stp-row-border-w', () => {
-      if (chkBorder?.checked) applyBorder();
+      if (chkBorder?.checked) applyBorder(true);
     });
 
-    bindColorPicker(container, 'swatch-row-border-col', 'txt-row-border-col', () => {
-      if (chkBorder?.checked) applyBorder();
+    bindColorPicker(container, 'swatch-row-border-col', 'txt-row-border-col', (_val, isCommit) => {
+      if (chkBorder?.checked) applyBorder(isCommit !== false);
     });
 
     bindStepper(container, 'stp-row-radius', (val) => {

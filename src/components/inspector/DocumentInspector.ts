@@ -271,15 +271,38 @@ export class DocumentInspector {
     });
 
     // 3. Background Color Sync
-    bindColorPicker(this.element, 'inp-doc-bg', 'txt-doc-bg', (val) => {
+    bindColorPicker(this.element, 'inp-doc-bg', 'txt-doc-bg', (val, isCommit) => {
       doc.settings.backgroundColor = val;
-      this.events.onChange(true);
+      const ifr = this.element.ownerDocument.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+      const ifrDoc = ifr?.contentDocument;
+      if (ifrDoc?.body) {
+        ifrDoc.body.style.backgroundColor = val;
+        const wrappers = ifrDoc.body.querySelectorAll<HTMLElement>('table.email-body, table.wrapper, table[width="100%"]');
+        wrappers.forEach((w) => {
+          w.style.backgroundColor = val;
+          w.setAttribute('bgcolor', val);
+        });
+      }
+      if (isCommit !== false) {
+        this.events.onChange(true);
+      }
     });
 
     // 4. Content Area Background Color Sync
-    bindColorPicker(this.element, 'inp-doc-content-bg', 'txt-doc-content-bg', (val) => {
+    bindColorPicker(this.element, 'inp-doc-content-bg', 'txt-doc-content-bg', (val, isCommit) => {
       doc.settings.contentBackgroundColor = val;
-      this.events.onChange(true);
+      const ifr = this.element.ownerDocument.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+      const ifrDoc = ifr?.contentDocument;
+      if (ifrDoc?.body) {
+        const contentTables = ifrDoc.body.querySelectorAll<HTMLElement>('table.email-container, table.content-table, table.row-content, table[width="600"]');
+        contentTables.forEach((tbl) => {
+          tbl.style.backgroundColor = val;
+          tbl.setAttribute('bgcolor', val);
+        });
+      }
+      if (isCommit !== false) {
+        this.events.onChange(true);
+      }
     });
 
     // 5. Background Image Toggle Switch
@@ -299,14 +322,23 @@ export class DocumentInspector {
     });
 
     // 7. Text Color Sync
-    bindColorPicker(this.element, 'inp-doc-text-color', 'txt-doc-text-color', (val) => {
+    bindColorPicker(this.element, 'inp-doc-text-color', 'txt-doc-text-color', (val, isCommit) => {
       doc.settings.textColor = val;
-      this.events.onChange(true);
+      const ifr = this.element.ownerDocument.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+      const ifrDoc = ifr?.contentDocument;
+      if (ifrDoc?.body) {
+        ifrDoc.body.style.color = val;
+      }
+      if (isCommit !== false) {
+        this.events.onChange(true);
+      }
     });
 
     // 8. Link Color Sync
-    bindColorPicker(this.element, 'inp-doc-link-color', 'txt-doc-link-color', () => {
-      this.events.onChange(true);
+    bindColorPicker(this.element, 'inp-doc-link-color', 'txt-doc-link-color', (_val, isCommit) => {
+      if (isCommit !== false) {
+        this.events.onChange(true);
+      }
     });
 
     // 9. Preheader Input

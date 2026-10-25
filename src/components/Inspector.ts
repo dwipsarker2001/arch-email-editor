@@ -489,7 +489,7 @@ export class Inspector {
     return renderColorPicker(swatchId, hexId, value);
   }
 
-  private bindColorPicker(container: HTMLElement, swatchId: string, hexId: string, onChange: (color: string) => void): void {
+  private bindColorPicker(container: HTMLElement, swatchId: string, hexId: string, onChange: (color: string, isCommit?: boolean) => void): void {
     bindColorPicker(container, swatchId, hexId, onChange);
   }
 
@@ -632,14 +632,14 @@ export class Inspector {
       this.events.onChange();
     });
 
-    this.bindColorPicker(container, 'swatch-head-color', 'txt-head-color', (val) => {
+    this.bindColorPicker(container, 'swatch-head-color', 'txt-head-color', (val, isCommit) => {
       headingEl.style.color = val;
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
 
-    this.bindColorPicker(container, 'swatch-head-link-color', 'txt-head-link-color', (val) => {
+    this.bindColorPicker(container, 'swatch-head-link-color', 'txt-head-link-color', (val, isCommit) => {
       headingEl.querySelectorAll('a').forEach((a) => (a.style.color = val));
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
 
     this.bindAlignment(container, 'grp-head-align', (val) => {
@@ -791,14 +791,14 @@ export class Inspector {
       this.events.onChange();
     });
 
-    this.bindColorPicker(container, 'swatch-text-color', 'txt-text-color', (val) => {
+    this.bindColorPicker(container, 'swatch-text-color', 'txt-text-color', (val, isCommit) => {
       TextAdapter.setColor(info.element, val, info.unit);
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
 
-    this.bindColorPicker(container, 'swatch-text-link-color', 'txt-text-link-color', (val) => {
+    this.bindColorPicker(container, 'swatch-text-link-color', 'txt-text-link-color', (val, isCommit) => {
       activeNode.querySelectorAll('a').forEach((a) => (a.style.color = val));
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
 
     this.bindAlignment(container, 'grp-text-align', (val) => {
@@ -991,14 +991,14 @@ export class Inspector {
       this.events.onChange();
     });
 
-    this.bindColorPicker(container, 'inp-btn-bg', 'txt-btn-bg', (val) => {
+    this.bindColorPicker(container, 'inp-btn-bg', 'txt-btn-bg', (val, isCommit) => {
       ButtonAdapter.setBackgroundColor(info.element, val, info.unit);
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
 
-    this.bindColorPicker(container, 'inp-btn-color', 'txt-btn-color', (val) => {
+    this.bindColorPicker(container, 'inp-btn-color', 'txt-btn-color', (val, isCommit) => {
       ButtonAdapter.setTextColor(info.element, val, info.unit);
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
 
     this.bindStepper(container, 'stp-btn-size', (val) => {
@@ -1099,9 +1099,9 @@ export class Inspector {
       this.events.onChange();
     });
 
-    this.bindColorPicker(container, 'swatch-div-color', 'txt-div-color', (val) => {
+    this.bindColorPicker(container, 'swatch-div-color', 'txt-div-color', (val, isCommit) => {
       DividerAdapter.setColor(info.element, val, info.unit);
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
 
     this.bindAlignment(container, 'grp-div-align', (val) => {
@@ -1284,9 +1284,9 @@ export class Inspector {
       this.events.onChange();
     });
 
-    this.bindColorPicker(container, 'swatch-list-color', 'txt-list-color', (val) => {
+    this.bindColorPicker(container, 'swatch-list-color', 'txt-list-color', (val, isCommit) => {
       target.style.color = val;
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
   }
 
@@ -1324,11 +1324,11 @@ export class Inspector {
       </div>
     `;
 
-    this.bindColorPicker(container, 'swatch-tbl-hdr-bg', 'txt-tbl-hdr-bg', (val) => {
+    this.bindColorPicker(container, 'swatch-tbl-hdr-bg', 'txt-tbl-hdr-bg', (val, isCommit) => {
       tableEl.querySelectorAll('th').forEach((th) => {
         th.style.backgroundColor = val;
       });
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
 
     this.bindStepper(container, 'stp-tbl-pad', (val) => {
@@ -1338,12 +1338,12 @@ export class Inspector {
       this.events.onChange();
     });
 
-    this.bindColorPicker(container, 'swatch-tbl-border', 'txt-tbl-border', (val) => {
+    this.bindColorPicker(container, 'swatch-tbl-border', 'txt-tbl-border', (val, isCommit) => {
       tableEl.style.borderColor = val;
       tableEl.querySelectorAll('td, th').forEach((cell) => {
         (cell as HTMLElement).style.borderColor = val;
       });
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
   }
 
@@ -1499,11 +1499,11 @@ export class Inspector {
       this.events.onChange();
     });
 
-    this.bindColorPicker(container, 'swatch-menu-color', 'txt-menu-color', (val) => {
+    this.bindColorPicker(container, 'swatch-menu-color', 'txt-menu-color', (val, isCommit) => {
       target.querySelectorAll('a').forEach((a) => {
         a.style.color = val;
       });
-      this.events.onChange();
+      if (isCommit !== false) this.events.onChange();
     });
   }
 

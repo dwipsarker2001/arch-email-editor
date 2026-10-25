@@ -74,7 +74,12 @@ export function renderColorPicker(swatchId: string, hexId: string, value: string
   `;
 }
 
-export function bindColorPicker(container: HTMLElement, swatchId: string, hexId: string, onChange: (color: string) => void): void {
+export function bindColorPicker(
+  container: HTMLElement,
+  swatchId: string,
+  hexId: string,
+  onChange: (color: string, isCommit?: boolean) => void
+): void {
   const swatch = container.querySelector<HTMLInputElement>(`#${swatchId}`);
   const hex = container.querySelector<HTMLInputElement>(`#${hexId}`);
   if (!swatch || !hex) return;
@@ -82,13 +87,29 @@ export function bindColorPicker(container: HTMLElement, swatchId: string, hexId:
   swatch.addEventListener('input', (e) => {
     const val = (e.target as HTMLInputElement).value;
     hex.value = val;
-    onChange(val);
+    onChange(val, false);
+  });
+
+  swatch.addEventListener('change', (e) => {
+    const val = (e.target as HTMLInputElement).value;
+    hex.value = val;
+    onChange(val, true);
+  });
+
+  hex.addEventListener('input', (e) => {
+    const val = (e.target as HTMLInputElement).value.trim();
+    if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val)) {
+      swatch.value = toHexColor(val, swatch.value);
+      onChange(val, false);
+    }
   });
 
   hex.addEventListener('change', (e) => {
-    const val = (e.target as HTMLInputElement).value;
-    swatch.value = toHexColor(val, '#ffffff');
-    onChange(val);
+    const val = (e.target as HTMLInputElement).value.trim();
+    const hexColor = toHexColor(val, '#ffffff');
+    swatch.value = hexColor;
+    hex.value = val || hexColor;
+    onChange(hexColor, true);
   });
 }
 
