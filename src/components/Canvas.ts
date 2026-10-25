@@ -1322,8 +1322,8 @@ export class Canvas {
         color: #ffffff !important;
       }
       .arch-selected-element {
-        outline: 1px solid #7747ff !important;
-        outline-offset: -1px !important;
+        outline: 2px solid #7747ff !important;
+        outline-offset: -2px !important;
       }
       .arch-hover-element:not(.arch-selected-element) {
         outline: 1.5px solid rgba(119, 71, 255, 0.75) !important;
