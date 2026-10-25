@@ -1854,6 +1854,17 @@ input:checked + .arch-toggle-slider:before {
   transition: opacity 0.12s ease;
 }
 
+/* Low-opacity drop zone overlay during drag & drop (Figma style) */
+.arch-figma-drop-target-overlay {
+  position: absolute;
+  background-color: rgba(119, 71, 255, 0.08);
+  pointer-events: none !important;
+  z-index: 40;
+  box-sizing: border-box;
+  border-radius: 2px;
+  transition: opacity 0.1s ease;
+}
+
 
 /* Unlayer-style Bottom Action Bar (Attached to bottom-left corner of selected item) */
 .arch-editor .arch-rge-bottom-actions,

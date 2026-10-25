@@ -1963,4 +1963,47 @@ describe('Figma vertical displacement', () => {
     editor.destroy();
     container.remove();
   });
+
+  it('drag and drop displays low-opacity overlay color on drop target and selects dropped element with overlay color', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    const html = `
+      <table class="row row-1" width="100%">
+        <tr>
+          <td class="column column-1" width="100%">
+            <table class="text_block" width="100%">
+              <tr>
+                <td style="padding: 15px;">
+                  <p class="para-1">First paragraph</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    `;
+
+    const editor = new ArchEmailEditor(container);
+    editor.importHTML(html);
+
+    const canvas = (editor as any).canvas;
+    const ifrDoc = canvas.iframe.contentDocument as Document;
+    const overlay = container.querySelector('.arch-canvas-overlay') as HTMLElement;
+    const row = ifrDoc.querySelector('.row-1') as HTMLElement;
+
+    // 1. During drag & drop: hovering a drop target shows the drop zone overlay color
+    canvas.updateDropTargetForElement(row, 200, 100);
+    expect(overlay.querySelector('.arch-figma-drop-target-overlay')).not.toBeNull();
+    expect(row.classList.contains('arch-drop-hover')).toBe(true);
+
+    // 2. On drop: inserting a new block selects the new block with the selection overlay color
+    canvas.insertBlock('button', row, 'after');
+    const selOverlay = overlay.querySelector('.arch-selection-overlay') as HTMLElement;
+    expect(selOverlay).not.toBeNull();
+    expect(selOverlay.style.display).toBe('block');
+
+    editor.destroy();
+    container.remove();
+  });
 });
