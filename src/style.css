@@ -537,20 +537,13 @@
 }
 
 .arch-editor__right-panel.is-collapsed .arch-right-tabs {
-  width: 0;
-  padding: 0;
-  overflow: visible;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.arch-right-tabs {
   position: relative;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   border-bottom: 1px solid #dcdfe4;
   background: #eceef1;
   padding: 0;
-  gap: 0;
+  gap: 0.5px;
   flex-shrink: 0;
   height: 46px;
 }
@@ -590,7 +583,7 @@
   font-size: 13px !important;
   font-weight: 500 !important;
   text-transform: none !important;
-  letter-spacing: normal !important;
+  letter-spacing: 0.5px !important;
   word-spacing: normal !important;
   color: #64748b !important;
   cursor: pointer;
@@ -626,7 +619,7 @@
   background: #ffffff !important;
   font-weight: 600 !important;
   box-shadow: none;
-  border-bottom: 2px solid #7747ff !important;
+  border-bottom: none !important;
 }
 
 .arch-editor button.arch-right-tab.is-active .arch-tab-icon,
@@ -3008,7 +3001,7 @@ input:checked + .arch-toggle-slider:before {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  justify-content: center !important;
+  justify-content: flex-start !important;
   padding: 0 !important;
   height: 100% !important;
   max-height: 100% !important;
@@ -3023,7 +3016,7 @@ input:checked + .arch-toggle-slider:before {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  justify-content: center !important;
+  justify-content: flex-start !important;
   overflow: hidden !important;
   padding: 0 !important;
   margin: 0 !important;
@@ -3034,14 +3027,14 @@ input:checked + .arch-toggle-slider:before {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  justify-content: center !important;
+  justify-content: flex-start !important;
   text-align: center !important;
-  padding: 24px 16px !important;
+  padding: 40px 16px 20px 16px !important;
   box-sizing: border-box !important;
   column-span: all !important;
   width: 100% !important;
   max-width: 270px !important;
-  margin: auto !important;
+  margin: 0 auto !important;
 }
 
 .arch-editor .arch-assets-no-match,
