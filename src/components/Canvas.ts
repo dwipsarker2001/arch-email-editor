@@ -63,7 +63,6 @@ import {
   findPrimaryContentContainer,
   ImageAdapter,
   resolveButtonAnatomy,
-  TextAdapter,
   wrapContextAwareHtmlSnippet
 } from '../engine/adapters';
 import { validateEmailStructure } from '../engine/history';
@@ -127,7 +126,7 @@ export class Canvas {
   private dropMemoDragged: HTMLElement | null = null;
   private slotRectCache = new Map<HTMLElement, { rect: DOMRect; scrollX: number; scrollY: number }>();
   private activeElementResize: {
-    kind: 'image' | 'button' | 'text';
+    kind: 'image' | 'button';
     target: HTMLElement;
     unit: HTMLElement;
     startX: number;
@@ -137,8 +136,7 @@ export class Canvas {
     maxWidth: number;
     dirX: number;
     dirY: number;
-    mode: 'box' | 'font';
-    startFontSize?: number;
+    mode: 'box';
     startPadY?: number;
   } | null = null;
   private columnResizeHandles: HTMLElement[] = [];
@@ -589,18 +587,6 @@ export class Canvas {
       }
       const rect = state.target.getBoundingClientRect();
       this.dimensionsBadge.textContent = `${nextWidth} × ${Math.round(rect.height)}`;
-    } else if (state.kind === 'text') {
-      if (state.mode === 'font' && state.startFontSize !== undefined) {
-        const combinedDelta = (deltaX + deltaY) / 2;
-        const nextSize = Math.round(Math.max(10, Math.min(96, state.startFontSize + combinedDelta / 8)));
-        TextAdapter.setFontSize(state.target, `${nextSize}px`, this.viewportMode, state.unit);
-        const rect = state.target.getBoundingClientRect();
-        this.dimensionsBadge.textContent = `Font: ${nextSize}px (${Math.round(rect.width)} × ${Math.round(rect.height)})`;
-      } else {
-        const nextWidth = Math.round(Math.max(60, Math.min(state.maxWidth, state.startWidth + deltaX)));
-        TextAdapter.setWidth(state.target, `${nextWidth}px`, state.unit);
-        this.dimensionsBadge.textContent = `Width: ${nextWidth}px`;
-      }
     }
 
     this.positionFloatingToolbar(state.unit, this.floatingToolbar || undefined);
@@ -2407,7 +2393,7 @@ export class Canvas {
       this.floatingToolbar = textToolbar;
     }
 
-    // 4. Element Resize Handles (Corner & Side Handles for Image, Button, Text)
+    // 4. Element Resize Handles (Corner & Side Handles for Image and Button; text uses typography controls instead of resize handles)
     if (this.activeMoveableUnit === unit && !isRowElement(unit) && !isColumnElement(unit)) {
       const targetEl = innerTarget || this.selectedElement || unit;
 
@@ -2422,19 +2408,8 @@ export class Canvas {
           (isButtonComponent(unit) && !unit.classList.contains('image_block')));
       const targetBtn = isButton ? resolveButtonAnatomy(targetEl, unit).anchor : null;
 
-      const isText =
-        !targetImg &&
-        !isButton &&
-        !this.isEditingText &&
-        (unit.classList.contains('paragraph_block') ||
-          unit.classList.contains('heading_block') ||
-          unit.classList.contains('text_block') ||
-          /^(h[1-6]|p|blockquote)$/i.test(targetEl.tagName) ||
-          /^(h[1-6]|p|blockquote)$/i.test(unit.tagName));
-      const targetText = isText ? TextAdapter.getTextHost(targetEl, unit) : null;
-
       let resizableTarget: HTMLElement | null = null;
-      let resizableKind: 'image' | 'button' | 'text' | null = null;
+      let resizableKind: 'image' | 'button' | null = null;
 
       if (targetImg) {
         resizableTarget = targetImg;
@@ -2442,9 +2417,6 @@ export class Canvas {
       } else if (targetBtn) {
         resizableTarget = targetBtn;
         resizableKind = 'button';
-      } else if (targetText) {
-        resizableTarget = targetText;
-        resizableKind = 'text';
       }
 
       if (resizableTarget && resizableKind) {
@@ -2452,36 +2424,36 @@ export class Canvas {
           side: 'nw' | 'ne' | 'sw' | 'se' | 'e' | 'w' | 's';
           dirX: number;
           dirY: number;
-          mode: 'box' | 'font';
+          mode: 'box';
           title: string;
         }> = [
           {
             side: 'nw',
             dirX: -1,
             dirY: -1,
-            mode: resizableKind === 'text' ? 'font' : 'box',
-            title: resizableKind === 'text' ? 'Drag to scale font size' : `Drag to resize ${resizableKind}`
+            mode: 'box',
+            title: `Drag to resize ${resizableKind}`
           },
           {
             side: 'ne',
             dirX: 1,
             dirY: -1,
-            mode: resizableKind === 'text' ? 'font' : 'box',
-            title: resizableKind === 'text' ? 'Drag to scale font size' : `Drag to resize ${resizableKind}`
+            mode: 'box',
+            title: `Drag to resize ${resizableKind}`
           },
           {
             side: 'sw',
             dirX: -1,
             dirY: 1,
-            mode: resizableKind === 'text' ? 'font' : 'box',
-            title: resizableKind === 'text' ? 'Drag to scale font size' : `Drag to resize ${resizableKind}`
+            mode: 'box',
+            title: `Drag to resize ${resizableKind}`
           },
           {
             side: 'se',
             dirX: 1,
             dirY: 1,
-            mode: resizableKind === 'text' ? 'font' : 'box',
-            title: resizableKind === 'text' ? 'Drag to scale font size' : `Drag to resize ${resizableKind}`
+            mode: 'box',
+            title: `Drag to resize ${resizableKind}`
           },
           {
             side: 'e',
@@ -2543,11 +2515,6 @@ export class Canvas {
                 parseInt(ButtonAdapter.getWidth(resizableTarget!, unit), 10) ||
                 parseInt(resizableTarget!.style.width || '', 10) ||
                 140;
-            } else if (resizableKind === 'text') {
-              parsedWidth =
-                parseInt(TextAdapter.getWidth(resizableTarget!, unit), 10) ||
-                colWidth ||
-                300;
             }
             const startWidth = targetElRect.width > 0 ? targetElRect.width : (resizableTarget!.getBoundingClientRect().width > 0 ? resizableTarget!.getBoundingClientRect().width : parsedWidth);
 
@@ -2563,7 +2530,6 @@ export class Canvas {
               dirX: def.dirX,
               dirY: def.dirY,
               mode: def.mode,
-              startFontSize: resizableKind === 'text' ? TextAdapter.getFontSize(resizableTarget!, unit) : undefined,
               startPadY: resizableKind === 'button' ? ButtonAdapter.getPaddingY(resizableTarget!, unit) : undefined
             };
 
@@ -2690,7 +2656,7 @@ export class Canvas {
       tb.style.left = `${left}px`;
     }
 
-    // 4. Element resize handles (Image, Button, Text)
+    // 4. Element resize handles (Image, Button)
     const targetEl = this.selectedElement || unit;
     const isRowOrCol = isRowElement(unit) || isColumnElement(unit);
 
@@ -2705,16 +2671,6 @@ export class Canvas {
       !targetImg &&
       (isButtonComponent(targetEl) ||
         (isButtonComponent(unit) && !unit.classList.contains('image_block')));
-    const isText =
-      !isRowOrCol &&
-      !targetImg &&
-      !isButton &&
-      !this.isEditingText &&
-      (unit.classList.contains('paragraph_block') ||
-        unit.classList.contains('heading_block') ||
-        unit.classList.contains('text_block') ||
-        /^(h[1-6]|p|blockquote)$/i.test(targetEl.tagName) ||
-        /^(h[1-6]|p|blockquote)$/i.test(unit.tagName));
 
     let targetNode: HTMLElement | null = null;
     if (this.resizeHandles.length > 0) {
@@ -2722,8 +2678,6 @@ export class Canvas {
         targetNode = targetImg;
       } else if (isButton) {
         targetNode = resolveButtonAnatomy(targetEl, unit).anchor;
-      } else if (isText) {
-        targetNode = TextAdapter.getTextHost(targetEl, unit);
       }
     }
 

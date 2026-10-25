@@ -1881,10 +1881,10 @@ describe('Figma vertical displacement', () => {
     expect(eHandle).toBeTruthy();
     expect(btn.classList.contains('arch-selected-element')).toBe(true);
 
-    // 4. Selecting paragraph inside column 2 also does not display column resize handles
+    // 4. Selecting paragraph inside column 2 also does not display column resize handles or element resize handles
     canvas.selectUnit(p, p);
     expect(overlay.querySelector('.arch-col-resize-handle')).toBeNull();
-    expect(overlay.querySelector('.arch-resize-handle--e')).toBeTruthy();
+    expect(overlay.querySelector('.arch-resize-handle')).toBeNull();
 
     editor.destroy();
     container.remove();

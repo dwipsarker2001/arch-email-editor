@@ -687,7 +687,7 @@ describe('ArchEmailEditor Core Engine', () => {
     editor.destroy();
   });
 
-  it('supports interactive text drag resize: side handle adjusts width and corner handle scales font size', () => {
+  it('does not display resize handles on text or text parent element, preserving clean typography editing', () => {
     const editor = ArchEmailEditor.create(container);
     const canvas = (editor as any).canvas;
     const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
@@ -699,47 +699,14 @@ describe('ArchEmailEditor Core Engine', () => {
     canvas.selectUnit(p, p);
 
     const overlay = container.querySelector('.arch-canvas-overlay') as HTMLElement;
-    // Verify right-side drag icon is removed so it does not block the right resize handle
-    expect(overlay.querySelector('.arch-rge-move-handle')).toBeNull();
-    const eHandle = overlay.querySelector('.arch-resize-handle--e') as HTMLElement;
-    const seHandle = overlay.querySelector('.arch-resize-handle--se') as HTMLElement;
-    expect(eHandle).toBeTruthy();
-    expect(seHandle).toBeTruthy();
+    // Verify resize handles are NOT rendered for text or its parent element
+    expect(overlay.querySelector('.arch-resize-handle')).toBeNull();
+    expect(overlay.querySelector('.arch-resize-handle--e')).toBeNull();
+    expect(overlay.querySelector('.arch-resize-handle--se')).toBeNull();
 
-    vi.spyOn(p, 'getBoundingClientRect').mockReturnValue({
-      left: 100,
-      right: 500,
-      top: 50,
-      bottom: 90,
-      width: 400,
-      height: 40,
-      x: 100,
-      y: 50,
-      toJSON: () => {}
-    });
-
-    // 1. Drag side handle to adjust line-wrap width
-    eHandle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 500, clientY: 70, button: 0 }));
-    window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 450, clientY: 70 })); // -50px
-
-    expect(p.style.maxWidth).toBe('350px');
-    let badge = overlay.querySelector('.arch-dimensions-pill');
-    expect(badge?.textContent).toBe('Width: 350px');
-
-    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-
-    // 2. Drag corner handle to scale font size
-    seHandle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 450, clientY: 90, button: 0 }));
-    window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 530, clientY: 170 })); // scale up
-
-    badge = overlay.querySelector('.arch-dimensions-pill');
-    expect(badge?.textContent).toContain('Font:');
-
-    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-
-    // Clean export
+    // Verify text selection has 2px outline and clean export
+    expect(p.classList.contains('arch-selected-element')).toBe(true);
     const cleanHtml = editor.getHTML();
-    expect(cleanHtml).toContain('max-width: 350px');
     expect(cleanHtml).not.toContain('arch-resize-handle');
 
     editor.destroy();
