@@ -195,4 +195,72 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     expect(document.querySelector('#arch-crop-modal-overlay')).toBeNull();
   });
 
+  it('renders Row Properties sidebar and ROW OPTIONS menu matching Text Properties layout, spacing and typography', () => {
+    const iframe = container.querySelector<HTMLIFrameElement>('.arch-canvas-iframe');
+    const ifrDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
+    expect(ifrDoc).toBeDefined();
+
+    // Insert a standard email row into the canvas
+    const rowHtml = `
+      <table class="row" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #f3f4f6;">
+        <tbody>
+          <tr>
+            <td>
+              <table class="row-content stack" align="center" width="600" style="background-color: #ffffff; width: 600px; margin: 0 auto; padding: 10px;">
+                <tbody>
+                  <tr>
+                    <td class="column column-1" width="100%" style="vertical-align: top;">
+                      <p>Row Content</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    ifrDoc!.body.insertAdjacentHTML('beforeend', rowHtml);
+    const rowEl = ifrDoc!.querySelector<HTMLElement>('table.row')!;
+    expect(rowEl).toBeTruthy();
+
+    // Select the row
+    (editor as any).canvas.selectUnit(rowEl, rowEl);
+
+    // Inspector title should say ROW PROPERTIES
+    const propTitle = container.querySelector('.arch-prop-title');
+    expect(propTitle?.textContent).toBe('ROW PROPERTIES');
+
+    // Bottom options accordion should dynamically say ROW OPTIONS
+    const optHeader = container.querySelector('#hdr-block-options span');
+    expect(optHeader?.textContent).toBe('ROW OPTIONS');
+
+    // Row settings should use .arch-rge-row and .arch-rge-label matching text properties
+    const rgeRows = container.querySelectorAll('#inspector-element-fields .arch-rge-row');
+    expect(rgeRows.length).toBeGreaterThanOrEqual(5);
+
+    const labels = Array.from(container.querySelectorAll('#inspector-element-fields .arch-rge-label')).map(
+      (l) => l.textContent?.trim()
+    );
+    expect(labels).toContain('Row background');
+    expect(labels).toContain('Content background');
+    expect(labels).toContain('Background image');
+    expect(labels).toContain('Content area border');
+    expect(labels).toContain('Vertical align');
+    expect(labels).toContain('Stack on mobile');
+    expect(labels).toContain('Column layout');
+
+    // Column preset grid should render sleek visual buttons
+    const presetBtns = container.querySelectorAll('.arch-col-preset-btn');
+    expect(presetBtns.length).toBe(6);
+
+    // ROW OPTIONS padding control adjusts .row-content table
+    const rowContent = rowEl.querySelector<HTMLElement>('.row-content')!;
+    const padAllInput = container.querySelector<HTMLInputElement>('#stp-pad-all');
+    expect(padAllInput).toBeTruthy();
+    padAllInput!.value = '35';
+    padAllInput!.dispatchEvent(new Event('change'));
+    expect(rowContent.style.padding).toBe('35px');
+  });
+
 });

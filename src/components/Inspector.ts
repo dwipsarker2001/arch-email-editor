@@ -6,10 +6,9 @@
  * customize any email element without breaking compound HTML or MSO VML.
  */
 
-import { EmailDocument, BlockNode, RowLayoutType, SelectedElementInfo, ViewportMode } from '../types';
+import { EmailDocument, BlockNode, SelectedElementInfo, ViewportMode } from '../types';
 import {
   ButtonAdapter,
-  ColumnLayoutAdapter,
   DividerAdapter,
   SocialAdapter,
   SpacerAdapter,
@@ -28,6 +27,7 @@ import {
 import { AssetsSidepanel, AssetItem } from './inspector/AssetsSidepanel';
 import { ImageInspector } from './inspector/ImageInspector';
 import { DocumentInspector } from './inspector/DocumentInspector';
+import { RowInspector } from './inspector/RowInspector';
 
 export interface InspectorEvents {
   onChange: (isDocumentSetting?: boolean) => void;
@@ -53,6 +53,7 @@ export type { AssetItem } from './inspector/AssetsSidepanel';
 export class Inspector {
   private imageInspector: ImageInspector;
   private documentInspector: DocumentInspector;
+  private rowInspector: RowInspector;
   private assetsPanel: AssetsSidepanel;
   private element: HTMLElement;
   private events: InspectorEvents;
@@ -73,6 +74,10 @@ export class Inspector {
     this.imageInspector = new ImageInspector(this.element, this.assetsPanel, this.events);
     this.documentInspector = new DocumentInspector(this.element, {
       onChange: (isDoc) => this.events.onChange(isDoc)
+    });
+    this.rowInspector = new RowInspector({
+      onChange: () => this.events.onChange(),
+      openAssetsPanel: (onSelect) => this.openAssetsPanel(onSelect)
     });
   }
 
@@ -130,16 +135,23 @@ export class Inspector {
       menu: 'MENU',
       html: 'HTML',
       row: 'ROW',
+      section: 'ROW',
       column: 'COLUMN'
     };
     const typeTitle = isDirectAnchor ? 'BUTTON' : (titleMap[info.type] || info.type.toUpperCase());
+    const optionsTitle = (info.type === 'row' || info.type === 'section') ? 'ROW OPTIONS' : info.type === 'column' ? 'COLUMN OPTIONS' : 'BLOCK OPTIONS';
 
     const targetUnit = info.unit || info.element;
-    const computedPad = parseInt(targetUnit.style.padding || info.element.style.padding || '20', 10) || 20;
-    const padTop = parseInt(targetUnit.style.paddingTop || '20', 10) || 20;
-    const padRight = parseInt(targetUnit.style.paddingRight || '20', 10) || 20;
-    const padBottom = parseInt(targetUnit.style.paddingBottom || '20', 10) || 20;
-    const padLeft = parseInt(targetUnit.style.paddingLeft || '20', 10) || 20;
+    const isRow = info.type === 'row' || info.type === 'section';
+    const rowContent = isRow ? (targetUnit.querySelector<HTMLElement>('.row-content') || targetUnit) : null;
+    const padTarget = rowContent || targetUnit;
+
+    const fallbackPad = isRow ? '0' : '20';
+    const computedPad = parseInt(padTarget.style.padding || info.element.style.padding || fallbackPad, 10) || (isRow ? 0 : 20);
+    const padTop = parseInt(padTarget.style.paddingTop || (padTarget.style.padding ? padTarget.style.padding : fallbackPad), 10) || (isRow ? 0 : 20);
+    const padRight = parseInt(padTarget.style.paddingRight || (padTarget.style.padding ? padTarget.style.padding : fallbackPad), 10) || (isRow ? 0 : 20);
+    const padBottom = parseInt(padTarget.style.paddingBottom || (padTarget.style.padding ? padTarget.style.padding : fallbackPad), 10) || (isRow ? 0 : 20);
+    const padLeft = parseInt(padTarget.style.paddingLeft || (padTarget.style.padding ? padTarget.style.padding : fallbackPad), 10) || (isRow ? 0 : 20);
     const padMoreExpanded = this.padMoreExpanded && this.padMoreUnit === targetUnit;
 
     this.element.innerHTML = `
@@ -164,7 +176,7 @@ export class Inspector {
       <div id="inspector-element-fields"></div>
 
       <div class="arch-accordion-header" id="hdr-block-options">
-        <span>BLOCK OPTIONS</span>
+        <span>${optionsTitle}</span>
         <span class="arch-accordion-arrow">▲</span>
       </div>
       <div class="arch-accordion-body" id="body-block-options" style="padding: 0; gap: 0;">
@@ -267,23 +279,23 @@ export class Inspector {
     });
 
     this.bindStepper(this.element, 'stp-pad-all', (val) => {
-      targetUnit.style.padding = `${val}px`;
+      padTarget.style.padding = `${val}px`;
       this.events.onChange();
     });
     this.bindStepper(this.element, 'stp-pad-top', (val) => {
-      targetUnit.style.paddingTop = `${val}px`;
+      padTarget.style.paddingTop = `${val}px`;
       this.events.onChange();
     });
     this.bindStepper(this.element, 'stp-pad-right', (val) => {
-      targetUnit.style.paddingRight = `${val}px`;
+      padTarget.style.paddingRight = `${val}px`;
       this.events.onChange();
     });
     this.bindStepper(this.element, 'stp-pad-bottom', (val) => {
-      targetUnit.style.paddingBottom = `${val}px`;
+      padTarget.style.paddingBottom = `${val}px`;
       this.events.onChange();
     });
     this.bindStepper(this.element, 'stp-pad-left', (val) => {
-      targetUnit.style.paddingLeft = `${val}px`;
+      padTarget.style.paddingLeft = `${val}px`;
       this.events.onChange();
     });
 
@@ -1464,155 +1476,7 @@ export class Inspector {
   }
 
   private renderSectionElementControls(container: HTMLElement, info: SelectedElementInfo): void {
-    const targetEl = info.unit || info.element;
-    const contentTable = targetEl.querySelector<HTMLElement>('.row-content') || targetEl;
-    const rowBg = toHexColor(targetEl.style.backgroundColor, '#ffffff');
-    const contentBg = toHexColor(contentTable.style.backgroundColor || info.backgroundColor, '#ffffff');
-
-    container.innerHTML = `
-      <div class="arch-accordion">
-        <!-- Accordion 1: Backgrounds -->
-        <div class="arch-accordion-header" data-toggle="row-bg">
-          <span>BACKGROUNDS</span>
-          <span class="arch-accordion-arrow">▲</span>
-        </div>
-        <div class="arch-accordion-body" id="sec-row-bg">
-          <div class="arch-form-row--split">
-            <label class="arch-form-label-sub">Row background</label>
-            ${this.renderColorPicker('swatch-row-bg', 'txt-row-bg', rowBg)}
-          </div>
-          <div class="arch-form-row--split">
-            <label class="arch-form-label-sub">Content background</label>
-            ${this.renderColorPicker('swatch-row-cnt-bg', 'txt-row-cnt-bg', contentBg)}
-          </div>
-          <div class="arch-form-row--split">
-            <label class="arch-form-label-sub">Row background image</label>
-            <label class="arch-toggle-switch">
-              <input type="checkbox" id="chk-row-bg-img" />
-              <span class="arch-toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Accordion 2: Borders -->
-        <div class="arch-accordion-header" data-toggle="row-borders">
-          <span>BORDERS</span>
-          <span class="arch-accordion-arrow">▲</span>
-        </div>
-        <div class="arch-accordion-body" id="sec-row-borders">
-          <div class="arch-form-row--split">
-            <label class="arch-form-label-sub">Content area border</label>
-            <label class="arch-toggle-switch">
-              <input type="checkbox" id="chk-row-border" />
-              <span class="arch-toggle-slider"></span>
-            </label>
-          </div>
-          <div class="arch-form-row--split">
-            <label class="arch-form-label-sub">Border style</label>
-            <select class="arch-select" id="sel-row-border-style" style="width: 140px;">
-              <option value="solid">Solid</option>
-              <option value="dashed">Dashed</option>
-              <option value="dotted">Dotted</option>
-            </select>
-          </div>
-          <div class="arch-form-row--split">
-            <label class="arch-form-label-sub">Border width</label>
-            ${this.renderStepper('stp-row-border-w', 0, 0, 20, 1)}
-          </div>
-          <div class="arch-form-row--split">
-            <label class="arch-form-label-sub">Rounded corners</label>
-            ${this.renderStepper('stp-row-radius', 0, 0, 50, 1)}
-          </div>
-        </div>
-
-        <!-- Accordion 3: Layout -->
-        <div class="arch-accordion-header" data-toggle="row-layout">
-          <span>LAYOUT</span>
-          <span class="arch-accordion-arrow">▲</span>
-        </div>
-        <div class="arch-accordion-body" id="sec-row-layout">
-          <div class="arch-form-row--split">
-            <label class="arch-form-label-sub">Content Area Padding</label>
-            ${this.renderStepper('stp-row-pad', 10, 0, 60, 5)}
-          </div>
-          <div class="arch-form-row--split">
-            <label class="arch-form-label-sub">Vertical align</label>
-            <div class="arch-segmented-group grp-row-valign">
-              <button type="button" class="arch-segmented-btn is-active" data-valign="top">Top</button>
-              <button type="button" class="arch-segmented-btn" data-valign="middle">Center</button>
-              <button type="button" class="arch-segmented-btn" data-valign="bottom">Bottom</button>
-            </div>
-          </div>
-          <div class="arch-form-row--split">
-            <label class="arch-form-label-sub">Stack on mobile</label>
-            <div class="arch-segmented-group grp-row-stack">
-              <button type="button" class="arch-segmented-btn is-active" data-stack="on">ON</button>
-              <button type="button" class="arch-segmented-btn" data-stack="off">OFF</button>
-            </div>
-          </div>
-          <div class="arch-form-group" style="margin-top: 8px;">
-            <label class="arch-form-label">Column Layout Preset</label>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-              <button type="button" class="arch-btn arch-btn--sm" data-col-preset="1-col">1 Col (100%)</button>
-              <button type="button" class="arch-btn arch-btn--sm" data-col-preset="2-col-50-50">2 Col (50/50)</button>
-              <button type="button" class="arch-btn arch-btn--sm" data-col-preset="2-col-33-67">2 Col (33/67)</button>
-              <button type="button" class="arch-btn arch-btn--sm" data-col-preset="2-col-67-33">2 Col (67/33)</button>
-              <button type="button" class="arch-btn arch-btn--sm" data-col-preset="3-col">3 Col (Equal)</button>
-              <button type="button" class="arch-btn arch-btn--sm" data-col-preset="4-col">4 Col (Equal)</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    this.bindColorPicker(container, 'swatch-row-bg', 'txt-row-bg', (val) => {
-      targetEl.style.backgroundColor = val;
-      this.events.onChange();
-    });
-
-    this.bindColorPicker(container, 'swatch-row-cnt-bg', 'txt-row-cnt-bg', (val) => {
-      contentTable.style.backgroundColor = val;
-      if (contentTable.tagName.toLowerCase() === 'td' || contentTable.tagName.toLowerCase() === 'table') {
-        contentTable.setAttribute('bgcolor', val);
-      }
-      this.events.onChange();
-    });
-
-    this.bindStepper(container, 'stp-row-pad', (val) => {
-      contentTable.style.padding = `${val}px`;
-      this.events.onChange();
-    });
-
-    this.bindStepper(container, 'stp-row-border-w', (val) => {
-      contentTable.style.borderWidth = `${val}px`;
-      this.events.onChange();
-    });
-
-    this.bindStepper(container, 'stp-row-radius', (val) => {
-      contentTable.style.borderRadius = `${val}px`;
-      this.events.onChange();
-    });
-
-    container.querySelectorAll<HTMLButtonElement>('[data-col-preset]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const preset = btn.getAttribute('data-col-preset') as RowLayoutType;
-        ColumnLayoutAdapter.applyRowPreset(targetEl, preset);
-        this.events.onChange();
-      });
-    });
-
-    // Toggle accordions inside Row Properties
-    container.querySelectorAll<HTMLElement>('.arch-accordion-header[data-toggle]').forEach((header) => {
-      header.addEventListener('click', () => {
-        const targetId = header.getAttribute('data-toggle');
-        const body = container.querySelector<HTMLElement>(`#sec-${targetId}`);
-        const arrow = header.querySelector<HTMLElement>('.arch-accordion-arrow');
-        if (body) {
-          const isHidden = body.classList.toggle('is-hidden');
-          if (arrow) arrow.textContent = isHidden ? '▼' : '▲';
-        }
-      });
-    });
+    this.rowInspector.renderSectionElementControls(container, info);
   }
 
   /**

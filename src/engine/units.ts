@@ -233,6 +233,7 @@ export function isButtonComponent(el: HTMLElement): boolean {
 export function isOuterWrapperTable(el: HTMLElement): boolean {
   if (el.tagName.toLowerCase() !== 'table') return false;
   if (el.classList.contains('nl-container')) return true;
+  if (isRowElement(el)) return false;
   const parent = el.parentElement;
   if (parent && parent.tagName.toLowerCase() === 'body') {
     const width = el.getAttribute('width') || el.style.width || '';
@@ -565,8 +566,9 @@ export function getParentStructuralUnit(unit: HTMLElement): HTMLElement | null {
 export function classifyUnitRole(unit: HTMLElement): UnitRole {
   if (!unit || !unit.tagName) return 'block';
   const tag = unit.tagName.toLowerCase();
-  if (tag === 'body' || tag === 'html' || isOuterWrapperTable(unit)) return 'body';
+  if (tag === 'body' || tag === 'html') return 'body';
   if (isRowElement(unit)) return 'row';
+  if (isOuterWrapperTable(unit)) return 'body';
   if (isColumnElement(unit)) return 'column';
   if (
     tag === 'a' ||

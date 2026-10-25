@@ -1148,6 +1148,123 @@
   color: #4b5563;
 }
 
+/* Column Layout Presets in Row Inspector */
+.arch-col-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.arch-col-preset-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.arch-col-preset-btn:hover {
+  background: #f3f4f6;
+  border-color: #cbd5e1;
+}
+
+.arch-col-preset-btn:active {
+  transform: translateY(1px);
+}
+
+.arch-col-preset-btn.is-active {
+  background: #f5f3ff;
+  border-color: #7747ff;
+  box-shadow: 0 0 0 1px #7747ff;
+}
+
+.arch-col-preset-btn.is-active .arch-col-preset-preview span {
+  background: #7747ff;
+}
+
+.arch-col-preset-btn.is-active .arch-col-preset-title {
+  color: #7747ff;
+  font-weight: 700;
+}
+
+.arch-col-preset-preview {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  height: 16px;
+  background: #e2e8f0;
+  padding: 2px;
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+
+.arch-col-preset-preview span {
+  display: block;
+  height: 100%;
+  background: #94a3b8;
+  border-radius: 2px;
+  transition: background 0.15s ease;
+}
+
+.arch-col-preset-btn:hover .arch-col-preset-preview span {
+  background: #7747ff;
+}
+
+.arch-col-preset-title {
+  font-size: 11px;
+  color: #4b5563;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.arch-theme--dark .arch-col-preset-btn {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.arch-theme--dark .arch-col-preset-btn:hover {
+  background: #283548;
+  border-color: #475569;
+}
+
+.arch-theme--dark .arch-col-preset-preview {
+  background: #0f172a;
+}
+
+.arch-theme--dark .arch-col-preset-preview span {
+  background: #475569;
+}
+
+.arch-theme--dark .arch-col-preset-btn:hover .arch-col-preset-preview span {
+  background: #818cf8;
+}
+
+.arch-theme--dark .arch-col-preset-title {
+  color: #cbd5e1;
+}
+
+.arch-theme--dark .arch-col-preset-btn.is-active {
+  background: #2e1065;
+  border-color: #818cf8;
+}
+
+.arch-theme--dark .arch-col-preset-btn.is-active .arch-col-preset-preview span {
+  background: #818cf8;
+}
+
+.arch-theme--dark .arch-col-preset-btn.is-active .arch-col-preset-title {
+  color: #c7d2fe;
+}
+
 .arch-segmented-icon-btn.is-active {
   background: #ede9fe;
   color: #7747ff;
@@ -3315,3 +3432,92 @@ input:checked + .arch-toggle-slider:before {
   border-color: #334155 !important;
   color: #f8fafc !important;
 }
+
+/* ==========================================================================
+   Full-Screen Zero Outer Page Scroll Enforcement
+   ========================================================================== */
+#editor-container {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  background-color: #f8fafc;
+  position: relative !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+#editor-container .arch-editor {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0% !important;
+  border: none !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#editor-container .arch-editor__toolbar {
+  flex-shrink: 0 !important;
+}
+
+#editor-container .arch-editor__body {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  display: flex !important;
+}
+
+#editor-container .arch-editor__canvas {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#editor-container .arch-canvas-container {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#editor-container .arch-canvas-iframe {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  width: 100% !important;
+  border: none !important;
+  display: block !important;
+}
+
+#editor-container .arch-editor__right-panel {
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+#editor-container .arch-right-tab-content {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
