@@ -1704,12 +1704,34 @@ export class Inspector {
         return;
       }
 
+      // 1. Ensure this image element is selected first
+      this.events.onSelectElementNode?.(info.element);
+
+      // 2. Centered loading on dark overlay in sidebar image area
       const previewBox = container.querySelector<HTMLElement>('#arch-img-preview-box');
-      previewBox?.classList.add('is-uploading');
+      if (previewBox) {
+        previewBox.classList.add('is-uploading');
+        let overlay = previewBox.querySelector<HTMLElement>('.arch-preview-uploading-overlay');
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.className = 'arch-preview-uploading-overlay';
+          overlay.innerHTML = `
+            <svg class="arch-spinner" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="12" cy="12" r="10" stroke="rgba(255, 255, 255, 0.25)"></circle>
+              <path d="M12 2a10 10 0 0 1 10 10" stroke="#ffffff" stroke-linecap="round"></path>
+            </svg>
+            <span>Uploading...</span>
+          `;
+          previewBox.appendChild(overlay);
+        }
+      }
 
       const formattedKb = ((file.size / 1024).toFixed(2)) + 'kb';
       this.events.onUploadImage(file, (url: string) => {
-        previewBox?.classList.remove('is-uploading');
+        if (previewBox) {
+          previewBox.classList.remove('is-uploading');
+          previewBox.querySelector('.arch-preview-uploading-overlay')?.remove();
+        }
         if (url) {
           const newAsset: AssetItem = {
             id: 'asset-' + Date.now(),
@@ -1720,6 +1742,8 @@ export class Inspector {
           this.customAssets.unshift(newAsset);
           // Directly select and apply the uploaded image to the template canvas
           applySelectedUrl(url, file.name, file.size);
+          // Keep image selected
+          this.events.onSelectElementNode?.(info.element);
         }
       });
       fileInput.value = '';
