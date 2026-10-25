@@ -871,6 +871,23 @@
   border-radius: 2px;
   cursor: pointer;
   flex-shrink: 0;
+  background: none;
+  overflow: hidden;
+}
+
+/* Fill the swatch completely with the chosen color (strip UA padding/border) */
+.arch-color-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.arch-color-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 1px;
+}
+
+.arch-color-swatch::-moz-color-swatch {
+  border: none;
+  border-radius: 1px;
 }
 
 .arch-color-hex {
@@ -973,36 +990,6 @@ input:checked + .arch-toggle-slider:before {
 .arch-icon-btn:hover {
   background: #f3f4f6;
   color: #111827;
-}
-
-.arch-ai-bar {
-  padding: 14px 18px 8px 18px;
-}
-
-.arch-ai-btn {
-  width: 100%;
-  height: 36px;
-  background: #7747ff;
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  padding: 0 14px;
-  font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.arch-ai-btn:hover {
-  background: #6336e0;
-}
-
-.arch-ai-btn:hover {
-  background: #6336e0;
 }
 
 /* Center Canvas - Full width touching sidebars */
@@ -1566,6 +1553,14 @@ input:checked + .arch-toggle-slider:before {
 .arch-resize-handle--ne,
 .arch-resize-handle--sw {
   cursor: nesw-resize;
+}
+
+.arch-resize-handle--e,
+.arch-resize-handle--w {
+  cursor: ew-resize;
+  width: 8px;
+  height: 18px;
+  border-radius: 4px;
 }
 
 .arch-img-resize-row {

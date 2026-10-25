@@ -217,6 +217,69 @@ export const ButtonAdapter = {
       padCell.setAttribute('align', align);
       padCell.style.textAlign = align;
     }
+  },
+
+  getWidth(el: HTMLElement, unit?: HTMLElement): string {
+    const { anchor, visualBox } = resolveButtonAnatomy(el, unit);
+    return visualBox.style.width || anchor.style.width || '';
+  },
+
+  setWidth(el: HTMLElement, width: string, unit?: HTMLElement): void {
+    const { anchor, visualBox, msoComments } = resolveButtonAnatomy(el, unit);
+    const norm = /^\d+$/.test(width.trim()) ? `${width.trim()}px` : width.trim();
+    visualBox.style.width = norm;
+    visualBox.style.boxSizing = 'border-box';
+    visualBox.style.display = 'inline-block';
+    visualBox.style.textAlign = 'center';
+
+    if (visualBox !== anchor) {
+      anchor.style.width = norm;
+      anchor.style.boxSizing = 'border-box';
+      anchor.style.display = 'inline-block';
+      anchor.style.textAlign = 'center';
+    }
+
+    const px = parseFloat(norm);
+    if (!isNaN(px)) {
+      for (const c of msoComments) {
+        if (c.nodeValue && /width\s*:\s*[^;"]+/i.test(c.nodeValue)) {
+          c.nodeValue = c.nodeValue.replace(/width\s*:\s*[^;"]+/i, `width:${norm}`);
+        }
+      }
+    }
+  },
+
+  getPaddingY(el: HTMLElement, unit?: HTMLElement): number {
+    const { anchor, visualBox } = resolveButtonAnatomy(el, unit);
+    const padTop = parseInt(visualBox.style.paddingTop || anchor.style.paddingTop || '', 10);
+    if (!isNaN(padTop) && padTop > 0) return padTop;
+    const pad = visualBox.style.padding || anchor.style.padding || '';
+    const parts = pad.trim().split(/\s+/);
+    if (parts.length >= 1) {
+      const p = parseInt(parts[0], 10);
+      if (!isNaN(p)) return p;
+    }
+    return 12;
+  },
+
+  setPaddingY(el: HTMLElement, padY: string, unit?: HTMLElement): void {
+    const { anchor, visualBox, msoComments } = resolveButtonAnatomy(el, unit);
+    const norm = /^\d+$/.test(padY.trim()) ? `${padY.trim()}px` : padY.trim();
+    visualBox.style.paddingTop = norm;
+    visualBox.style.paddingBottom = norm;
+    if (visualBox !== anchor) {
+      anchor.style.paddingTop = norm;
+      anchor.style.paddingBottom = norm;
+    }
+    const px = parseFloat(norm);
+    if (!isNaN(px)) {
+      for (const c of msoComments) {
+        if (c.nodeValue && /height\s*:\s*[^;"]+/i.test(c.nodeValue)) {
+          const totalHeight = px * 2 + 20;
+          c.nodeValue = c.nodeValue.replace(/height\s*:\s*[^;"]+/i, `height:${totalHeight}px`);
+        }
+      }
+    }
   }
 };
 
@@ -453,6 +516,31 @@ export const TextAdapter = {
     if (padCell && viewport === 'desktop') {
       padCell.setAttribute('align', align);
       padCell.style.textAlign = align;
+    }
+  },
+
+  getFontSize(el: HTMLElement, unit?: HTMLElement): number {
+    const host = this.getTextHost(el, unit);
+    const parsed = parseInt(host.style.fontSize || '', 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+    const comp = host.ownerDocument?.defaultView?.getComputedStyle(host).fontSize;
+    return parseInt(comp || '16', 10) || 16;
+  },
+
+  getWidth(el: HTMLElement, unit?: HTMLElement): string {
+    const host = this.getTextHost(el, unit);
+    return host.style.maxWidth || host.style.width || '';
+  },
+
+  setWidth(el: HTMLElement, width: string, unit?: HTMLElement): void {
+    const host = this.getTextHost(el, unit);
+    const norm = /^\d+$/.test(width.trim()) ? `${width.trim()}px` : width.trim();
+    host.style.maxWidth = norm;
+    host.style.display = 'inline-block';
+    host.style.boxSizing = 'border-box';
+    const parent = host.parentElement;
+    if (parent && parent.tagName.toLowerCase() === 'div' && !parent.classList.contains('alignment')) {
+      parent.style.maxWidth = norm;
     }
   }
 };

@@ -265,6 +265,41 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     editor.destroy();
   });
 
+  it('keeps per-side padding inputs open after changing a side padding', () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML(PUMPKIN_EXCERPT);
+
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+
+    const textBlock = ifrDoc.querySelector('.text_block.block-1') as HTMLElement;
+    textBlock.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const moreChk = container.querySelector('#chk-pad-more') as HTMLInputElement;
+    const singleRow = container.querySelector('#row-pad-single') as HTMLElement;
+    const multiRow = container.querySelector('#row-pad-multi') as HTMLElement;
+    expect(moreChk.checked).toBe(false);
+    expect(singleRow.style.display).not.toBe('none');
+
+    moreChk.checked = true;
+    moreChk.dispatchEvent(new Event('change'));
+    expect(singleRow.style.display).toBe('none');
+    expect(multiRow.style.display).toBe('block');
+
+    const topInp = container.querySelector('#stp-pad-top') as HTMLInputElement;
+    topInp.value = '33';
+    topInp.dispatchEvent(new Event('change'));
+
+    // A property change re-renders the inspector; the expanded state must survive it.
+    const moreAfter = container.querySelector('#chk-pad-more') as HTMLInputElement;
+    expect(moreAfter.checked).toBe(true);
+    expect((container.querySelector('#row-pad-single') as HTMLElement).style.display).toBe('none');
+    expect((container.querySelector('#row-pad-multi') as HTMLElement).style.display).toBe('block');
+    expect((container.querySelector('#stp-pad-top') as HTMLInputElement).value).toBe('33');
+
+    editor.destroy();
+  });
+
   it('R14, R15, R16: never marks linked images (<a><img/></a>) contenteditable, and resizes/aligns wrapper <div style="max-width"> in sync', () => {
     const editor = ArchEmailEditor.create(container);
     editor.importHTML(PUMPKIN_EXCERPT);

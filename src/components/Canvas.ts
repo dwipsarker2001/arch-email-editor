@@ -38,6 +38,7 @@ import {
   getParentStructuralUnit,
   getUnitAncestry,
   isColumnElement,
+  isButtonComponent,
   isEditableTextHost,
   isOuterWrapperTable,
   isRowElement,
@@ -60,7 +61,9 @@ import {
   ColumnLayoutAdapter,
   ensureEmptyColumnPlaceholders,
   findPrimaryContentContainer,
-  ImageAdapter
+  ImageAdapter,
+  resolveButtonAnatomy,
+  TextAdapter
 } from '../engine/adapters';
 import { validateEmailStructure } from '../engine/history';
 
@@ -119,13 +122,20 @@ export class Canvas {
   private displaceKey = '';
   private dropMemoDragged: HTMLElement | null = null;
   private slotRectCache = new Map<HTMLElement, { rect: DOMRect; scrollX: number; scrollY: number }>();
-  private activeImageResize: {
-    img: HTMLElement;
+  private activeElementResize: {
+    kind: 'image' | 'button' | 'text';
+    target: HTMLElement;
     unit: HTMLElement;
     startX: number;
+    startY: number;
     startWidth: number;
+    startHeight: number;
     maxWidth: number;
-    dir: 1 | -1;
+    dirX: number;
+    dirY: number;
+    mode: 'box' | 'font';
+    startFontSize?: number;
+    startPadY?: number;
   } | null = null;
   private columnResizeHandles: HTMLElement[] = [];
   private activeColumnResize: {
@@ -273,8 +283,8 @@ export class Canvas {
         this.handleColumnResizeMove(e.clientX);
         return;
       }
-      if (this.activeImageResize) {
-        this.handleImageResizeMove(e.clientX);
+      if (this.activeElementResize) {
+        this.handleElementResizeMove(e.clientX, e.clientY);
         return;
       }
       if (!this.pointerDragCandidate) return;
@@ -292,8 +302,8 @@ export class Canvas {
         this.finishColumnResize();
         return;
       }
-      if (this.activeImageResize) {
-        this.finishImageResize();
+      if (this.activeElementResize) {
+        this.finishElementResize();
         return;
       }
       if (!this.pointerDragCandidate) return;
@@ -451,40 +461,75 @@ export class Canvas {
   }
 
   /**
-   * Resizes the active image live as the user drags a corner `.arch-resize-handle`.
+   * Resizes the active element (image, button, text) live as the user drags an `.arch-resize-handle`.
    */
-  private handleImageResizeMove(clientX: number): void {
-    const state = this.activeImageResize;
+  private handleElementResizeMove(clientX: number, clientY: number): void {
+    const state = this.activeElementResize;
     if (!state) return;
 
-    const deltaX = (clientX - state.startX) * state.dir;
-    const nextWidth = Math.round(Math.max(24, Math.min(state.maxWidth, state.startWidth + deltaX)));
-    ImageAdapter.setWidth(state.img, `${nextWidth}px`, state.unit);
+    const deltaX = (clientX - state.startX) * state.dirX;
+    const deltaY = (clientY - state.startY) * state.dirY;
 
-    if (this.floatingToolbar) {
-      this.positionFloatingToolbar(state.unit, this.floatingToolbar);
-    }
     if (!this.dimensionsBadge) {
       const dim = document.createElement('div');
       dim.className = 'arch-dimensions-pill';
       this.overlayLayer.appendChild(dim);
       this.dimensionsBadge = dim;
     }
-    const rect = state.img.getBoundingClientRect();
-    const h = rect.height > 0 ? Math.round(rect.height) : Math.round(nextWidth);
-    this.dimensionsBadge.textContent = `${nextWidth} × ${h}`;
+
+    if (state.kind === 'image') {
+      const nextWidth = Math.round(Math.max(24, Math.min(state.maxWidth, state.startWidth + deltaX)));
+      ImageAdapter.setWidth(state.target, `${nextWidth}px`, state.unit);
+      const rect = state.target.getBoundingClientRect();
+      const h = rect.height > 0 ? Math.round(rect.height) : Math.round(nextWidth);
+      this.dimensionsBadge.textContent = `${nextWidth} × ${h}`;
+    } else if (state.kind === 'button') {
+      const nextWidth = Math.round(Math.max(40, Math.min(state.maxWidth, state.startWidth + deltaX)));
+      ButtonAdapter.setWidth(state.target, `${nextWidth}px`, state.unit);
+      if (state.dirY !== 0 && state.startPadY !== undefined) {
+        const nextPadY = Math.round(Math.max(4, Math.min(48, state.startPadY + deltaY)));
+        ButtonAdapter.setPaddingY(state.target, `${nextPadY}px`, state.unit);
+      }
+      const rect = state.target.getBoundingClientRect();
+      this.dimensionsBadge.textContent = `${nextWidth} × ${Math.round(rect.height)}`;
+    } else if (state.kind === 'text') {
+      if (state.mode === 'font' && state.startFontSize !== undefined) {
+        const combinedDelta = (deltaX + deltaY) / 2;
+        const nextSize = Math.round(Math.max(10, Math.min(96, state.startFontSize + combinedDelta / 8)));
+        TextAdapter.setFontSize(state.target, `${nextSize}px`, this.viewportMode, state.unit);
+        const rect = state.target.getBoundingClientRect();
+        this.dimensionsBadge.textContent = `Font: ${nextSize}px (${Math.round(rect.width)} × ${Math.round(rect.height)})`;
+      } else {
+        const nextWidth = Math.round(Math.max(60, Math.min(state.maxWidth, state.startWidth + deltaX)));
+        TextAdapter.setWidth(state.target, `${nextWidth}px`, state.unit);
+        this.dimensionsBadge.textContent = `Width: ${nextWidth}px`;
+      }
+    }
+
+    this.positionFloatingToolbar(state.unit, this.floatingToolbar || undefined);
+
+    const targetRect = state.target.getBoundingClientRect();
+    const containerRect = this.containerElement.getBoundingClientRect();
+    this.dimensionsBadge.style.left = `${targetRect.left - containerRect.left + targetRect.width / 2}px`;
+    this.dimensionsBadge.style.top = `${Math.max(4, targetRect.top - containerRect.top - 24)}px`;
   }
 
   /**
-   * Commits an interactive image resize operation and syncs the Inspector & history.
+   * Commits an interactive element resize operation and syncs the Inspector & history.
    */
-  private finishImageResize(): void {
-    const state = this.activeImageResize;
+  private finishElementResize(): void {
+    const state = this.activeElementResize;
     if (!state) return;
-    this.activeImageResize = null;
+    this.activeElementResize = null;
     this.suppressNextClick = true;
     this.overlayLayer.style.pointerEvents = 'none';
-    this.selectUnit(state.img, state.unit);
+
+    if (this.dimensionsBadge) {
+      this.dimensionsBadge.remove();
+      this.dimensionsBadge = null;
+    }
+
+    this.selectUnit(state.target, state.unit);
     this.adjustHeight();
     this.onStructureChanged();
   }
@@ -1407,8 +1452,8 @@ export class Canvas {
           this.handleColumnResizeMove(iframeRect.left + e.clientX);
           return;
         }
-        if (this.activeImageResize) {
-          this.handleImageResizeMove(iframeRect.left + e.clientX);
+        if (this.activeElementResize) {
+          this.handleElementResizeMove(iframeRect.left + e.clientX, iframeRect.top + e.clientY);
           return;
         }
         if (!this.pointerDragCandidate) return;
@@ -1424,8 +1469,8 @@ export class Canvas {
           this.finishColumnResize();
           return;
         }
-        if (this.activeImageResize) {
-          this.finishImageResize();
+        if (this.activeElementResize) {
+          this.finishElementResize();
           return;
         }
         if (!this.pointerDragCandidate) return;
@@ -2244,50 +2289,153 @@ export class Canvas {
       this.floatingToolbar = textToolbar;
     }
 
-    // 4. Image Resize Handles (corner handles for images)
-    if (this.activeMoveableUnit === unit) {
+    // 4. Element Resize Handles (Corner & Side Handles for Image, Button, Text)
+    if (this.activeMoveableUnit === unit && !isRowElement(unit) && !isColumnElement(unit)) {
       const targetEl = innerTarget || this.selectedElement || unit;
+
       const isDirectImageSelected =
         unit.tagName.toLowerCase() === 'img' ||
         (targetEl.tagName.toLowerCase() === 'img' && targetEl !== unit);
       const targetImg = isDirectImageSelected ? ImageAdapter.findImage(targetEl, unit) : null;
 
+      const isButton =
+        !targetImg &&
+        (isButtonComponent(targetEl) ||
+          (isButtonComponent(unit) && !unit.classList.contains('image_block')));
+      const targetBtn = isButton ? resolveButtonAnatomy(targetEl, unit).anchor : null;
+
+      const isText =
+        !targetImg &&
+        !isButton &&
+        !this.isEditingText &&
+        (unit.classList.contains('paragraph_block') ||
+          unit.classList.contains('heading_block') ||
+          unit.classList.contains('text_block') ||
+          /^(h[1-6]|p|blockquote)$/i.test(targetEl.tagName) ||
+          /^(h[1-6]|p|blockquote)$/i.test(unit.tagName));
+      const targetText = isText ? TextAdapter.getTextHost(targetEl, unit) : null;
+
+      let resizableTarget: HTMLElement | null = null;
+      let resizableKind: 'image' | 'button' | 'text' | null = null;
+
       if (targetImg) {
-        const corners: Array<{ corner: 'nw' | 'ne' | 'sw' | 'se'; dir: 1 | -1 }> = [
-          { corner: 'nw', dir: -1 },
-          { corner: 'ne', dir: 1 },
-          { corner: 'sw', dir: -1 },
-          { corner: 'se', dir: 1 }
+        resizableTarget = targetImg;
+        resizableKind = 'image';
+      } else if (targetBtn) {
+        resizableTarget = targetBtn;
+        resizableKind = 'button';
+      } else if (targetText) {
+        resizableTarget = targetText;
+        resizableKind = 'text';
+      }
+
+      if (resizableTarget && resizableKind) {
+        const handleDefs: Array<{
+          side: 'nw' | 'ne' | 'sw' | 'se' | 'e' | 'w';
+          dirX: number;
+          dirY: number;
+          mode: 'box' | 'font';
+          title: string;
+        }> = [
+          {
+            side: 'nw',
+            dirX: -1,
+            dirY: -1,
+            mode: resizableKind === 'text' ? 'font' : 'box',
+            title: resizableKind === 'text' ? 'Drag to scale font size' : `Drag to resize ${resizableKind}`
+          },
+          {
+            side: 'ne',
+            dirX: 1,
+            dirY: -1,
+            mode: resizableKind === 'text' ? 'font' : 'box',
+            title: resizableKind === 'text' ? 'Drag to scale font size' : `Drag to resize ${resizableKind}`
+          },
+          {
+            side: 'sw',
+            dirX: -1,
+            dirY: 1,
+            mode: resizableKind === 'text' ? 'font' : 'box',
+            title: resizableKind === 'text' ? 'Drag to scale font size' : `Drag to resize ${resizableKind}`
+          },
+          {
+            side: 'se',
+            dirX: 1,
+            dirY: 1,
+            mode: resizableKind === 'text' ? 'font' : 'box',
+            title: resizableKind === 'text' ? 'Drag to scale font size' : `Drag to resize ${resizableKind}`
+          },
+          {
+            side: 'e',
+            dirX: 1,
+            dirY: 0,
+            mode: 'box',
+            title: `Drag to resize ${resizableKind} width`
+          },
+          {
+            side: 'w',
+            dirX: -1,
+            dirY: 0,
+            mode: 'box',
+            title: `Drag to resize ${resizableKind} width`
+          }
         ];
-        for (const { corner, dir } of corners) {
+
+        for (const def of handleDefs) {
           const handle = document.createElement('div');
-          handle.className = `arch-resize-handle arch-resize-handle--${corner}`;
-          handle.dataset.corner = corner;
-          handle.title = 'Drag to resize image';
+          handle.className = `arch-resize-handle arch-resize-handle--${def.side}`;
+          handle.dataset.corner = def.side;
+          handle.dataset.side = def.side;
+          handle.title = def.title;
+
           handle.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
             e.preventDefault();
             e.stopPropagation();
-            const imgRect = targetImg.getBoundingClientRect();
-            const parsedWidth =
-              parseInt(ImageAdapter.getWidth(targetImg, unit), 10) ||
-              parseInt(targetImg.getAttribute('width') || '', 10) ||
-              200;
-            const startWidth = imgRect.width > 0 ? imgRect.width : parsedWidth;
-            const colCell = targetImg.closest('td, th') as HTMLElement | null;
+
+            const rect = resizableTarget!.getBoundingClientRect();
+            const colCell = resizableTarget!.closest('td, th') as HTMLElement | null;
             const colWidth = colCell?.getBoundingClientRect().width || 0;
             const maxWidth = colWidth > 40 ? Math.round(colWidth) : 600;
 
-            this.activeImageResize = {
-              img: targetImg,
+            let parsedWidth = 120;
+            if (resizableKind === 'image') {
+              parsedWidth =
+                parseInt(ImageAdapter.getWidth(resizableTarget!, unit), 10) ||
+                parseInt(resizableTarget!.getAttribute('width') || '', 10) ||
+                200;
+            } else if (resizableKind === 'button') {
+              parsedWidth =
+                parseInt(ButtonAdapter.getWidth(resizableTarget!, unit), 10) ||
+                parseInt(resizableTarget!.style.width || '', 10) ||
+                140;
+            } else if (resizableKind === 'text') {
+              parsedWidth =
+                parseInt(TextAdapter.getWidth(resizableTarget!, unit), 10) ||
+                colWidth ||
+                300;
+            }
+            const startWidth = rect.width > 0 ? rect.width : parsedWidth;
+
+            this.activeElementResize = {
+              kind: resizableKind!,
+              target: resizableTarget!,
               unit,
               startX: e.clientX,
+              startY: e.clientY,
               startWidth,
+              startHeight: rect.height > 0 ? rect.height : 40,
               maxWidth: Math.max(maxWidth, Math.round(startWidth)),
-              dir
+              dirX: def.dirX,
+              dirY: def.dirY,
+              mode: def.mode,
+              startFontSize: resizableKind === 'text' ? TextAdapter.getFontSize(resizableTarget!, unit) : undefined,
+              startPadY: resizableKind === 'button' ? ButtonAdapter.getPaddingY(resizableTarget!, unit) : undefined
             };
+
             this.overlayLayer.style.pointerEvents = 'auto';
           });
+
           this.overlayLayer.appendChild(handle);
           this.resizeHandles.push(handle);
         }
@@ -2407,25 +2555,71 @@ export class Canvas {
       tb.style.left = `${left}px`;
     }
 
-    // 4. Image resize handles
+    // 4. Element resize handles (Image, Button, Text)
     const targetEl = this.selectedElement || unit;
-    const targetImg =
-      this.resizeHandles.length > 0 ? ImageAdapter.findImage(targetEl, unit) : null;
+    const isRowOrCol = isRowElement(unit) || isColumnElement(unit);
+
+    const isDirectImageSelected =
+      !isRowOrCol &&
+      (unit.tagName.toLowerCase() === 'img' ||
+        (targetEl.tagName.toLowerCase() === 'img' && targetEl !== unit));
+    const targetImg = isDirectImageSelected ? ImageAdapter.findImage(targetEl, unit) : null;
+
+    const isButton =
+      !isRowOrCol &&
+      !targetImg &&
+      (isButtonComponent(targetEl) ||
+        (isButtonComponent(unit) && !unit.classList.contains('image_block')));
+    const isText =
+      !isRowOrCol &&
+      !targetImg &&
+      !isButton &&
+      !this.isEditingText &&
+      (unit.classList.contains('paragraph_block') ||
+        unit.classList.contains('heading_block') ||
+        unit.classList.contains('text_block') ||
+        /^(h[1-6]|p|blockquote)$/i.test(targetEl.tagName) ||
+        /^(h[1-6]|p|blockquote)$/i.test(unit.tagName));
+
+    let targetNode: HTMLElement | null = null;
+    if (this.resizeHandles.length > 0) {
+      if (targetImg) {
+        targetNode = targetImg;
+      } else if (isButton) {
+        targetNode = resolveButtonAnatomy(targetEl, unit).anchor;
+      } else if (isText) {
+        targetNode = TextAdapter.getTextHost(targetEl, unit);
+      }
+    }
+
     const targetRect =
-      targetImg && targetImg.getBoundingClientRect().width > 0
-        ? targetImg.getBoundingClientRect()
+      targetNode && targetNode.getBoundingClientRect().width > 0
+        ? targetNode.getBoundingClientRect()
         : unitRect;
 
     for (const handle of this.resizeHandles) {
-      const corner = handle.dataset.corner;
-      const hTop =
-        corner === 'nw' || corner === 'ne'
-          ? offsetY + targetRect.top - 5
-          : offsetY + targetRect.bottom - 5;
-      const hLeft =
-        corner === 'nw' || corner === 'sw'
-          ? offsetX + targetRect.left - 5
-          : offsetX + targetRect.right - 5;
+      const side = handle.dataset.side || handle.dataset.corner;
+      let hTop = 0;
+      let hLeft = 0;
+
+      if (side === 'nw' || side === 'ne') {
+        hTop = offsetY + targetRect.top - 5;
+      } else if (side === 'sw' || side === 'se') {
+        hTop = offsetY + targetRect.bottom - 5;
+      } else if (side === 'e' || side === 'w') {
+        hTop = offsetY + targetRect.top + targetRect.height / 2 - 9;
+      }
+
+      if (side === 'nw' || side === 'sw') {
+        hLeft = offsetX + targetRect.left - 5;
+      } else if (side === 'ne' || side === 'se') {
+        hLeft = offsetX + targetRect.right - 5;
+      } else if (side === 'e') {
+        hLeft = offsetX + targetRect.right - 4;
+      } else if (side === 'w') {
+        hLeft = offsetX + targetRect.left - 4;
+      }
+
       handle.style.top = `${hTop}px`;
       handle.style.left = `${hLeft}px`;
     }
@@ -2487,7 +2681,7 @@ export class Canvas {
       this.columnResizeHandles.forEach((h) => h.remove());
       this.columnResizeHandles = [];
     }
-    if (!this.pointerDragCandidate?.active && !this.activeImageResize && !this.activeColumnResize) {
+    if (!this.pointerDragCandidate?.active && !this.activeElementResize && !this.activeColumnResize) {
       this.overlayLayer.style.pointerEvents = 'none';
     }
   }
