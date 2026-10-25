@@ -1074,6 +1074,7 @@ export class Inspector {
     if (notice) {
       const span = notice.querySelector('span');
       if (span) span.textContent = msg;
+      notice.classList.add('is-visible');
       notice.style.display = 'flex';
     }
   }
@@ -1147,6 +1148,11 @@ export class Inspector {
     });
 
     uploadBtn?.addEventListener('click', () => {
+      if (!this.events.onUploadImage) {
+        closePanel();
+        this.showUploadNotice('Upload is not setup yet, check documentation.');
+        return;
+      }
       uploadInput?.click();
     });
 
@@ -1456,7 +1462,10 @@ export class Inspector {
 
       if (cleanUrl) {
         const notice = this.element.querySelector<HTMLElement>('#arch-img-upload-notice');
-        if (notice) notice.style.display = 'none';
+        if (notice) {
+          notice.classList.remove('is-visible');
+          notice.style.display = 'none';
+        }
         if (previewImg) previewImg.src = cleanUrl;
         previewBox?.classList.add('has-image');
         previewBox?.classList.remove('is-empty');
@@ -1533,6 +1542,12 @@ export class Inspector {
       e.stopPropagation();
       replaceDropdown?.classList.remove('is-open');
       replaceMenu?.classList.remove('is-open');
+
+      if (!this.events.onUploadImage) {
+        this.showUploadNotice('Upload is not setup yet, check documentation.');
+        return;
+      }
+
       fileInput?.click();
     });
 

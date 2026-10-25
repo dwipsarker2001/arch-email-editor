@@ -2955,7 +2955,7 @@ input:checked + .arch-toggle-slider:before {
 /* Upload Warning Notice on top of image preview */
 .arch-editor .arch-img-upload-notice,
 .arch-img-upload-notice {
-  display: flex !important;
+  display: none !important;
   align-items: center !important;
   gap: 7px !important;
   background: #fef2f2 !important;
@@ -2968,6 +2968,11 @@ input:checked + .arch-toggle-slider:before {
   font-weight: 500 !important;
   line-height: 1.35 !important;
   box-sizing: border-box !important;
+}
+
+.arch-editor .arch-img-upload-notice.is-visible,
+.arch-img-upload-notice.is-visible {
+  display: flex !important;
 }
 
 .arch-editor .arch-img-upload-notice svg,

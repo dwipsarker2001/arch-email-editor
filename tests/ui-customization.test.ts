@@ -150,18 +150,15 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
       expect(previewTag.src).toBe('https://example.com/new-photo.jpg');
     }
 
-    // Verify upload notice appears if upload system is not configured
-    const fileInput = container.querySelector<HTMLInputElement>('#inp-img-file-upload');
+    // Verify upload notice is hidden initially and appears on upload option click
+    const uploadOpt = container.querySelector<HTMLButtonElement>('#opt-img-upload');
     const notice = container.querySelector<HTMLElement>('#arch-img-upload-notice');
     expect(notice).not.toBeNull();
+    expect(notice?.classList.contains('is-visible')).toBe(false);
 
-    const dummyFile = new File(['test'], 'photo.png', { type: 'image/png' });
-    Object.defineProperty(fileInput, 'files', {
-      value: [dummyFile],
-      configurable: true
-    });
-    fileInput?.dispatchEvent(new Event('change'));
-    expect(notice?.style.display).toBe('flex');
+    // Clicking upload option when upload is not setup triggers the warning notice
+    uploadOpt?.click();
+    expect(notice?.classList.contains('is-visible')).toBe(true);
     expect(notice?.textContent).toContain('Upload is not setup yet, check documentation.');
   });
 
