@@ -3544,3 +3544,160 @@ body.arch-canvas-dragging *,
   overflow-x: hidden !important;
 }
 
+/* Component Save Sidepanel */
+.arch-editor .arch-component-sidepanel,
+.arch-component-sidepanel {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: #ffffff !important;
+  z-index: 100 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  transform: translateX(100%) !important;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.arch-editor .arch-component-sidepanel.is-open,
+.arch-component-sidepanel.is-open {
+  transform: translateX(0) !important;
+}
+
+.arch-editor .arch-component-header,
+.arch-component-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  padding: 12px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-component-header .arch-prop-title,
+.arch-component-header .arch-prop-title {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+}
+
+.arch-editor .arch-component-body,
+.arch-component-body {
+  flex: 1 1 0% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 16px !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-component-preview-label,
+.arch-component-preview-label {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  margin-bottom: 8px !important;
+}
+
+.arch-editor .arch-component-preview-wrap,
+.arch-component-preview-wrap {
+  flex: 1 1 0% !important;
+  min-height: 200px !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  overflow: auto !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+}
+
+.arch-editor .arch-component-preview-stage,
+.arch-component-preview-stage {
+  width: 100% !important;
+  max-width: 600px !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+.arch-editor .arch-component-footer,
+.arch-component-footer {
+  padding: 16px !important;
+  border-top: 1px solid #f1f5f9 !important;
+  background: #ffffff !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+}
+
+.arch-editor .arch-component-name-label,
+.arch-component-name-label {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.arch-editor .arch-component-name-input,
+.arch-component-name-input {
+  width: 100% !important;
+  height: 36px !important;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  padding: 0 12px !important;
+  font-size: 13px !important;
+  color: #0f172a !important;
+  box-sizing: border-box !important;
+  outline: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.arch-editor .arch-component-name-input:focus,
+.arch-component-name-input:focus {
+  border-color: #7747ff !important;
+  box-shadow: 0 0 0 2px rgba(119, 71, 255, 0.15) !important;
+}
+
+/* Dark theme overrides */
+.arch-theme--dark .arch-component-sidepanel {
+  background: #18191b !important;
+  color: #e2e8f0 !important;
+}
+.arch-theme--dark .arch-component-header,
+.arch-theme--dark .arch-component-footer {
+  background: #18191b !important;
+  border-color: #27272a !important;
+}
+.arch-theme--dark .arch-component-header .arch-prop-title {
+  color: #f1f5f9 !important;
+}
+.arch-theme--dark .arch-component-name-label {
+  color: #94a3b8 !important;
+}
+.arch-theme--dark .arch-component-preview-wrap {
+  background: #0f172a !important;
+  border-color: #27272a !important;
+}
+.arch-theme--dark .arch-component-name-input {
+  background: #27272a !important;
+  border-color: #3f3f46 !important;
+  color: #f8fafc !important;
+}
+

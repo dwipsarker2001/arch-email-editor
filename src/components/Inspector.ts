@@ -28,6 +28,7 @@ import { AssetsSidepanel, AssetItem } from './inspector/AssetsSidepanel';
 import { ImageInspector } from './inspector/ImageInspector';
 import { DocumentInspector } from './inspector/DocumentInspector';
 import { RowInspector } from './inspector/RowInspector';
+import { ComponentSidepanel } from './inspector/ComponentSidepanel';
 
 export interface InspectorEvents {
   onChange: (isDocumentSetting?: boolean) => void;
@@ -55,6 +56,8 @@ export class Inspector {
   private documentInspector: DocumentInspector;
   private rowInspector: RowInspector;
   private assetsPanel: AssetsSidepanel;
+  private componentPanel: ComponentSidepanel;
+  private currentElementInfo: SelectedElementInfo | null = null;
   private element: HTMLElement;
   private events: InspectorEvents;
   private viewportMode: ViewportMode = 'desktop';
@@ -75,6 +78,7 @@ export class Inspector {
     this.documentInspector = new DocumentInspector(this.element, {
       onChange: (isDoc) => this.events.onChange(isDoc)
     });
+    this.componentPanel = new ComponentSidepanel({ container: this.element });
     this.rowInspector = new RowInspector({
       onChange: () => this.events.onChange(),
       openAssetsPanel: (onSelect) => this.openAssetsPanel(onSelect)
@@ -202,6 +206,7 @@ export class Inspector {
    * Renders controls for a live clicked DOM element inside the email template.
    */
   private renderElementSettings(info: SelectedElementInfo): void {
+    this.currentElementInfo = info;
     const activeNode = info.unit || info.element;
     const isDirectAnchor = activeNode.tagName.toLowerCase() === 'a';
     const titleMap: Record<string, string> = {
@@ -326,6 +331,10 @@ export class Inspector {
     `;
 
     // Bind Header Action clicks
+    this.element.querySelector('#btn-prop-component')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openComponentPanel();
+    });
     this.element.querySelector('#btn-prop-close')?.addEventListener('click', () => {
       this.events.onDeselect?.();
       const blocksTab = document.querySelector<HTMLButtonElement>('[data-tab="blocks"]');
@@ -1034,6 +1043,16 @@ export class Inspector {
 
   public openAssetsPanel(onSelect: (url: string, name?: string, size?: string) => void): void {
     this.assetsPanel.openAssetsPanel(onSelect);
+  }
+
+  public openComponentPanel(): void {
+    if (!this.currentElementInfo) return;
+    const unit = this.currentElementInfo.unit || this.currentElementInfo.element;
+    this.componentPanel.openComponentPanel({
+      unit,
+      element: this.currentElementInfo.element,
+      type: this.currentElementInfo.type
+    });
   }
 
   public openCropModal(imageUrl: string, onApply: (croppedDataUrl: string) => void): void {

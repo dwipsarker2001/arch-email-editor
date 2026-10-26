@@ -81,6 +81,42 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     const cssContent = readFileSync(resolve(__dirname, '../dist/arch-email-editor.css'), 'utf-8');
     expect(cssContent).toContain('.arch-rge-action-btn svg');
   });
+  it('opens component sidepanel with preview and name input when component action is clicked', () => {
+    const iframe = container.querySelector<HTMLIFrameElement>('.arch-canvas-iframe');
+    const ifrDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
+    const targetBlock = ifrDoc?.querySelector<HTMLElement>('h1, h2, h3, p, img, a') || ifrDoc?.body?.querySelector<HTMLElement>('td');
+
+    targetBlock?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    const bottomActions = container.querySelector<HTMLElement>('.arch-rge-bottom-actions');
+    const componentBtn = bottomActions?.querySelector<HTMLButtonElement>('.btn-rge-component');
+    expect(componentBtn).not.toBeNull();
+
+    // Click the Component action button
+    componentBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    // Assert sidepanel opened
+    const sidepanel = container.querySelector<HTMLElement>('.arch-component-sidepanel');
+    expect(sidepanel).not.toBeNull();
+
+    // Verify preview container exists
+    const previewStage = sidepanel?.querySelector('#arch-component-preview-stage');
+    expect(previewStage).not.toBeNull();
+    expect(previewStage?.innerHTML.trim().length).toBeGreaterThan(0);
+
+    // Verify name input exists and is in the footer
+    const nameInput = sidepanel?.querySelector<HTMLInputElement>('#inp-component-name');
+    expect(nameInput).not.toBeNull();
+    expect(nameInput?.value.length).toBeGreaterThan(0);
+
+    // Verify close button dismisses sidepanel
+    const closeBtn = sidepanel?.querySelector<HTMLButtonElement>('#btn-component-close');
+    expect(closeBtn).not.toBeNull();
+    closeBtn?.click();
+
+    expect(sidepanel?.classList.contains('is-open')).toBe(false);
+  });
+
   it('hides default action buttons when configured via actions or show* options', () => {
     const customContainer = document.createElement('div');
     document.body.appendChild(customContainer);
