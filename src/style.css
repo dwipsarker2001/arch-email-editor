@@ -1914,7 +1914,7 @@ input:checked + .arch-toggle-slider:before {
   background: rgba(0, 0, 0, 0.4) !important;
 }
 
-/* Ensure comment, delete, copy icons are always pure white with zero external framework bleed */
+/* Ensure component, delete, copy icons are always pure white with zero external framework bleed */
 .arch-editor .arch-rge-action-btn svg,
 .arch-rge-action-btn svg,
 .arch-rge-bottom-actions svg {

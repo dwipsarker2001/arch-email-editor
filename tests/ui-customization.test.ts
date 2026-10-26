@@ -39,7 +39,7 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     expect(cssContent).toContain('color:#fff');
   });
 
-  it('shows a border and bottom-left action bar with comment, delete, copy when an item is clicked', () => {
+  it('shows a border and bottom-right action bar with component, delete, copy when an item is clicked', () => {
     const iframe = container.querySelector<HTMLIFrameElement>('.arch-canvas-iframe');
     expect(iframe).not.toBeNull();
 
@@ -61,11 +61,12 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     const bottomActions = container.querySelector<HTMLElement>('.arch-rge-bottom-actions');
     expect(bottomActions).not.toBeNull();
 
-    const commentBtn = bottomActions?.querySelector('.btn-rge-comment');
+    const componentBtn = bottomActions?.querySelector('.btn-rge-component');
     const deleteBtn = bottomActions?.querySelector('.btn-rge-del');
     const copyBtn = bottomActions?.querySelector('.btn-rge-dup');
 
-    expect(commentBtn).not.toBeNull();
+    expect(componentBtn).not.toBeNull();
+    expect(componentBtn?.getAttribute('title')).toBe('Component');
     expect(deleteBtn).not.toBeNull();
     expect(copyBtn).not.toBeNull();
 

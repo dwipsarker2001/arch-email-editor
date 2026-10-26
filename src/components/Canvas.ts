@@ -2348,7 +2348,7 @@ export class Canvas {
       this.selectionOverlay = selOverlay;
     }
 
-    // 1. Bottom Action Bar (Comment, Delete, Duplicate Attached to Bottom Edge)
+    // 1. Bottom Action Bar (Component, Delete, Duplicate Attached to Bottom Edge)
     const effectiveActionUnit =
       (this.activeMoveableUnit && this.activeMoveableUnit.classList?.contains('arch-selected-element') ? this.activeMoveableUnit : null) ||
       (unit && unit.classList?.contains('arch-selected-element') ? unit : null) ||
@@ -2357,8 +2357,8 @@ export class Canvas {
     const bottomActions = document.createElement('div');
     bottomActions.className = 'arch-rge-bottom-actions';
     bottomActions.innerHTML = `
-      <button type="button" class="arch-rge-action-btn btn-rge-comment" title="Add comment">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <button type="button" class="arch-rge-action-btn btn-rge-component btn-rge-comment" title="Component">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.536 11.293a1 1 0 0 0 0 1.414l2.376 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"/><path d="M2.297 11.293a1 1 0 0 0 0 1.414l2.377 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414L6.088 8.916a1 1 0 0 0-1.414 0z"/><path d="M8.916 17.912a1 1 0 0 0 0 1.415l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.415l-2.377-2.376a1 1 0 0 0-1.414 0z"/><path d="M8.916 4.674a1 1 0 0 0 0 1.414l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"/></svg>
       </button>
       <button type="button" class="arch-rge-action-btn btn-rge-del" title="Delete element">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -2378,10 +2378,10 @@ export class Canvas {
       this.duplicateSelectedElement(effectiveActionUnit);
     });
 
-    bottomActions.querySelector('.btn-rge-comment')?.addEventListener('click', (e) => {
+    bottomActions.querySelector('.btn-rge-component, .btn-rge-comment')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      const commentBtn = document.querySelector<HTMLButtonElement>('#btn-prop-comment');
-      commentBtn?.click();
+      const componentBtn = document.querySelector<HTMLButtonElement>('#btn-prop-component, #btn-prop-comment');
+      componentBtn?.click();
     });
 
     this.overlayLayer.appendChild(bottomActions);
