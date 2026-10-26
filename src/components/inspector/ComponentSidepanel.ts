@@ -1,6 +1,6 @@
 /**
  * Arch Email Editor - Component Sidepanel Submodule
- * Sliding drawer panel displaying proportionally scaled component preview inside an isolated iframe and name input.
+ * Sliding drawer panel displaying a full-width rectangular component preview inside an isolated iframe and name input.
  */
 
 import { isOuterWrapperTable, isRowElement } from '../../engine/units';
@@ -61,32 +61,24 @@ function extractCleanHtml(el: HTMLElement): string {
 }
 
 /**
- * Wraps extracted HTML into compliant table structures for isolated iframe rendering.
+ * Wraps extracted HTML into a compliant full-width row table structure
+ * so it renders as a realistic rectangular block spanning edge-to-edge.
  */
-function wrapForPreview(cleanHtml: string, targetComponent: HTMLElement): { html: string; isFullRow: boolean } {
+function wrapForPreview(cleanHtml: string, targetComponent: HTMLElement): string {
   const tag = targetComponent.tagName ? targetComponent.tagName.toLowerCase() : '';
   const isRow = isRowElement(targetComponent) || (tag === 'table' && targetComponent.classList.contains('row'));
 
   if (tag === 'tr') {
-    return {
-      html: `<table border="0" cellpadding="0" cellspacing="0" width="100%" style="width: 100%; border-collapse: collapse; margin: 0 auto;"><tbody>${cleanHtml}</tbody></table>`,
-      isFullRow: true
-    };
+    return `<table border="0" cellpadding="0" cellspacing="0" width="100%" class="row" style="width: 100%; border-collapse: collapse; margin: 0 auto;"><tbody>${cleanHtml}</tbody></table>`;
   }
   if (tag === 'td' || tag === 'th') {
-    return {
-      html: `<table border="0" cellpadding="0" cellspacing="0" width="100%" style="width: 100%; border-collapse: collapse; margin: 0 auto;"><tbody><tr>${cleanHtml}</tr></tbody></table>`,
-      isFullRow: false
-    };
+    return `<table border="0" cellpadding="0" cellspacing="0" width="100%" class="row" style="width: 100%; border-collapse: collapse; margin: 0 auto;"><tbody><tr>${cleanHtml}</tr></tbody></table>`;
   }
   if (!isRow && tag !== 'table') {
-    return {
-      html: `<div style="padding: 16px; display: flex; justify-content: center; align-items: center; width: 100%;">${cleanHtml}</div>`,
-      isFullRow: false
-    };
+    return `<table border="0" cellpadding="0" cellspacing="0" width="100%" class="row" style="width: 100%; border-collapse: collapse; margin: 0 auto; background: #ffffff;"><tr><td align="center" style="padding: 24px 20px;">${cleanHtml}</td></tr></table>`;
   }
 
-  return { html: cleanHtml, isFullRow: isRow };
+  return cleanHtml;
 }
 
 export class ComponentSidepanel {
@@ -102,10 +94,10 @@ export class ComponentSidepanel {
 
     this.container.style.overflow = 'hidden';
 
-    // 1. Resolve exact selected component (not full template) and extract clean HTML
+    // 1. Resolve exact selected component and wrap as a full-width rectangular block
     const targetComponent = resolveComponentTarget(params.unit, params.element);
     const cleanHtml = extractCleanHtml(targetComponent);
-    const { html: previewHtml, isFullRow } = wrapForPreview(cleanHtml, targetComponent);
+    const previewHtml = wrapForPreview(cleanHtml, targetComponent);
 
     // 2. Generate initial default name based on component type
     const typeLabel = (params.type || 'Component').charAt(0).toUpperCase() + (params.type || 'Component').slice(1);
@@ -151,7 +143,7 @@ export class ComponentSidepanel {
 
     this.container.appendChild(panel);
 
-    // 3. Render clean preview HTML inside the isolated iframe with dynamic proportional scaling
+    // 3. Render clean preview HTML inside the isolated iframe with edge-to-edge full-width rectangular scaling
     const iframe = panel.querySelector<HTMLIFrameElement>('#arch-component-preview-iframe');
     if (iframe) {
       const doc = iframe.contentDocument || iframe.contentWindow?.document;
@@ -168,36 +160,28 @@ export class ComponentSidepanel {
                   margin: 0;
                   padding: 0;
                   width: 100%;
-                  height: 100%;
-                  background: #f1f5f9;
+                  background: #ffffff;
                   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  overflow: hidden;
+                  overflow-x: hidden;
+                  overflow-y: auto;
                 }
                 #preview-viewport {
                   width: 100%;
-                  height: 100%;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
                   overflow: hidden;
-                  padding: 10px;
-                  box-sizing: border-box;
+                  background: #ffffff;
                 }
                 #preview-scaler {
                   width: 600px;
-                  max-width: 600px;
-                  transform-origin: center center;
-                  margin: 0 auto;
+                  min-width: 600px;
+                  transform-origin: top left;
                   pointer-events: none;
                   user-select: none;
                   background: #ffffff;
-                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-                  border-radius: 4px;
-                  overflow: hidden;
                   transition: transform 0.15s ease-out;
+                }
+                table {
+                  width: 100% !important;
+                  margin: 0 !important;
                 }
                 img {
                   max-width: 100% !important;
@@ -210,7 +194,7 @@ export class ComponentSidepanel {
             </head>
             <body>
               <div id="preview-viewport">
-                <div id="preview-scaler" data-full-row="${isFullRow ? 'true' : 'false'}">
+                <div id="preview-scaler">
                   ${previewHtml}
                 </div>
               </div>
@@ -220,39 +204,30 @@ export class ComponentSidepanel {
                   var scaler = document.getElementById('preview-scaler');
                   if (!viewport || !scaler) return;
 
-                  var availW = viewport.clientWidth - 16;
-                  var availH = viewport.clientHeight - 16;
-                  if (availW <= 0 || availH <= 0) return;
+                  var availW = viewport.clientWidth;
+                  if (availW <= 0) return;
 
-                  var isFullRow = scaler.getAttribute('data-full-row') === 'true';
-                  var naturalW = 600;
-
-                  if (!isFullRow) {
-                    var firstEl = scaler.firstElementChild;
-                    if (firstEl) {
-                      var elW = firstEl.offsetWidth || firstEl.scrollWidth;
-                      if (elW > 0 && elW < 520) {
-                        naturalW = Math.max(elW + 20, 200);
-                        scaler.style.width = naturalW + 'px';
-                      }
-                    }
-                  } else {
-                    scaler.style.width = '600px';
-                  }
-
-                  var naturalH = scaler.scrollHeight || scaler.offsetHeight || 120;
-                  var scaleW = availW / naturalW;
-                  var scaleH = availH / Math.max(naturalH, 1);
-                  var scale = Math.min(scaleW, scaleH);
-
-                  scale = Math.min(1.0, Math.max(0.15, scale));
+                  // Full-width edge-to-edge rectangular scale matching container width
+                  var scale = availW / 600;
                   scaler.style.transform = 'scale(' + scale + ')';
+
+                  // Adapt height to the scaled content height
+                  var naturalH = scaler.scrollHeight || scaler.offsetHeight || 100;
+                  var scaledH = Math.ceil(naturalH * scale);
+                  viewport.style.height = scaledH + 'px';
+                  document.body.style.height = scaledH + 'px';
+
+                  try {
+                    if (window.frameElement) {
+                      window.frameElement.style.height = Math.max(scaledH, 120) + 'px';
+                    }
+                  } catch (e) {}
                 }
 
                 window.addEventListener('resize', updateScale);
                 setTimeout(updateScale, 20);
                 setTimeout(updateScale, 100);
-                setTimeout(updateScale, 300);
+                setTimeout(updateScale, 250);
               </script>
             </body>
           </html>
