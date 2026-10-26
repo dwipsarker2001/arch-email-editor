@@ -1,7 +1,9 @@
 /**
  * Arch Email Editor - Component Sidepanel Submodule
- * Sliding drawer panel displaying component preview and name input.
+ * Sliding drawer panel displaying component preview inside an isolated iframe and name input.
  */
+
+import { isOuterWrapperTable } from '../../engine/units';
 
 export interface ComponentSidepanelOptions {
   container: HTMLElement;
@@ -15,15 +17,20 @@ export interface OpenComponentPanelParams {
 }
 
 /**
- * Resolves the enclosing Section / Row for the selected unit,
- * ensuring the full row layout and background styling are captured.
+ * Resolves the target element representing the selected component.
+ * Targets only the selected component/element (or row if a row was selected),
+ * never climbing to the full email template or outer wrapper table.
  */
-function resolveEnclosingSection(unit: HTMLElement): HTMLElement {
-  const row = unit.closest('table.row, [data-arch-row], .row') as HTMLElement | null;
-  if (row) return row;
-  const table = unit.closest('table') as HTMLElement | null;
-  if (table && table.offsetWidth > 300) return table;
-  return unit;
+function resolveComponentTarget(unit: HTMLElement, element?: HTMLElement): HTMLElement {
+  const target = unit || element;
+  if (!target || !target.tagName) return unit;
+
+  const tag = target.tagName.toLowerCase();
+  if (tag === 'body' || tag === 'html' || isOuterWrapperTable(target)) {
+    return element || unit;
+  }
+
+  return target;
 }
 
 /**
@@ -66,12 +73,12 @@ export class ComponentSidepanel {
 
     this.container.style.overflow = 'hidden';
 
-    // 1. Resolve enclosing Section/Row and clean HTML
-    const targetSection = resolveEnclosingSection(params.unit);
-    const cleanHtml = extractCleanHtml(targetSection);
+    // 1. Resolve exact selected component (not full template) and extract clean HTML
+    const targetComponent = resolveComponentTarget(params.unit, params.element);
+    const cleanHtml = extractCleanHtml(targetComponent);
 
-    // 2. Generate initial default name
-    const typeLabel = (params.type || 'Section').charAt(0).toUpperCase() + (params.type || 'Section').slice(1);
+    // 2. Generate initial default name based on component type
+    const typeLabel = (params.type || 'Component').charAt(0).toUpperCase() + (params.type || 'Component').slice(1);
     const initialName = params.defaultName || `${typeLabel} Component`;
 
     const panel = document.createElement('div');
@@ -89,9 +96,12 @@ export class ComponentSidepanel {
       <div class="arch-component-body">
         <div class="arch-component-preview-label">Preview</div>
         <div class="arch-component-preview-wrap">
-          <div class="arch-component-preview-stage" id="arch-component-preview-stage">
-            ${cleanHtml}
-          </div>
+          <iframe
+            class="arch-component-preview-iframe"
+            id="arch-component-preview-iframe"
+            tabindex="-1"
+            title="Component Preview"
+          ></iframe>
         </div>
       </div>
 
@@ -110,6 +120,62 @@ export class ComponentSidepanel {
     `;
 
     this.container.appendChild(panel);
+
+    // 3. Render clean preview HTML inside the isolated iframe
+    const iframe = panel.querySelector<HTMLIFrameElement>('#arch-component-preview-iframe');
+    if (iframe) {
+      let previewHtml = cleanHtml;
+      const tag = targetComponent.tagName ? targetComponent.tagName.toLowerCase() : '';
+      if (tag === 'tr') {
+        previewHtml = `<table border="0" cellpadding="0" cellspacing="0" width="100%" style="width: 100%; border-collapse: collapse;"><tbody>${cleanHtml}</tbody></table>`;
+      } else if (tag === 'td' || tag === 'th') {
+        previewHtml = `<table border="0" cellpadding="0" cellspacing="0" width="100%" style="width: 100%; border-collapse: collapse;"><tbody><tr>${cleanHtml}</tr></tbody></table>`;
+      }
+
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8" />
+              <style>
+                * { box-sizing: border-box; }
+                html, body {
+                  margin: 0;
+                  padding: 12px;
+                  width: 100%;
+                  min-height: 100%;
+                  background: #ffffff;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  overflow: auto;
+                }
+                table {
+                  max-width: 100% !important;
+                  margin: 0 auto !important;
+                }
+                table.row, table.row-content {
+                  width: 100% !important;
+                }
+                img {
+                  max-width: 100% !important;
+                  height: auto !important;
+                }
+                .arch-selected-element, .arch-hover-element {
+                  outline: none !important;
+                }
+              </style>
+            </head>
+            <body>${previewHtml}</body>
+          </html>
+        `);
+        doc.close();
+      }
+    }
 
     const closeBtn = panel.querySelector<HTMLButtonElement>('#btn-component-close');
     const nameInput = panel.querySelector<HTMLInputElement>('#inp-component-name');

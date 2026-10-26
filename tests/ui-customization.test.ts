@@ -99,10 +99,11 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     const sidepanel = container.querySelector<HTMLElement>('.arch-component-sidepanel');
     expect(sidepanel).not.toBeNull();
 
-    // Verify preview container exists
-    const previewStage = sidepanel?.querySelector('#arch-component-preview-stage');
-    expect(previewStage).not.toBeNull();
-    expect(previewStage?.innerHTML.trim().length).toBeGreaterThan(0);
+    // Verify preview iframe exists and contains the component HTML
+    const previewIframe = sidepanel?.querySelector<HTMLIFrameElement>('#arch-component-preview-iframe');
+    expect(previewIframe).not.toBeNull();
+    const iframeBody = previewIframe?.contentDocument?.body?.innerHTML || '';
+    expect(iframeBody.length).toBeGreaterThan(0);
 
     // Verify name input exists and is in the footer
     const nameInput = sidepanel?.querySelector<HTMLInputElement>('#inp-component-name');

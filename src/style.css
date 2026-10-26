@@ -3622,17 +3622,20 @@ body.arch-canvas-dragging *,
   padding: 12px !important;
   overflow: auto !important;
   box-sizing: border-box !important;
-  display: flex !important;
-  align-items: flex-start !important;
-  justify-content: center !important;
+  position: relative !important;
+  height: 180px !important;
+  max-height: 200px !important;
+  flex: 0 0 auto !important;
+  padding: 0 !important;
 }
 
-.arch-editor .arch-component-preview-stage,
-.arch-component-preview-stage {
+.arch-editor .arch-component-preview-iframe,
+.arch-component-preview-iframe {
   width: 100% !important;
-  max-width: 600px !important;
-  pointer-events: none !important;
-  user-select: none !important;
+  height: 100% !important;
+  border: none !important;
+  display: block !important;
+  background: #ffffff !important;
 }
 
 .arch-editor .arch-component-footer,
