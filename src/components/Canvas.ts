@@ -189,11 +189,12 @@ export class Canvas {
     this.overlayLayer = document.createElement('div');
     this.overlayLayer.className = 'arch-canvas-overlay';
 
-    // Floating vertical bottom-right History & Zoom controls (BeeFree / Figma layout)
+    // Floating vertical top-right Canvas Tools (Placeholders, History & Zoom)
     this.floatingHistory = document.createElement('div');
     this.floatingHistory.className = 'arch-canvas-floating-history';
     this.floatingHistory.style.position = 'absolute';
-    this.floatingHistory.style.bottom = '20px';
+    this.floatingHistory.style.top = '20px';
+    this.floatingHistory.style.bottom = 'auto';
     this.floatingHistory.style.right = '20px';
     this.floatingHistory.style.left = 'auto';
     this.floatingHistory.style.width = 'auto';
