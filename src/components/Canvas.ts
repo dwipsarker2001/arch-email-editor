@@ -2508,6 +2508,16 @@ private zoomLevel: number = 1;
     if (showTextToolbar && editableHost && ifrDoc) {
       const textToolbar = document.createElement('div');
       textToolbar.className = 'arch-rge-text-toolbar';
+      // Preserve the text selection so color apply works after focus moves to the toolbar
+      const savedSelection = ifrDoc.getSelection();
+      let savedRange = (savedSelection && savedSelection.rangeCount > 0)
+        ? savedSelection.getRangeAt(0).cloneRange()
+        : null;
+      const onSelChange = () => {
+        const s = ifrDoc.getSelection();
+        if (s && s.rangeCount > 0) savedRange = s.getRangeAt(0).cloneRange();
+      };
+      ifrDoc.addEventListener('selectionchange', onSelChange);
       textToolbar.innerHTML = `
         <div class="arch-rge-toolbar-row">
           <button type="button" class="arch-toolbar-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
@@ -2609,6 +2619,16 @@ private zoomLevel: number = 1;
 
       const applyHilite = (color: string) => {
         if (color && ifrDoc) {
+          // restore selection lost when focus moved to the toolbar/picker
+          if (savedRange) {
+            try {
+              const sel = ifrDoc.getSelection();
+              if (sel) {
+                sel.removeAllRanges();
+                sel.addRange(savedRange);
+              }
+            } catch (e) { /* ignore */ }
+          }
           ifrDoc.execCommand('hiliteColor', false, color);
           if (hiliteBar) hiliteBar.style.background = color;
           if (customInput) customInput.value = color;
