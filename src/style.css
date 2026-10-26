@@ -3684,6 +3684,14 @@ body.arch-canvas-dragging *,
   background: #ffffff !important;
 }
 
+.arch-editor .arch-component-field,
+.arch-component-field {
+  margin-top: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+}
+
 .arch-editor .arch-component-footer,
 .arch-component-footer {
   padding: 16px !important;

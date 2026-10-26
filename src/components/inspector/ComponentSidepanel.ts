@@ -126,18 +126,18 @@ export class ComponentSidepanel {
             title="Component Preview"
           ></iframe>
         </div>
-      </div>
 
-      <div class="arch-component-footer">
-        <label class="arch-component-name-label" for="inp-component-name">Component Name</label>
-        <div class="arch-component-input-wrap">
-          <input
-            type="text"
-            class="arch-component-name-input"
-            id="inp-component-name"
-            placeholder="Enter component name..."
-            value="${initialName}"
-          />
+        <div class="arch-component-field">
+          <label class="arch-component-name-label" for="inp-component-name">Component Name</label>
+          <div class="arch-component-input-wrap">
+            <input
+              type="text"
+              class="arch-component-name-input"
+              id="inp-component-name"
+              placeholder="Enter component name..."
+              value="${initialName}"
+            />
+          </div>
         </div>
       </div>
     `;

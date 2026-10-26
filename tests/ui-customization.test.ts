@@ -105,8 +105,8 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     const iframeBody = previewIframe?.contentDocument?.body?.innerHTML || '';
     expect(iframeBody.length).toBeGreaterThan(0);
 
-    // Verify name input exists and is in the footer
-    const nameInput = sidepanel?.querySelector<HTMLInputElement>('#inp-component-name');
+    // Verify name input exists directly below preview in body
+    const nameInput = sidepanel?.querySelector<HTMLInputElement>('.arch-component-body #inp-component-name');
     expect(nameInput).not.toBeNull();
     expect(nameInput?.value.length).toBeGreaterThan(0);
 
