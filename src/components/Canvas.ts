@@ -2630,16 +2630,28 @@ private zoomLevel: number = 1;
         });
       });
 
-      customInput?.addEventListener('change', () => {
-        applyHilite(customInput.value);
-        if (hilitePalette) hilitePalette.style.display = 'none';
-      });
-
-      // close palette on outside click
-      const closePalette = (ev: MouseEvent) => {
-        if (hilitePalette && hilitePalette.style.display !== 'none' && !hilitePalette.contains(ev.target as Node) && ev.target !== hiliteBtn) {
-          hilitePalette.style.display = 'none';
+      const applyCustom = () => {
+        const color = customInput?.value;
+        if (color) {
+          applyHilite(color);
+          if (hilitePalette) hilitePalette.style.display = 'none';
         }
+      };
+      customInput?.addEventListener('input', () => {
+        const bar = textToolbar.querySelector<HTMLElement>('#tb-hilite-bar');
+        if (bar && customInput.value) bar.style.background = customInput.value;
+      });
+      customInput?.addEventListener('change', applyCustom);
+      customInput?.addEventListener('blur', applyCustom);
+
+      // close palette on outside click (ignore the color input itself)
+      const closePalette = (ev: MouseEvent) => {
+        if (!hilitePalette || hilitePalette.style.display === 'none') return;
+        const t = ev.target as Node;
+        if (hilitePalette.contains(t)) return;
+        if (t === hiliteBtn || hiliteBtn?.contains(t)) return;
+        if (t === customInput) return;
+        hilitePalette.style.display = 'none';
       };
       document.addEventListener('mousedown', closePalette);
 
