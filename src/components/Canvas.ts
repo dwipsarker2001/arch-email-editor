@@ -227,6 +227,10 @@ export class Canvas {
           <line x1="8" y1="11" x2="14" y2="11"/>
         </svg>
       </button>
+      <span class="arch-floating-history-divider"></span>
+      <button class="arch-floating-history-btn arch-btn--placeholder" type="button" title="Placeholders ({})">
+        <span style="font-family: monospace; font-size: 13px; font-weight: 700; line-height: 1;">{}</span>
+      </button>
     `;
 
     this.floatingHistory.querySelector('.arch-btn--undo')?.addEventListener('click', (e) => {
