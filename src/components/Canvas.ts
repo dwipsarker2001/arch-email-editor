@@ -2513,10 +2513,21 @@ private zoomLevel: number = 1;
       let savedRange = (savedSelection && savedSelection.rangeCount > 0)
         ? savedSelection.getRangeAt(0).cloneRange()
         : null;
-      const onSelChange = () => {
+      const saveSelection = () => {
         const s = ifrDoc.getSelection();
         if (s && s.rangeCount > 0) savedRange = s.getRangeAt(0).cloneRange();
       };
+      const restoreSelection = () => {
+        if (!savedRange) return;
+        try {
+          const sel = ifrDoc.getSelection();
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(savedRange);
+          }
+        } catch (e) { /* ignore */ }
+      };
+      const onSelChange = () => saveSelection();
       ifrDoc.addEventListener('selectionchange', onSelChange);
       textToolbar.innerHTML = `
         <div class="arch-rge-toolbar-row">
@@ -2528,29 +2539,14 @@ private zoomLevel: number = 1;
           <button type="button" class="arch-toolbar-btn arch-toolbar-btn--color" id="btn-tb-text-color" title="Text Color">
             <span style="font-weight: 700; font-size: 11px;">A</span>
             <span class="arch-toolbar-color-indicator" id="tb-color-bar" style="background: #101112;"></span>
+            <input type="color" id="tb-text-input" style="position:absolute;opacity:0;width:0;height:0;border:none;padding:0;margin:0;" value="#101112" />
           </button>
-          <span class="arch-tb-hilite-wrap" style="position:relative;display:inline-flex;">
-          <button type="button" class="arch-toolbar-btn arch-toolbar-btn--color" id="btn-tb-hilite-color" title="Highlight Color">
+          <button type="button" class="arch-toolbar-btn arch-toolbar-btn--color" id="btn-tb-hilite-color" title="Highlight Color" style="position:relative;">
+
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 2 4 4-12 12H6v-4L18 2z"/></svg>
             <span class="arch-toolbar-color-indicator" id="tb-hilite-bar" style="background: #facc15;"></span>
+            <input type="color" id="tb-hilite-input" style="position:absolute;opacity:0;width:0;height:0;border:none;padding:0;margin:0;" value="#facc15" />
           </button>
-          <div class="arch-tb-hilite-palette" id="tb-hilite-palette" style="display:none;">
-            <div class="arch-tb-hilite-swatches">
-              <button type="button" class="arch-tb-swatch" data-color="#fef08a" style="background:#fef08a;" title="Yellow"></button>
-              <button type="button" class="arch-tb-swatch" data-color="#fde68a" style="background:#fde68a;" title="Amber"></button>
-              <button type="button" class="arch-tb-swatch" data-color="#bbf7d0" style="background:#bbf7d0;" title="Green"></button>
-              <button type="button" class="arch-tb-swatch" data-color="#bfdbfe" style="background:#bfdbfe;" title="Blue"></button>
-              <button type="button" class="arch-tb-swatch" data-color="#fecaca" style="background:#fecaca;" title="Red"></button>
-              <button type="button" class="arch-tb-swatch" data-color="#e9d5ff" style="background:#e9d5ff;" title="Purple"></button>
-              <button type="button" class="arch-tb-swatch" data-color="#fed7aa" style="background:#fed7aa;" title="Orange"></button>
-              <button type="button" class="arch-tb-swatch" data-color="#f5f5f5" style="background:#f5f5f5;" title="Gray"></button>
-            </div>
-            <label class="arch-tb-hilite-custom">
-              Custom
-              <input type="color" id="tb-hilite-custom" value="#facc15" />
-            </label>
-          </div>
-          </span>
           <span class="arch-toolbar-divider"></span>
           <button type="button" class="arch-toolbar-btn" data-cmd="superscript" title="Superscript">X²</button>
           <button type="button" class="arch-toolbar-btn" data-cmd="subscript" title="Subscript">X₂</button>
@@ -2603,77 +2599,68 @@ private zoomLevel: number = 1;
 
       textToolbar.querySelector('#btn-tb-text-color')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        const color = prompt('Enter hex text color:', '#7747ff');
-        if (color && ifrDoc) {
-          ifrDoc.execCommand('foreColor', false, color);
-          const bar = textToolbar.querySelector<HTMLElement>('#tb-color-bar');
-          if (bar) bar.style.background = color;
-          this.onStructureChanged();
+        const textColorInput = textToolbar.querySelector<HTMLInputElement>('#tb-text-input');
+        if (textColorInput) {
+          saveSelection();
+          textColorInput.click();
         }
       });
 
-      const hiliteBtn = textToolbar.querySelector<HTMLButtonElement>('#btn-tb-hilite-color');
-      const hilitePalette = textToolbar.querySelector<HTMLElement>('#tb-hilite-palette');
+      const applyTextColor = (color: string) => {
+        if (color && ifrDoc) {
+          restoreSelection();
+          ifrDoc.execCommand('foreColor', false, color);
+          const bar = textToolbar.querySelector<HTMLElement>('#tb-color-bar');
+          if (bar) bar.style.background = color;
+          const input = textToolbar.querySelector<HTMLInputElement>('#tb-text-input');
+          if (input) input.value = color;
+          this.onStructureChanged();
+        }
+      };
+
+      const textColorInput = textToolbar.querySelector<HTMLInputElement>('#tb-text-input');
+
+      if (textColorInput) {
+        textColorInput.addEventListener('click', (e) => e.stopPropagation());
+        textColorInput.addEventListener('change', () => {
+          const color = textColorInput.value;
+          if (color) applyTextColor(color);
+        });
+      }
+
+      const hiliteInput = textToolbar.querySelector<HTMLInputElement>('#tb-hilite-input');
       const hiliteBar = textToolbar.querySelector<HTMLElement>('#tb-hilite-bar');
-      const customInput = textToolbar.querySelector<HTMLInputElement>('#tb-hilite-custom');
+      const hiliteBtn = textToolbar.querySelector<HTMLButtonElement>('#btn-tb-hilite-color');
 
       const applyHilite = (color: string) => {
         if (color && ifrDoc) {
-          // restore selection lost when focus moved to the toolbar/picker
-          if (savedRange) {
-            try {
-              const sel = ifrDoc.getSelection();
-              if (sel) {
-                sel.removeAllRanges();
-                sel.addRange(savedRange);
-              }
-            } catch (e) { /* ignore */ }
-          }
+          restoreSelection();
           ifrDoc.execCommand('hiliteColor', false, color);
           if (hiliteBar) hiliteBar.style.background = color;
-          if (customInput) customInput.value = color;
+          if (hiliteInput) hiliteInput.value = color;
           this.onStructureChanged();
         }
       };
 
       hiliteBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (hilitePalette) hilitePalette.style.display = hilitePalette.style.display === 'none' ? 'block' : 'none';
-      });
-
-      textToolbar.querySelectorAll<HTMLButtonElement>('.arch-tb-swatch').forEach((sw) => {
-        sw.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const color = sw.dataset.color;
-          if (color) applyHilite(color);
-          if (hilitePalette) hilitePalette.style.display = 'none';
-        });
-      });
-
-      const applyCustom = () => {
-        const color = customInput?.value;
-        if (color) {
-          applyHilite(color);
-          if (hilitePalette) hilitePalette.style.display = 'none';
+        if (hiliteInput) {
+          saveSelection();
+          hiliteInput.click();
         }
-      };
-      customInput?.addEventListener('input', () => {
-        const bar = textToolbar.querySelector<HTMLElement>('#tb-hilite-bar');
-        if (bar && customInput.value) bar.style.background = customInput.value;
       });
-      customInput?.addEventListener('change', applyCustom);
-      customInput?.addEventListener('blur', applyCustom);
 
-      // close palette on outside click (ignore the color input itself)
-      const closePalette = (ev: MouseEvent) => {
-        if (!hilitePalette || hilitePalette.style.display === 'none') return;
-        const t = ev.target as Node;
-        if (hilitePalette.contains(t)) return;
-        if (t === hiliteBtn || hiliteBtn?.contains(t)) return;
-        if (t === customInput) return;
-        hilitePalette.style.display = 'none';
-      };
-      document.addEventListener('mousedown', closePalette);
+      if (hiliteInput) {
+        hiliteInput.addEventListener('click', (e) => e.stopPropagation());
+        hiliteInput.addEventListener('change', () => {
+          const color = hiliteInput.value;
+          if (color) applyHilite(color);
+        });
+        hiliteInput.addEventListener('input', () => {
+          const bar = textToolbar.querySelector<HTMLElement>('#tb-hilite-bar');
+          if (bar && hiliteInput.value) bar.style.background = hiliteInput.value;
+        });
+      }
 
       textToolbar.querySelector('#btn-tb-align')?.addEventListener('click', (e) => {
         e.stopPropagation();

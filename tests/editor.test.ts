@@ -542,6 +542,88 @@ describe('ArchEmailEditor Core Engine', () => {
     editor.destroy();
   });
 
+  it('applies text and highlight colors to the saved iframe selection', () => {
+    const editor = ArchEmailEditor.create(container);
+    const canvas = (editor as any).canvas;
+    const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+    const originalExecCommand = ifrDoc.execCommand;
+    const commandSelections: Array<{
+      command: string;
+      value?: string;
+      range: Range | null;
+    }> = [];
+    const execCommand = vi.fn((command: string, _showUI?: boolean, value?: string) => {
+      const selection = ifrDoc.getSelection();
+      commandSelections.push({
+        command,
+        value,
+        range: selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null
+      });
+      return true;
+    });
+    ifrDoc.execCommand = execCommand;
+
+    try {
+      const paragraph = ifrDoc.querySelector('p') as HTMLElement;
+      canvas.enterTextEditMode(paragraph);
+      const toolbar = container.querySelector('.arch-rge-text-toolbar') as HTMLElement;
+      const selection = ifrDoc.getSelection()!;
+      const range = ifrDoc.createRange();
+      range.selectNodeContents(paragraph);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      const selectedRange = range.cloneRange();
+      ifrDoc.dispatchEvent(new Event('selectionchange'));
+
+      const textButton = toolbar.querySelector('#btn-tb-text-color') as HTMLButtonElement;
+      const hiliteButton = toolbar.querySelector('#btn-tb-hilite-color') as HTMLButtonElement;
+      const textInput = toolbar.querySelector('#tb-text-input') as HTMLInputElement;
+      const hiliteInput = toolbar.querySelector('#tb-hilite-input') as HTMLInputElement;
+      expect(textButton).toBeTruthy();
+      expect(hiliteButton).toBeTruthy();
+      expect(textInput).toBeTruthy();
+      expect(hiliteInput).toBeTruthy();
+
+      const simulatePickerFocus = () => {
+        selection.removeAllRanges();
+        ifrDoc.dispatchEvent(new Event('selectionchange'));
+      };
+      const textInputClick = vi.spyOn(textInput, 'click').mockImplementation(simulatePickerFocus);
+      const hiliteInputClick = vi.spyOn(hiliteInput, 'click').mockImplementation(simulatePickerFocus);
+
+      textButton.click();
+      expect(textInputClick).toHaveBeenCalledOnce();
+      textInput.value = '#123456';
+      textInput.dispatchEvent(new Event('change'));
+
+      hiliteButton.click();
+      expect(hiliteInputClick).toHaveBeenCalledOnce();
+      hiliteInput.value = '#abcdef';
+      hiliteInput.dispatchEvent(new Event('change'));
+
+      expect(execCommand).toHaveBeenNthCalledWith(1, 'foreColor', false, '#123456');
+      expect(execCommand).toHaveBeenNthCalledWith(2, 'hiliteColor', false, '#abcdef');
+      expect(commandSelections).toHaveLength(2);
+      commandSelections.forEach(({ range: appliedRange }) => {
+        expect(appliedRange).not.toBeNull();
+        expect(appliedRange!.startContainer).toBe(selectedRange.startContainer);
+        expect(appliedRange!.startOffset).toBe(selectedRange.startOffset);
+        expect(appliedRange!.endContainer).toBe(selectedRange.endContainer);
+        expect(appliedRange!.endOffset).toBe(selectedRange.endOffset);
+      });
+      expect(toolbar.querySelector<HTMLElement>('#tb-color-bar')?.style.background).toBe('rgb(18, 52, 86)');
+      expect(toolbar.querySelector<HTMLElement>('#tb-hilite-bar')?.style.background).toBe('rgb(171, 205, 239)');
+    } finally {
+      if (originalExecCommand) {
+        ifrDoc.execCommand = originalExecCommand;
+      } else {
+        delete (ifrDoc as Partial<Document>).execCommand;
+      }
+      editor.destroy();
+    }
+  });
+
   it('supports interactive column drag resize, live percentage badge, and clean email export', () => {
     const editor = ArchEmailEditor.create(container);
     const canvas = (editor as any).canvas;
