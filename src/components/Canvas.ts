@@ -1319,8 +1319,10 @@ export class Canvas {
     const styleEl = doc.createElement('style');
     styleEl.id = 'arch-canvas-editor-style';
     styleEl.textContent = `
-      /* Sleek 6px canvas scrollbar */
+      /* Sleek 6px canvas scrollbar (overlay so it gives space to the template area) */
       html, body {
+        overflow-y: auto !important;
+        overflow-y: overlay !important;
         scrollbar-width: thin !important;
         scrollbar-color: #cbd5e1 transparent !important;
       }

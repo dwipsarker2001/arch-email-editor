@@ -652,6 +652,8 @@
 
 .arch-editor__canvas,
 .arch-canvas-container {
+  overflow-y: auto !important;
+  overflow-y: overlay !important;
   scrollbar-width: thin !important;
   scrollbar-color: #cbd5e1 transparent !important;
 }
@@ -3562,6 +3564,8 @@ body.arch-canvas-dragging *,
   width: 100% !important;
   display: flex !important;
   flex-direction: column !important;
+  overflow-y: auto !important;
+  overflow-y: overlay !important;
 }
 
 #editor-container .arch-canvas-iframe {
