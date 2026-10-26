@@ -3618,19 +3618,16 @@ body.arch-canvas-dragging *,
 
 .arch-editor .arch-component-preview-wrap,
 .arch-component-preview-wrap {
-  flex: 1 1 0% !important;
-  min-height: 200px !important;
-  background: #f8fafc !important;
+  flex: 0 0 auto !important;
+  height: 200px !important;
+  max-height: 220px !important;
+  background: #f1f5f9 !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 8px !important;
-  padding: 12px !important;
-  overflow: auto !important;
+  padding: 0 !important;
+  overflow: hidden !important;
   box-sizing: border-box !important;
   position: relative !important;
-  height: 180px !important;
-  max-height: 200px !important;
-  flex: 0 0 auto !important;
-  padding: 0 !important;
 }
 
 .arch-editor .arch-component-preview-iframe,
