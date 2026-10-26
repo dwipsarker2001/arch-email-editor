@@ -650,10 +650,48 @@
   background: #ffffff;
 }
 
+.arch-editor__canvas,
+.arch-canvas-container {
+  scrollbar-width: thin !important;
+  scrollbar-color: #cbd5e1 transparent !important;
+}
+
+.arch-editor__canvas::-webkit-scrollbar,
+.arch-canvas-container::-webkit-scrollbar,
+.arch-canvas-iframe::-webkit-scrollbar,
 .arch-right-tab-content::-webkit-scrollbar,
 .arch-tab-panel::-webkit-scrollbar,
 .arch-editor__inspector::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
+}
+
+.arch-editor__canvas::-webkit-scrollbar-track,
+.arch-canvas-container::-webkit-scrollbar-track,
+.arch-canvas-iframe::-webkit-scrollbar-track,
+.arch-right-tab-content::-webkit-scrollbar-track,
+.arch-tab-panel::-webkit-scrollbar-track,
+.arch-editor__inspector::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.arch-editor__canvas::-webkit-scrollbar-thumb,
+.arch-canvas-container::-webkit-scrollbar-thumb,
+.arch-canvas-iframe::-webkit-scrollbar-thumb,
+.arch-right-tab-content::-webkit-scrollbar-thumb,
+.arch-tab-panel::-webkit-scrollbar-thumb,
+.arch-editor__inspector::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.arch-editor__canvas::-webkit-scrollbar-thumb:hover,
+.arch-canvas-container::-webkit-scrollbar-thumb:hover,
+.arch-canvas-iframe::-webkit-scrollbar-thumb:hover,
+.arch-right-tab-content::-webkit-scrollbar-thumb:hover,
+.arch-tab-panel::-webkit-scrollbar-thumb:hover,
+.arch-editor__inspector::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .arch-right-tab-content::-webkit-scrollbar-track,

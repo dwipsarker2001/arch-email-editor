@@ -1319,6 +1319,26 @@ export class Canvas {
     const styleEl = doc.createElement('style');
     styleEl.id = 'arch-canvas-editor-style';
     styleEl.textContent = `
+      /* Sleek 6px canvas scrollbar */
+      html, body {
+        scrollbar-width: thin !important;
+        scrollbar-color: #cbd5e1 transparent !important;
+      }
+      ::-webkit-scrollbar {
+        width: 6px !important;
+        height: 6px !important;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent !important;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1 !important;
+        border-radius: 4px !important;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8 !important;
+      }
+
       *, *:focus, *:focus-visible, [contenteditable], [contenteditable="true"] {
         outline: none !important;
         -webkit-tap-highlight-color: transparent !important;
