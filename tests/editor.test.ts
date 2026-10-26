@@ -907,6 +907,28 @@ describe('ArchEmailEditor Core Engine', () => {
     expect(undoBtn).toBeTruthy();
     expect(redoBtn).toBeTruthy();
 
+    // Sidebar toggle sits at the top, AI spark at the bottom.
+    const floatButtons = floatHistory.querySelectorAll('.arch-floating-history-btn');
+    const sidebarToggle = floatButtons[0] as HTMLButtonElement;
+    expect(sidebarToggle.classList.contains('arch-btn--sidebar-close')).toBe(true);
+    expect(floatButtons[floatButtons.length - 1].classList.contains('arch-btn--ai')).toBe(true);
+
+    // The old in-sidebar toggle is gone; the floating button opens/closes the right panel.
+    const rightPanel = container.querySelector('.arch-editor__right-panel') as HTMLElement;
+    expect(container.querySelector('#arch-btn-collapse-panel')).toBeNull();
+    expect(rightPanel.classList.contains('is-collapsed')).toBe(false);
+    expect(sidebarToggle.getAttribute('aria-expanded')).toBe('true');
+
+    sidebarToggle.click();
+    expect(rightPanel.classList.contains('is-collapsed')).toBe(true);
+    expect(sidebarToggle.getAttribute('aria-expanded')).toBe('false');
+    expect(sidebarToggle.title).toBe('Open sidebar');
+
+    sidebarToggle.click();
+    expect(rightPanel.classList.contains('is-collapsed')).toBe(false);
+    expect(sidebarToggle.getAttribute('aria-expanded')).toBe('true');
+    expect(sidebarToggle.title).toBe('Close sidebar');
+
     // Initially undo and redo are disabled (at initial state)
     expect(undoBtn.disabled).toBe(true);
     expect(redoBtn.disabled).toBe(true);
@@ -931,6 +953,63 @@ describe('ArchEmailEditor Core Engine', () => {
 
     editor.destroy();
   });
+
+  it('opens a template-strings sidepanel in the right sidebar when {} is clicked', () => {
+    const custom = [
+      { value: '{{-FM_NAME-}}', label: 'Firm Name', description: 'The name of the firm.', category: 'Firm' },
+      { value: '{{-CL_EMAIL-}}', label: 'Client Email', description: 'The client primary email.', category: 'Client' }
+    ];
+    const editor = ArchEmailEditor.create(container, { placeholders: custom });
+
+    const btn = container.querySelector<HTMLButtonElement>('.arch-btn--placeholder') as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+
+    btn.click();
+
+    const panel = container.querySelector<HTMLElement>('.arch-placeholders-sidepanel');
+    expect(panel).toBeTruthy();
+    expect(panel!.classList.contains('is-open')).toBe(true);
+    expect(panel!.querySelectorAll('.arch-placeholder-item').length).toBe(2);
+    expect(panel!.textContent).toContain('{{-FM_NAME-}}');
+    expect(panel!.textContent).toContain('Firm Name');
+
+    // Search filters the list
+    const search = panel!.querySelector<HTMLInputElement>('#ph-search') as HTMLInputElement;
+    search.value = 'client';
+    search.dispatchEvent(new Event('input'));
+    expect(panel!.querySelectorAll('.arch-placeholder-item').length).toBe(1);
+
+    // Close button dismisses it
+    const closeBtn = panel!.querySelector<HTMLButtonElement>('#btn-ph-close') as HTMLButtonElement;
+    closeBtn.click();
+    expect(panel!.classList.contains('is-open')).toBe(false);
+
+    editor.destroy();
+  });
+
+  it('shows an empty state when no placeholders are provided', () => {
+    const editor = ArchEmailEditor.create(container);
+    const btn = container.querySelector<HTMLButtonElement>('.arch-btn--placeholder') as HTMLButtonElement;
+    btn.click();
+    const panel = container.querySelector<HTMLElement>('.arch-placeholders-sidepanel');
+    expect(panel).toBeTruthy();
+    expect(panel!.textContent).toContain('No template strings');
+    editor.destroy();
+  });
+
+  it('hides the canvas scrollbar so the template preview uses the full width', () => {
+    const editor = ArchEmailEditor.create(container);
+
+    const iframe = container.querySelector<HTMLIFrameElement>('.arch-canvas-iframe') as HTMLIFrameElement;
+    const ifrDoc = iframe.contentDocument!;
+    const styleText = ifrDoc.getElementById('arch-canvas-editor-style')?.textContent || '';
+    expect(styleText).toContain('scrollbar-width: none');
+    expect(styleText).toContain('width: 0');
+    expect(container.querySelector('.arch-canvas-scrollbar')).toBeNull();
+
+    editor.destroy();
+  });
+
   it('supports readOnly mode and prevents direct editing or dragging', () => {
     const roContainer = document.createElement('div');
     document.body.appendChild(roContainer);

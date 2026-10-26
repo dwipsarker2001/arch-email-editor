@@ -81,6 +81,10 @@ export interface CanvasEvents {
   onResolveSection?: (id: string) => PrebuiltSection | undefined;
   onUndo?: () => void;
   onRedo?: () => void;
+  /** Toggles the right sidebar; returns whether it is now collapsed. */
+  onToggleSidebar?: () => boolean;
+  /** Opens the template-strings sidepanel in the right sidebar. */
+  onOpenPlaceholders?: () => void;
 }
 
 function isTextLeafElement(el: HTMLElement | null): boolean {
@@ -119,6 +123,11 @@ export class Canvas {
   private hoveredDropTarget: HTMLElement | null = null;
   private hoveredDropPosition: 'before' | 'after' = 'after';
   private viewportMode: ViewportMode = 'desktop';
+private zoomLevel: number = 1;
+private scrollbarV: HTMLElement | null = null;
+private scrollbarH: HTMLElement | null = null;
+private vThumb: HTMLElement | null = null;
+private hThumb: HTMLElement | null = null;
   private isEditingText: boolean = false;
   private suppressNextClick: boolean = false;
   private iframeEventsAbortController: AbortController | null = null;
@@ -193,13 +202,20 @@ export class Canvas {
     this.floatingHistory = document.createElement('div');
     this.floatingHistory.className = 'arch-canvas-floating-history';
     this.floatingHistory.style.position = 'absolute';
-    this.floatingHistory.style.top = '20px';
+    this.floatingHistory.style.top = '10px';
     this.floatingHistory.style.bottom = 'auto';
-    this.floatingHistory.style.right = '20px';
+    this.floatingHistory.style.right = '10px';
     this.floatingHistory.style.left = 'auto';
     this.floatingHistory.style.width = 'auto';
     this.floatingHistory.innerHTML = `
-      <button class="arch-floating-history-btn arch-btn--placeholder" type="button" title="Placeholders ({})">
+      <button class="arch-floating-history-btn arch-btn--sidebar-close" type="button" title="Close sidebar" aria-label="Close sidebar" aria-expanded="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="18" x="3" y="3" rx="2"/>
+          <path d="M15 3v18"/>
+        </svg>
+      </button>
+      <span class="arch-floating-history-divider"></span>
+      <button class="arch-floating-history-btn arch-btn--placeholder" type="button" title="Placeholders ({})" aria-label="Template strings" aria-haspopup="menu" aria-expanded="false">
         <span style="font-family: monospace; font-size: 13px; font-weight: 700; line-height: 1;">{}</span>
       </button>
       <span class="arch-floating-history-divider"></span>
@@ -231,6 +247,12 @@ export class Canvas {
           <line x1="8" y1="11" x2="14" y2="11"/>
         </svg>
       </button>
+      <span class="arch-floating-history-divider"></span>
+      <button class="arch-floating-history-btn arch-btn--ai" type="button" title="AI Assistant" aria-label="AI Assistant">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>
+        </svg>
+      </button>
     `;
 
     this.floatingHistory.querySelector('.arch-btn--undo')?.addEventListener('click', (e) => {
@@ -243,12 +265,149 @@ export class Canvas {
       this.events.onRedo?.();
     });
 
+    const sidebarToggle = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--sidebar-close');
+    sidebarToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const collapsed = this.events.onToggleSidebar?.();
+      if (typeof collapsed === 'boolean') {
+        sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+        const label = collapsed ? 'Open sidebar' : 'Close sidebar';
+        sidebarToggle.title = label;
+        sidebarToggle.setAttribute('aria-label', label);
+      }
+    });
+
     this.containerElement.appendChild(this.iframe);
     this.containerElement.appendChild(this.overlayLayer);
     this.containerElement.appendChild(this.floatingHistory);
+    this.buildScrollbars();
     this.element.appendChild(this.containerElement);
 
+    const placeholderButton = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--placeholder');
+    placeholderButton?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.events.onOpenPlaceholders?.();
+    });
+
+    // Zoom controls
+    this.zoomLevel = 1;
+    const zoomInBtn = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--zoom-in');
+    const zoomOutBtn = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--zoom-out');
+    zoomInBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.setZoom(this.zoomLevel + 0.1);
+    });
+    zoomOutBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.setZoom(this.zoomLevel - 0.1);
+    });
+
     this.bindOuterEvents();
+  }
+
+  public setZoom(level: number): void {
+    const clamped = Math.min(2, Math.max(0.5, Math.round(level * 10) / 10));
+    this.zoomLevel = clamped;
+    if (this.iframe) {
+      // CSS `zoom` reflows the iframe so the canvas container can scroll
+      (this.iframe.style as any).zoom = String(clamped);
+      if (this.containerElement) {
+        if (clamped === 1) {
+          this.containerElement.style.removeProperty('overflow');
+        } else {
+          this.containerElement.style.setProperty('overflow', 'auto', 'important');
+        }
+        // reflow then sync
+        requestAnimationFrame(() => this.syncScrollbars());
+      }
+    }
+    const zoomInBtn = this.floatingHistory?.querySelector<HTMLButtonElement>('.arch-btn--zoom-in');
+    const zoomOutBtn = this.floatingHistory?.querySelector<HTMLButtonElement>('.arch-btn--zoom-out');
+    if (zoomInBtn) zoomInBtn.title = `Zoom In (${Math.round(clamped * 100)}%)`;
+    if (zoomOutBtn) zoomOutBtn.title = `Zoom Out (${Math.round(clamped * 100)}%)`;
+  }
+
+  private buildScrollbars(): void {
+    if (!this.containerElement) return;
+
+    // Vertical
+    const vTrack = document.createElement('div');
+    vTrack.className = 'arch-canvas-scrollbar arch-canvas-scrollbar--v';
+    const vThumb = document.createElement('div');
+    vThumb.className = 'arch-canvas-scrollbar__thumb';
+    vTrack.appendChild(vThumb);
+    this.containerElement.appendChild(vTrack);
+    this.scrollbarV = vTrack;
+    this.vThumb = vThumb;
+
+    let vDragging = false, vStartY = 0, vStartScroll = 0;
+    const vMove = (e: MouseEvent) => {
+      if (!vDragging) return;
+      const maxScroll = this.containerElement.scrollHeight - this.containerElement.clientHeight;
+      const trackH = vTrack.clientHeight - vThumb.offsetHeight;
+      const delta = e.clientY - vStartY;
+      const scrollDelta = trackH > 0 ? (delta / trackH) * maxScroll : 0;
+      this.containerElement.scrollTop = vStartScroll + scrollDelta;
+    };
+    const vUp = () => { vDragging = false; document.removeEventListener('mousemove', vMove); document.removeEventListener('mouseup', vUp); };
+    vThumb.addEventListener('mousedown', (e) => { e.stopPropagation(); e.preventDefault(); vDragging = true; vStartY = e.clientY; vStartScroll = this.containerElement.scrollTop; document.addEventListener('mousemove', vMove); document.addEventListener('mouseup', vUp); });
+
+    // Horizontal
+    const hTrack = document.createElement('div');
+    hTrack.className = 'arch-canvas-scrollbar arch-canvas-scrollbar--h';
+    const hThumb = document.createElement('div');
+    hThumb.className = 'arch-canvas-scrollbar__thumb';
+    hTrack.appendChild(hThumb);
+    this.containerElement.appendChild(hTrack);
+    this.scrollbarH = hTrack;
+    this.hThumb = hThumb;
+
+    let hDragging = false, hStartX = 0, hStartScroll = 0;
+    const hMove = (e: MouseEvent) => {
+      if (!hDragging) return;
+      const maxScroll = this.containerElement.scrollWidth - this.containerElement.clientWidth;
+      const trackW = hTrack.clientWidth - hThumb.offsetWidth;
+      const delta = e.clientX - hStartX;
+      const scrollDelta = trackW > 0 ? (delta / trackW) * maxScroll : 0;
+      this.containerElement.scrollLeft = hStartScroll + scrollDelta;
+    };
+    const hUp = () => { hDragging = false; document.removeEventListener('mousemove', hMove); document.removeEventListener('mouseup', hUp); };
+    hThumb.addEventListener('mousedown', (e) => { e.stopPropagation(); e.preventDefault(); hDragging = true; hStartX = e.clientX; hStartScroll = this.containerElement.scrollLeft; document.addEventListener('mousemove', hMove); document.addEventListener('mouseup', hUp); });
+
+    this.containerElement.addEventListener('scroll', () => this.syncScrollbars());
+    this.syncScrollbars();
+  }
+
+  private syncScrollbars(): void {
+    const c = this.containerElement;
+    if (this.scrollbarV && this.vThumb) {
+      const ratio = c.clientHeight / c.scrollHeight;
+      if (ratio >= 0.999) {
+        this.scrollbarV.style.display = 'none';
+      } else {
+        this.scrollbarV.style.display = 'block';
+        const thumbH = Math.max(24, c.clientHeight * ratio);
+        this.vThumb.style.height = thumbH + 'px';
+        const maxScroll = c.scrollHeight - c.clientHeight;
+        const maxTop = c.clientHeight - thumbH;
+        const top = maxScroll > 0 ? (c.scrollTop / maxScroll) * maxTop : 0;
+        this.vThumb.style.top = top + 'px';
+      }
+    }
+    if (this.scrollbarH && this.hThumb) {
+      const ratio = c.clientWidth / c.scrollWidth;
+      if (ratio >= 0.999) {
+        this.scrollbarH.style.display = 'none';
+      } else {
+        this.scrollbarH.style.display = 'block';
+        const thumbW = Math.max(24, c.clientWidth * ratio);
+        this.hThumb.style.width = thumbW + 'px';
+        const maxScroll = c.scrollWidth - c.clientWidth;
+        const maxLeft = c.clientWidth - thumbW;
+        const left = maxScroll > 0 ? (c.scrollLeft / maxScroll) * maxLeft : 0;
+        this.hThumb.style.left = left + 'px';
+      }
+    }
   }
 
   public updateHistoryState(canUndo: boolean, canRedo: boolean): void {
@@ -1319,26 +1478,16 @@ export class Canvas {
     const styleEl = doc.createElement('style');
     styleEl.id = 'arch-canvas-editor-style';
     styleEl.textContent = `
-      /* Sleek 6px canvas scrollbar (overlay so it gives space to the template area) */
+      /* Scrollbar fully removed: wheel/touch scrolling still works, but no classic or overlay
+         scrollbar reserves space, so the template always gets the full iframe width. */
       html, body {
         overflow-y: auto !important;
-        overflow-y: overlay !important;
-        scrollbar-width: thin !important;
-        scrollbar-color: #cbd5e1 transparent !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
       }
       ::-webkit-scrollbar {
-        width: 6px !important;
-        height: 6px !important;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent !important;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1 !important;
-        border-radius: 4px !important;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8 !important;
+        width: 0 !important;
+        height: 0 !important;
       }
 
       *, *:focus, *:focus-visible, [contenteditable], [contenteditable="true"] {

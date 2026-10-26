@@ -674,6 +674,63 @@ CREATE TABLE IF NOT EXISTS `email-assets` (
 
 ---
 
+## 🏷️ Template Strings / Placeholders
+
+Arch Email Editor includes a **Template Strings** sidepanel (opened via the `{}` button in the floating canvas toolbar) that lists reusable placeholder tokens your backend replaces when sending an email.
+
+The library is **host-agnostic**: it ships **no default placeholders**. You provide them at init time or at runtime.
+
+### 1. Configuration via Options
+
+Pass a flat array or a nested `{ categories }` object:
+
+```javascript
+const editor = ArchEmailEditor.create('#editor', {
+  placeholders: [
+    { value: '{{-FM_NAME-}}', label: 'Firm Name', description: 'The name of the law firm.', category: 'Firm Details' },
+    { value: '{{-CL_EMAIL-}}', label: 'Client Email', description: 'The client primary email.', category: 'Client Details' }
+  ]
+  // OR nested shape:
+  // placeholders: {
+  //   categories: [
+  //     { category_name: 'Firm Details', placeholders: [ { label: 'Firm Name', value: '{{-FM_NAME-}}', description: '...' } ] }
+  //   ]
+  // }
+});
+```
+
+Each placeholder item supports:
+- `value` (or `code`) - the template string copied/inserted (e.g. `{{-FM_NAME-}}`).
+- `label` (optional) - friendly display name.
+- `description` (optional) - meaning shown as secondary text.
+- `category` (or `category_name`) - grouping header (defaults to `General`).
+
+### 2. Runtime Updates
+
+```javascript
+// Replace the whole catalog (e.g. after fetching from your API)
+editor.setPlaceholders(fetchedPlaceholders);
+
+// Or update via the right panel directly
+editor.rightPanel?.setPlaceholders(fetchedPlaceholders);
+```
+
+### 3. Fetching from Your Own API
+
+The library makes **no network requests**. Fetch placeholders from your backend and pass them in:
+
+```javascript
+fetch('/your-backend?action=get_placeholders')
+  .then(res => res.json())
+  .then(data => editor.setPlaceholders(data.placeholders || data));
+```
+
+### 4. Empty State
+
+If no placeholders are provided, the sidepanel shows: "No template strings. Pass `placeholders` when creating the editor."
+
+---
+
 ## 📖 API Reference
 
 ### `ArchEmailEditor.create(target, options)`
@@ -706,6 +763,7 @@ Initializes and mounts the editor.
 | `onChange` | `(doc: EmailDocument) => void` | `undefined` | Fired when any content or structure changes. |
 | `onSelectBlock` | `(block: BlockNode \| null) => void` | `undefined` | Fired when an element or block is selected. |
 | `assets` | `(AssetItem \| string)[]` | `[]` | Media library assets available for image picker. |
+| `placeholders` | `PlaceholderItem[] \| { categories }` | `[]` | Template placeholder strings shown in the Template Strings sidepanel. Host-provided (no defaults). |
 | `onUploadImage` | `(file: File, callback: (url: string) => void) => void` | `undefined` | Hook called when user uploads an image file. |
 | `onBrowseMedia` | `((callback: (url: string) => void) => void)` | `undefined` | Optional override hook for custom browse modal. |
 
@@ -776,6 +834,8 @@ Initializes and mounts the editor.
 | `destroy()` | `void` | Unbinds all listeners and removes the editor from DOM. |
 | `setAssets(assets)` | `void` | Updates the media gallery assets catalog dynamically. |
 | `getAssets()` | `AssetItem[]` | Returns the currently loaded media library assets array. |
+| `setPlaceholders(placeholders)` | `void` | Updates the template strings catalog dynamically. |
+| `getPlaceholders()` | `any[]` | Returns the currently loaded template strings array. |
 
 ---
 

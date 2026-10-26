@@ -238,6 +238,31 @@ export interface PrebuiltSection {
 }
 
 /**
+ * A single template placeholder string shown in the Template Strings sidepanel.
+ * Hosts may pass either this flat shape or a nested `{ categories }` shape.
+ */
+export interface PlaceholderItem {
+  /** The template string to copy/insert (e.g. "{{-FM_NAME-}}"). Aliases: `code`. */
+  value?: string;
+  code?: string;
+  /** Friendly display name (e.g. "Firm Name"). Falls back to description, then value. */
+  label?: string;
+  /** Meaning / description of the placeholder. */
+  description?: string;
+  /** Grouping category (e.g. "Firm Details"). Aliases: `category_name`. */
+  category?: string;
+  category_name?: string;
+}
+
+export interface PlaceholderCategory {
+  category_name?: string;
+  category?: string;
+  placeholders: PlaceholderItem[];
+}
+
+export type PlaceholdersOption = PlaceholderItem[] | { categories: PlaceholderCategory[] };
+
+/**
  * Configuration options passed to `ArchEmailEditor.create(target, options)`.
  */
 /**
@@ -285,6 +310,9 @@ export interface EditorOptions {
   sections?: PrebuiltSection[];
   /** Custom modular sections array to append to the sections library */
   customSections?: PrebuiltSection[];
+  /** Template placeholder strings shown in the Template Strings sidepanel.
+   *  Accepts a flat array or a nested `{ categories }` object. Hosts fetch these from their own API. */
+  placeholders?: PlaceholdersOption;
   /** Callback fired whenever blocks, content, or settings change */
   onChange?: (doc: EmailDocument) => void;
   /** Callback fired when an element or block is selected */

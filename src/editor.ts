@@ -113,6 +113,15 @@ export class ArchEmailEditor {
     this.rightPanel?.setAssets(assets);
   }
 
+  public setPlaceholders(placeholders: any): void {
+    this.options.placeholders = placeholders;
+    this.rightPanel?.setPlaceholders(placeholders);
+  }
+
+  public getPlaceholders(): any[] {
+    return this.rightPanel?.getPlaceholders?.() ?? [];
+  }
+
   /**
    * Returns the currently loaded media assets.
    */
@@ -581,7 +590,9 @@ export class ArchEmailEditor {
       onRemoveBlock: (id) => this.removeBlock(id),
       onResolveSection: (id) => this.getSectionById(id),
       onUndo: () => this.undo(),
-      onRedo: () => this.redo()
+      onRedo: () => this.redo(),
+      onToggleSidebar: () => this.rightPanel?.toggleCollapsed() ?? false,
+      onOpenPlaceholders: () => this.rightPanel?.openPlaceholdersPanel()
     });
 
     // 4. Initialize Unified Right Panel (Blocks | Sections | Settings)
@@ -627,7 +638,8 @@ export class ArchEmailEditor {
           this.selectedBlockId = null;
           this.canvas?.clearSelection();
           this.rightPanel?.update(this.document, null, null);
-        }
+        },
+        placeholders: this.options.placeholders
       },
       resolvedSections
     );

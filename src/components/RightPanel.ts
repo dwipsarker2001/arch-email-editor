@@ -10,6 +10,7 @@
 
 import { BlockType, RowLayoutType, ViewportMode, EmailDocument, SelectedElementInfo, PrebuiltSection } from '../types';
 import { Inspector, InspectorEvents } from './Inspector';
+import { PlaceholdersSidepanel } from './inspector/PlaceholdersSidepanel';
 import { getDefaultSections } from '../engine/sections';
 
 export type RightPanelTab = 'content' | 'rows' | 'settings' | 'blocks' | 'sections';
@@ -19,6 +20,7 @@ export interface RightPanelEvents extends InspectorEvents {
   onAddRowLayout: (layout: RowLayoutType) => void;
   onInsertSection?: (section: PrebuiltSection) => void;
   onDeselect?: () => void;
+  placeholders?: any;
 }
 
 function escapeHtml(str: string): string {
@@ -44,6 +46,8 @@ export class RightPanel {
 
   // Element inspector displays in the Content tab when an element is selected
   private elementInspector: Inspector;
+  // Template strings sidepanel (slides over the Content tab)
+  private placeholdersPanel: PlaceholdersSidepanel | null = null;
   // Document inspector displays in the Settings tab for global design settings
   private documentInspector: Inspector;
 
@@ -97,6 +101,20 @@ export class RightPanel {
     });
 
     this.render();
+
+    const contentPanel = this.element.querySelector<HTMLElement>('#arch-panel-blocks');
+    if (contentPanel) {
+      contentPanel.style.position = 'relative';
+      this.placeholdersPanel = new PlaceholdersSidepanel({
+        container: contentPanel,
+        onSelect: (code) => {
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(code).catch(() => {});
+          }
+        },
+        placeholders: events.placeholders
+      });
+    }
   }
 
   private readOnly: boolean = false;
@@ -124,9 +142,35 @@ export class RightPanel {
     return this.element;
   }
 
+  /** Toggles the right sidebar and returns whether it is now collapsed. */
+  public toggleCollapsed(): boolean {
+    return this.element.classList.toggle('is-collapsed');
+  }
+
   
   public setAssets(assets: any[]): void {
     this.elementInspector.setAssets(assets);
+  }
+
+  public setPlaceholders(placeholders: any): void {
+    this.placeholdersPanel?.setPlaceholders(placeholders);
+  }
+
+  public getPlaceholders(): any[] {
+    return this.placeholdersPanel?.getPlaceholders?.() ?? [];
+  }
+
+  /** Opens (or toggles) the template-strings sidepanel in the right sidebar. */
+  public openPlaceholdersPanel(): void {
+    this.element.classList.remove('is-collapsed');
+    if (this.activeTab !== 'blocks') {
+      this.setActiveTab('blocks');
+    }
+    if (this.placeholdersPanel?.isOpen()) {
+      this.placeholdersPanel.close();
+    } else {
+      this.placeholdersPanel?.open();
+    }
   }
 
   public getAssets(): any[] {
@@ -145,6 +189,11 @@ export class RightPanel {
     // Normalize aliases: 'content' -> 'blocks', 'rows' -> 'sections'
     const normalizedTab = tab === 'content' ? 'blocks' : tab === 'rows' ? 'sections' : tab;
     if (this.activeTab === normalizedTab) return;
+
+    if (this.activeTab === "blocks" && normalizedTab !== "blocks") {
+      this.placeholdersPanel?.close();
+    }
+
     this.activeTab = normalizedTab;
 
     this.tabButtons.forEach((btn, t) => {
@@ -191,9 +240,6 @@ export class RightPanel {
   private render(): void {
     this.element.innerHTML = `
       <div class="arch-right-tabs">
-        <button type="button" class="arch-right-panel-toggle" id="arch-btn-collapse-panel" title="Collapse / Expand Panel">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
-        </button>
         <button type="button" class="arch-right-tab is-active" data-tab="blocks" data-tab-name="content" title="Content Blocks">
           <svg class="arch-tab-icon" width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
             <rect x="1" y="1" width="6" height="6" rx="1"/>
@@ -386,12 +432,6 @@ export class RightPanel {
       btn.addEventListener('click', () => {
         this.setActiveTab(tab as RightPanelTab);
       });
-    });
-
-    // Bind collapse toggle button
-    const collapseBtn = this.element.querySelector<HTMLButtonElement>('#arch-btn-collapse-panel');
-    collapseBtn?.addEventListener('click', () => {
-      this.element.classList.toggle('is-collapsed');
     });
 
     // Bind Content Block click & dragstart
