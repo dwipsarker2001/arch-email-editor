@@ -1,6 +1,7 @@
 /**
  * Arch Email Editor - Component Sidepanel Submodule
  * Sliding drawer panel displaying a full-width rectangular component preview inside an isolated iframe and name input.
+ * The preview area's height dynamically adapts to match the component's exact scaled height.
  */
 
 import { isOuterWrapperTable, isRowElement } from '../../engine/units';
@@ -75,7 +76,7 @@ function wrapForPreview(cleanHtml: string, targetComponent: HTMLElement): string
     return `<table border="0" cellpadding="0" cellspacing="0" width="100%" class="row" style="width: 100%; border-collapse: collapse; margin: 0 auto;"><tbody><tr>${cleanHtml}</tr></tbody></table>`;
   }
   if (!isRow && tag !== 'table') {
-    return `<table border="0" cellpadding="0" cellspacing="0" width="100%" class="row" style="width: 100%; border-collapse: collapse; margin: 0 auto; background: #ffffff;"><tr><td align="center" style="padding: 24px 20px;">${cleanHtml}</td></tr></table>`;
+    return `<table border="0" cellpadding="0" cellspacing="0" width="100%" class="row" style="width: 100%; border-collapse: collapse; margin: 0 auto; background: #ffffff;"><tr><td align="center" style="padding: 18px 16px;">${cleanHtml}</td></tr></table>`;
   }
 
   return cleanHtml;
@@ -117,7 +118,7 @@ export class ComponentSidepanel {
 
       <div class="arch-component-body">
         <div class="arch-component-preview-label">Preview</div>
-        <div class="arch-component-preview-wrap">
+        <div class="arch-component-preview-wrap" id="arch-component-preview-wrap">
           <iframe
             class="arch-component-preview-iframe"
             id="arch-component-preview-iframe"
@@ -143,8 +144,27 @@ export class ComponentSidepanel {
 
     this.container.appendChild(panel);
 
-    // 3. Render clean preview HTML inside the isolated iframe with edge-to-edge full-width rectangular scaling
     const iframe = panel.querySelector<HTMLIFrameElement>('#arch-component-preview-iframe');
+    const wrap = panel.querySelector<HTMLElement>('#arch-component-preview-wrap');
+
+    const applyScaledHeight = () => {
+      try {
+        const doc = iframe?.contentDocument || iframe?.contentWindow?.document;
+        const scaler = doc?.getElementById('preview-scaler');
+        if (doc && scaler && wrap && iframe) {
+          const availW = wrap.clientWidth || panel.clientWidth - 32;
+          if (availW > 0) {
+            const scale = availW / 600;
+            const naturalH = scaler.scrollHeight || scaler.offsetHeight || 60;
+            const scaledH = Math.max(Math.ceil(naturalH * scale), 36);
+            iframe.style.height = `${scaledH}px`;
+            wrap.style.height = `${scaledH}px`;
+          }
+        }
+      } catch (e) {}
+    };
+
+    // 3. Render clean preview HTML inside the isolated iframe with edge-to-edge full-width rectangular scaling
     if (iframe) {
       const doc = iframe.contentDocument || iframe.contentWindow?.document;
       if (doc) {
@@ -160,13 +180,14 @@ export class ComponentSidepanel {
                   margin: 0;
                   padding: 0;
                   width: 100%;
+                  height: auto;
                   background: #ffffff;
                   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                  overflow-x: hidden;
-                  overflow-y: auto;
+                  overflow: hidden;
                 }
                 #preview-viewport {
                   width: 100%;
+                  height: auto;
                   overflow: hidden;
                   background: #ffffff;
                 }
@@ -177,7 +198,7 @@ export class ComponentSidepanel {
                   pointer-events: none;
                   user-select: none;
                   background: #ffffff;
-                  transition: transform 0.15s ease-out;
+                  transition: transform 0.1s ease-out;
                 }
                 table {
                   width: 100% !important;
@@ -211,28 +232,35 @@ export class ComponentSidepanel {
                   var scale = availW / 600;
                   scaler.style.transform = 'scale(' + scale + ')';
 
-                  // Adapt height to the scaled content height
-                  var naturalH = scaler.scrollHeight || scaler.offsetHeight || 100;
-                  var scaledH = Math.ceil(naturalH * scale);
+                  // Adapt height to match the component's exact scaled height
+                  var naturalH = scaler.scrollHeight || scaler.offsetHeight || 60;
+                  var scaledH = Math.max(Math.ceil(naturalH * scale), 36);
                   viewport.style.height = scaledH + 'px';
                   document.body.style.height = scaledH + 'px';
 
                   try {
                     if (window.frameElement) {
-                      window.frameElement.style.height = Math.max(scaledH, 120) + 'px';
+                      window.frameElement.style.height = scaledH + 'px';
+                      var parentWrap = window.frameElement.parentElement;
+                      if (parentWrap) {
+                        parentWrap.style.height = scaledH + 'px';
+                      }
                     }
                   } catch (e) {}
                 }
 
                 window.addEventListener('resize', updateScale);
-                setTimeout(updateScale, 20);
-                setTimeout(updateScale, 100);
-                setTimeout(updateScale, 250);
+                setTimeout(updateScale, 15);
+                setTimeout(updateScale, 80);
+                setTimeout(updateScale, 200);
               </script>
             </body>
           </html>
         `);
         doc.close();
+
+        // Apply height right after document write
+        applyScaledHeight();
       }
     }
 
@@ -254,15 +282,18 @@ export class ComponentSidepanel {
       this.container.style.overflow = 'hidden';
       panel.classList.add('is-open');
 
-      // Trigger scale calculation when transition kicks in
+      // Trigger scale & height calculations when transition completes
       setTimeout(() => {
+        applyScaledHeight();
         try {
           const win = iframe?.contentWindow as any;
           if (win && win.updateScale) {
             win.updateScale();
           }
         } catch (e) {}
-      }, 100);
+      }, 80);
+
+      setTimeout(applyScaledHeight, 220);
 
       // Focus name input after slide animation begins
       setTimeout(() => {
