@@ -1767,22 +1767,26 @@ input:checked + .arch-toggle-slider:before {
 }
 
 /* Floating Bottom-Right Vertical History & Zoom Widget (Undo / Redo / Zoom) */
+.arch-editor .arch-canvas-floating-history,
 .arch-canvas-floating-history {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  left: auto;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  background: #ffffff;
-  border: 1px solid var(--arch-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.05);
-  padding: 3px;
-  gap: 2px;
-  z-index: 30;
-  user-select: none;
+  position: absolute !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  left: auto !important;
+  width: auto !important;
+  max-width: 44px !important;
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  background: #ffffff !important;
+  border: 1px solid var(--arch-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.05) !important;
+  padding: 3px !important;
+  gap: 2px !important;
+  z-index: 30 !important;
+  user-select: none !important;
+  box-sizing: border-box !important;
 }
 
 .arch-floating-history-btn {

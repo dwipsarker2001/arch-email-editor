@@ -192,6 +192,11 @@ export class Canvas {
     // Floating vertical bottom-right History & Zoom controls (BeeFree / Figma layout)
     this.floatingHistory = document.createElement('div');
     this.floatingHistory.className = 'arch-canvas-floating-history';
+    this.floatingHistory.style.position = 'absolute';
+    this.floatingHistory.style.bottom = '20px';
+    this.floatingHistory.style.right = '20px';
+    this.floatingHistory.style.left = 'auto';
+    this.floatingHistory.style.width = 'auto';
     this.floatingHistory.innerHTML = `
       <button class="arch-floating-history-btn arch-btn--undo" type="button" title="Undo (Ctrl+Z)" disabled>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
