@@ -124,10 +124,6 @@ export class Canvas {
   private hoveredDropPosition: 'before' | 'after' = 'after';
   private viewportMode: ViewportMode = 'desktop';
 private zoomLevel: number = 1;
-private scrollbarV: HTMLElement | null = null;
-private scrollbarH: HTMLElement | null = null;
-private vThumb: HTMLElement | null = null;
-private hThumb: HTMLElement | null = null;
   private isEditingText: boolean = false;
   private suppressNextClick: boolean = false;
   private iframeEventsAbortController: AbortController | null = null;
@@ -280,7 +276,6 @@ private hThumb: HTMLElement | null = null;
     this.containerElement.appendChild(this.iframe);
     this.containerElement.appendChild(this.overlayLayer);
     this.containerElement.appendChild(this.floatingHistory);
-    this.buildScrollbars();
     this.element.appendChild(this.containerElement);
 
     const placeholderButton = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--placeholder');
@@ -313,101 +308,16 @@ private hThumb: HTMLElement | null = null;
       (this.iframe.style as any).zoom = String(clamped);
       if (this.containerElement) {
         if (clamped === 1) {
-          this.containerElement.style.removeProperty('overflow');
+          this.containerElement.classList.remove('is-zoomed');
         } else {
-          this.containerElement.style.setProperty('overflow', 'auto', 'important');
+          this.containerElement.classList.add('is-zoomed');
         }
-        // reflow then sync
-        requestAnimationFrame(() => this.syncScrollbars());
       }
     }
     const zoomInBtn = this.floatingHistory?.querySelector<HTMLButtonElement>('.arch-btn--zoom-in');
     const zoomOutBtn = this.floatingHistory?.querySelector<HTMLButtonElement>('.arch-btn--zoom-out');
     if (zoomInBtn) zoomInBtn.title = `Zoom In (${Math.round(clamped * 100)}%)`;
     if (zoomOutBtn) zoomOutBtn.title = `Zoom Out (${Math.round(clamped * 100)}%)`;
-  }
-
-  private buildScrollbars(): void {
-    if (!this.containerElement) return;
-
-    // Vertical
-    const vTrack = document.createElement('div');
-    vTrack.className = 'arch-canvas-scrollbar arch-canvas-scrollbar--v';
-    const vThumb = document.createElement('div');
-    vThumb.className = 'arch-canvas-scrollbar__thumb';
-    vTrack.appendChild(vThumb);
-    this.containerElement.appendChild(vTrack);
-    this.scrollbarV = vTrack;
-    this.vThumb = vThumb;
-
-    let vDragging = false, vStartY = 0, vStartScroll = 0;
-    const vMove = (e: MouseEvent) => {
-      if (!vDragging) return;
-      const maxScroll = this.containerElement.scrollHeight - this.containerElement.clientHeight;
-      const trackH = vTrack.clientHeight - vThumb.offsetHeight;
-      const delta = e.clientY - vStartY;
-      const scrollDelta = trackH > 0 ? (delta / trackH) * maxScroll : 0;
-      this.containerElement.scrollTop = vStartScroll + scrollDelta;
-    };
-    const vUp = () => { vDragging = false; document.removeEventListener('mousemove', vMove); document.removeEventListener('mouseup', vUp); };
-    vThumb.addEventListener('mousedown', (e) => { e.stopPropagation(); e.preventDefault(); vDragging = true; vStartY = e.clientY; vStartScroll = this.containerElement.scrollTop; document.addEventListener('mousemove', vMove); document.addEventListener('mouseup', vUp); });
-
-    // Horizontal
-    const hTrack = document.createElement('div');
-    hTrack.className = 'arch-canvas-scrollbar arch-canvas-scrollbar--h';
-    const hThumb = document.createElement('div');
-    hThumb.className = 'arch-canvas-scrollbar__thumb';
-    hTrack.appendChild(hThumb);
-    this.containerElement.appendChild(hTrack);
-    this.scrollbarH = hTrack;
-    this.hThumb = hThumb;
-
-    let hDragging = false, hStartX = 0, hStartScroll = 0;
-    const hMove = (e: MouseEvent) => {
-      if (!hDragging) return;
-      const maxScroll = this.containerElement.scrollWidth - this.containerElement.clientWidth;
-      const trackW = hTrack.clientWidth - hThumb.offsetWidth;
-      const delta = e.clientX - hStartX;
-      const scrollDelta = trackW > 0 ? (delta / trackW) * maxScroll : 0;
-      this.containerElement.scrollLeft = hStartScroll + scrollDelta;
-    };
-    const hUp = () => { hDragging = false; document.removeEventListener('mousemove', hMove); document.removeEventListener('mouseup', hUp); };
-    hThumb.addEventListener('mousedown', (e) => { e.stopPropagation(); e.preventDefault(); hDragging = true; hStartX = e.clientX; hStartScroll = this.containerElement.scrollLeft; document.addEventListener('mousemove', hMove); document.addEventListener('mouseup', hUp); });
-
-    this.containerElement.addEventListener('scroll', () => this.syncScrollbars());
-    this.syncScrollbars();
-  }
-
-  private syncScrollbars(): void {
-    const c = this.containerElement;
-    if (this.scrollbarV && this.vThumb) {
-      const ratio = c.clientHeight / c.scrollHeight;
-      if (ratio >= 0.999) {
-        this.scrollbarV.style.display = 'none';
-      } else {
-        this.scrollbarV.style.display = 'block';
-        const thumbH = Math.max(24, c.clientHeight * ratio);
-        this.vThumb.style.height = thumbH + 'px';
-        const maxScroll = c.scrollHeight - c.clientHeight;
-        const maxTop = c.clientHeight - thumbH;
-        const top = maxScroll > 0 ? (c.scrollTop / maxScroll) * maxTop : 0;
-        this.vThumb.style.top = top + 'px';
-      }
-    }
-    if (this.scrollbarH && this.hThumb) {
-      const ratio = c.clientWidth / c.scrollWidth;
-      if (ratio >= 0.999) {
-        this.scrollbarH.style.display = 'none';
-      } else {
-        this.scrollbarH.style.display = 'block';
-        const thumbW = Math.max(24, c.clientWidth * ratio);
-        this.hThumb.style.width = thumbW + 'px';
-        const maxScroll = c.scrollWidth - c.clientWidth;
-        const maxLeft = c.clientWidth - thumbW;
-        const left = maxScroll > 0 ? (c.scrollLeft / maxScroll) * maxLeft : 0;
-        this.hThumb.style.left = left + 'px';
-      }
-    }
   }
 
   public updateHistoryState(canUndo: boolean, canRedo: boolean): void {

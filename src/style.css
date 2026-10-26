@@ -634,48 +634,30 @@
   position: relative !important;
 }
 
-/* Custom overlay scrollbars for zoomed canvas */
-.arch-canvas-scrollbar {
-  position: absolute !important;
-  z-index: 40 !important;
-  background: rgba(15, 23, 42, 0.08) !important;
-  border-radius: 4px !important;
-  opacity: 1 !important;
-  transition: opacity 0.15s ease !important;
-  pointer-events: auto !important;
+/* Native scrollbars shown only when canvas is zoomed */
+.arch-canvas-container.is-zoomed {
+  overflow: auto !important;
+  scrollbar-width: auto !important;
+  -ms-overflow-style: auto !important;
 }
 
-.arch-canvas-scrollbar--v {
-  top: 6px !important;
-  right: 4px !important;
-  bottom: 6px !important;
-  width: 8px !important;
+.arch-canvas-container.is-zoomed::-webkit-scrollbar {
+  display: block !important;
+  width: 10px !important;
+  height: 10px !important;
 }
 
-.arch-canvas-scrollbar--h {
-  left: 6px !important;
-  right: 6px !important;
-  bottom: 4px !important;
-  height: 8px !important;
+.arch-canvas-container.is-zoomed::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.35) !important;
+  border-radius: 5px !important;
 }
 
-.arch-canvas-scrollbar__thumb {
-  position: absolute !important;
-  background: rgba(15, 23, 42, 0.45) !important;
-  border-radius: 4px !important;
-  cursor: grab !important;
-  transition: background 0.15s ease !important;
-  min-height: 24px !important;
-  min-width: 24px !important;
+.arch-canvas-container.is-zoomed::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.6) !important;
 }
 
-.arch-canvas-scrollbar__thumb:hover {
-  background: rgba(15, 23, 42, 0.7) !important;
-}
-
-.arch-canvas-scrollbar__thumb:active {
-  cursor: grabbing !important;
-  background: #2563eb !important;
+.arch-canvas-container.is-zoomed::-webkit-scrollbar-track {
+  background: transparent !important;
 }
 
 .arch-editor__canvas::-webkit-scrollbar,
