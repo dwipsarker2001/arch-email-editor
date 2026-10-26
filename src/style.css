@@ -638,16 +638,11 @@
 .arch-canvas-scrollbar {
   position: absolute !important;
   z-index: 40 !important;
-  background: rgba(15, 23, 42, 0.06) !important;
+  background: rgba(15, 23, 42, 0.08) !important;
   border-radius: 4px !important;
-  opacity: 0 !important;
+  opacity: 1 !important;
   transition: opacity 0.15s ease !important;
   pointer-events: auto !important;
-}
-
-.arch-canvas-container:hover .arch-canvas-scrollbar,
-.arch-canvas-scrollbar:active {
-  opacity: 1 !important;
 }
 
 .arch-canvas-scrollbar--v {
