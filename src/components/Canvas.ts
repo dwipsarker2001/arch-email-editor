@@ -198,13 +198,16 @@ export class Canvas {
     this.floatingHistory.style.left = 'auto';
     this.floatingHistory.style.width = 'auto';
     this.floatingHistory.innerHTML = `
+      <button class="arch-floating-history-btn arch-btn--placeholder" type="button" title="Placeholders ({})">
+        <span style="font-family: monospace; font-size: 13px; font-weight: 700; line-height: 1;">{}</span>
+      </button>
+      <span class="arch-floating-history-divider"></span>
       <button class="arch-floating-history-btn arch-btn--undo" type="button" title="Undo (Ctrl+Z)" disabled>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 14 4 9l5-5"/>
           <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/>
         </svg>
       </button>
-      <span class="arch-floating-history-divider"></span>
       <button class="arch-floating-history-btn arch-btn--redo" type="button" title="Redo (Ctrl+Y)" disabled>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="m15 14 5-5-5-5"/>
@@ -226,10 +229,6 @@ export class Canvas {
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
           <line x1="8" y1="11" x2="14" y2="11"/>
         </svg>
-      </button>
-      <span class="arch-floating-history-divider"></span>
-      <button class="arch-floating-history-btn arch-btn--placeholder" type="button" title="Placeholders ({})">
-        <span style="font-family: monospace; font-size: 13px; font-weight: 700; line-height: 1;">{}</span>
       </button>
     `;
 
