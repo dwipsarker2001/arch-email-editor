@@ -2522,6 +2522,7 @@ private zoomLevel: number = 1;
           <button type="button" class="arch-toolbar-btn arch-toolbar-btn--color" id="btn-tb-hilite-color" title="Highlight Color">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 2 4 4-12 12H6v-4L18 2z"/></svg>
             <span class="arch-toolbar-color-indicator" id="tb-hilite-bar" style="background: #facc15;"></span>
+            <input type="color" id="tb-hilite-input" value="#facc15" style="position:absolute;opacity:0;width:0;height:0;border:none;padding:0;margin:0;" />
           </button>
           <span class="arch-toolbar-divider"></span>
           <button type="button" class="arch-toolbar-btn" data-cmd="superscript" title="Superscript">X²</button>
@@ -2584,9 +2585,14 @@ private zoomLevel: number = 1;
         }
       });
 
-      textToolbar.querySelector('#btn-tb-hilite-color')?.addEventListener('click', (e) => {
+      const hiliteInput = textToolbar.querySelector<HTMLInputElement>('#tb-hilite-input');
+      const hiliteBtn = textToolbar.querySelector<HTMLButtonElement>('#btn-tb-hilite-color');
+      hiliteBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
-        const color = prompt('Enter highlight color:', '#fef08a');
+        hiliteInput?.click();
+      });
+      hiliteInput?.addEventListener('change', () => {
+        const color = hiliteInput.value;
         if (color && ifrDoc) {
           ifrDoc.execCommand('hiliteColor', false, color);
           const bar = textToolbar.querySelector<HTMLElement>('#tb-hilite-bar');
