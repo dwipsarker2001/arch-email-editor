@@ -6,7 +6,7 @@ Make the Alt text and Link fields in the image inspector visually consistent wit
 
 ## Design
 
-Use the existing metadata field-row layout for the two image fields: a vertical label/input arrangement, full-width controls, 14px vertical and 18px horizontal padding, and an 8px gap. Keep the existing field labels, link prefix, values, and input event behavior unchanged. Limit the change to these two fields.
+Use the existing metadata field-row layout for the two image fields: a vertical label/input arrangement, full-width controls, 14px vertical and 18px horizontal padding, an 8px gap, and the lighter metadata label style. Keep the existing field labels, link prefix, values, and input event behavior unchanged. Limit the change to these two fields.
 
 ## Validation
 

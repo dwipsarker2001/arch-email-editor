@@ -1074,7 +1074,7 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
                 <div class="alignment" align="center">
                   <div class="fullWidth" style="max-width: 300px;">
                     <a href="https://example.com/promo" target="_blank" class="promo-link">
-                      <img src="https://example.com/banner.png" style="display: block; height: auto; border: 0; width: 100%;" width="300" alt="Promo" />
+                      <img src="https://example.com/banner.png" style="display: block; height: auto; border: 0; width: 100%;" width="300" height="150" alt="Promo" />
                     </a>
                   </div>
                 </div>
@@ -1132,10 +1132,21 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
 
     expect(img.getAttribute('width')).toBe('380');
+    expect(img.getAttribute('height')).toBe('190');
     expect(img.style.maxWidth).toBe('380px');
     expect(sizeWrapper.style.maxWidth).toBe('380px');
+    expect(sizeWrapper.style.height).toBe('190px');
 
-    // 4. Using the Inspector range slider or preset buttons also resizes the image cleanly
+    // 4. Dragging a middle edge handle resizes only that axis
+    const eastHandle = container.querySelector('.arch-resize-handle--e') as HTMLElement;
+    eastHandle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 200, clientY: 200 }));
+    window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 240, clientY: 200 }));
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    expect(img.getAttribute('width')).toBe('420');
+    expect(img.getAttribute('height')).toBe('190');
+    expect(sizeWrapper.style.height).toBe('190px');
+
+    // 5. Using the Inspector range slider or preset buttons also resizes the image cleanly
     const preset50 = container.querySelector('[data-width-preset="50%"]') as HTMLButtonElement;
     expect(preset50).toBeTruthy();
     preset50.click();

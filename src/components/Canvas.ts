@@ -668,13 +668,24 @@ private zoomLevel: number = 1;
     }
 
     if (state.kind === 'image') {
-      const nextWidth = state.dirX !== 0
+      let nextWidth = state.dirX !== 0
         ? Math.round(Math.max(24, Math.min(state.maxWidth, state.startWidth + deltaX)))
         : Math.round(state.startWidth);
-
-      const nextHeight = state.dirY !== 0
+      let nextHeight = state.dirY !== 0
         ? Math.round(Math.max(20, state.startHeight + deltaY))
         : Math.round(state.startHeight);
+
+      if (state.dirX !== 0 && state.dirY !== 0) {
+        const widthScale = nextWidth / state.startWidth;
+        const heightScale = nextHeight / state.startHeight;
+        const scale = Math.abs(widthScale - 1) >= Math.abs(heightScale - 1) ? widthScale : heightScale;
+        const boundedScale = Math.max(
+          Math.max(24 / state.startWidth, 20 / state.startHeight),
+          Math.min(state.maxWidth / state.startWidth, scale)
+        );
+        nextWidth = Math.round(state.startWidth * boundedScale);
+        nextHeight = Math.round(state.startHeight * boundedScale);
+      }
 
       ImageAdapter.setDimensions(state.target, nextWidth, nextHeight, state.unit);
       this.dimensionsBadge.textContent = `${nextWidth} × ${nextHeight}`;

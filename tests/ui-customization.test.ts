@@ -177,6 +177,8 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
 
     const previewTag = container.querySelector<HTMLImageElement>('#arch-img-preview-tag');
     expect(previewTag).not.toBeNull();
+    expect(container.querySelector('#inp-img-alt')?.closest('.arch-form-group')?.getAttribute('style') || '').toContain('padding: 12px 18px 12px');
+    expect(container.querySelector('#inp-img-link')?.closest('.arch-form-group')?.getAttribute('style') || '').toContain('padding: 12px 18px 12px');
 
     // Changing the URL input updates the preview image
     const srcInput = container.querySelector<HTMLInputElement>('#inp-img-src');

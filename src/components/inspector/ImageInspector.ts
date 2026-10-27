@@ -266,12 +266,12 @@ export class ImageInspector {
         </select>
       </div>
 
-      <div class="arch-form-group">
+      <div class="arch-form-group" style="padding: 12px 18px 12px;">
         <label class="arch-form-label">Alt text</label>
         <input type="text" class="arch-input" id="inp-img-alt" value="${alt}" placeholder="Description of image" />
       </div>
 
-      <div class="arch-form-group">
+      <div class="arch-form-group" style="padding: 12px 18px 12px;">
         <label class="arch-form-label">Link (optional)</label>
         <div class="arch-url-group">
           <span class="arch-url-prefix">https://</span>
