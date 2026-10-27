@@ -539,8 +539,7 @@
 .arch-editor__right-panel.is-collapsed .arch-right-tabs {
   width: 0 !important;
   padding: 0 !important;
-  overflow: visible !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  overflow: hidden !important;
 }
 
 .arch-editor .arch-right-tabs,
@@ -554,29 +553,6 @@
   gap: 0;
   flex-shrink: 0;
   height: 46px;
-}
-
-.arch-right-panel-toggle {
-  position: absolute;
-  left: -14px;
-  top: 9px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #7747ff;
-  color: #ffffff;
-  border: 2px solid #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 50;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
-  transition: transform 0.2s ease, background-color 0.15s ease;
-}
-
-.arch-right-panel-toggle:hover {
-  background: #6336e0;
 }
 
 .arch-editor button.arch-right-tab,
@@ -650,10 +626,72 @@
   background: #ffffff;
 }
 
+.arch-editor__canvas,
+.arch-canvas-container {
+  overflow: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  position: relative !important;
+}
+
+/* Native scrollbars shown only when canvas is zoomed */
+.arch-canvas-container.is-zoomed {
+  overflow: auto !important;
+  scrollbar-width: auto !important;
+  -ms-overflow-style: auto !important;
+}
+
+.arch-canvas-container.is-zoomed::-webkit-scrollbar {
+  display: block !important;
+  width: 10px !important;
+  height: 10px !important;
+}
+
+.arch-canvas-container.is-zoomed::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.35) !important;
+  border-radius: 5px !important;
+}
+
+.arch-canvas-container.is-zoomed::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.6) !important;
+}
+
+.arch-canvas-container.is-zoomed::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.arch-editor__canvas::-webkit-scrollbar,
+.arch-canvas-container::-webkit-scrollbar,
+.arch-canvas-iframe::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 .arch-right-tab-content::-webkit-scrollbar,
 .arch-tab-panel::-webkit-scrollbar,
 .arch-editor__inspector::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
+}
+
+.arch-right-tab-content::-webkit-scrollbar-track,
+.arch-tab-panel::-webkit-scrollbar-track,
+.arch-editor__inspector::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.arch-right-tab-content::-webkit-scrollbar-thumb,
+.arch-tab-panel::-webkit-scrollbar-thumb,
+.arch-editor__inspector::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.arch-right-tab-content::-webkit-scrollbar-thumb:hover,
+.arch-tab-panel::-webkit-scrollbar-thumb:hover,
+.arch-editor__inspector::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .arch-right-tab-content::-webkit-scrollbar-track,
@@ -1766,21 +1804,28 @@ input:checked + .arch-toggle-slider:before {
   position: relative;
 }
 
-/* Floating Bottom-Left History Widget (Undo / Redo) */
+/* Floating Top-Right Vertical Canvas Tools (Placeholders / History / Zoom) */
+.arch-editor .arch-canvas-floating-history,
 .arch-canvas-floating-history {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  display: inline-flex;
-  align-items: center;
-  background: #ffffff;
-  border: 1px solid var(--arch-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.05);
-  padding: 3px;
-  gap: 2px;
-  z-index: 30;
-  user-select: none;
+  position: absolute !important;
+  top: 10px !important;
+  bottom: auto !important;
+  right: 10px !important;
+  left: auto !important;
+  width: auto !important;
+  max-width: 44px !important;
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  background: #ffffff !important;
+  border: 1px solid var(--arch-border) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+  padding: 3px !important;
+  gap: 2px !important;
+  z-index: 30 !important;
+  user-select: none !important;
+  box-sizing: border-box !important;
 }
 
 .arch-floating-history-btn {
@@ -1807,16 +1852,21 @@ input:checked + .arch-toggle-slider:before {
   background: #e2e8f0;
 }
 
+.arch-floating-history-btn.is-active {
+  background: #eff6ff;
+  color: var(--arch-primary);
+}
+
 .arch-floating-history-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
 
 .arch-floating-history-divider {
-  width: 1px;
-  height: 16px;
+  width: 16px;
+  height: 1px;
   background: var(--arch-border);
-  margin: 0 2px;
+  margin: 2px 0;
 }
 
 .arch-canvas-iframe {
@@ -1914,7 +1964,7 @@ input:checked + .arch-toggle-slider:before {
   background: rgba(0, 0, 0, 0.4) !important;
 }
 
-/* Ensure comment, delete, copy icons are always pure white with zero external framework bleed */
+/* Ensure component, delete, copy icons are always pure white with zero external framework bleed */
 .arch-editor .arch-rge-action-btn svg,
 .arch-rge-action-btn svg,
 .arch-rge-bottom-actions svg {
@@ -2032,6 +2082,62 @@ input:checked + .arch-toggle-slider:before {
   height: 2px;
   width: 12px;
   border-radius: 1px;
+}
+
+/* Highlight color palette (small swatches, above toolbar) */
+.arch-tb-hilite-palette {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 6px;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  z-index: 60;
+  min-width: 160px;
+}
+
+.arch-tb-hilite-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.arch-tb-swatch {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.arch-tb-swatch:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2);
+}
+
+.arch-tb-hilite-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.arch-tb-hilite-custom input[type="color"] {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
 }
 
 .arch-editor .arch-floating-toolbar,
@@ -3517,6 +3623,7 @@ body.arch-canvas-dragging *,
   width: 100% !important;
   display: flex !important;
   flex-direction: column !important;
+  overflow: hidden !important;
 }
 
 #editor-container .arch-canvas-iframe {
@@ -3544,3 +3651,348 @@ body.arch-canvas-dragging *,
   overflow-x: hidden !important;
 }
 
+/* Component Save Sidepanel */
+.arch-editor .arch-component-sidepanel,
+.arch-component-sidepanel {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: #ffffff !important;
+  z-index: 100 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  transform: translateX(100%) !important;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.arch-editor .arch-component-sidepanel.is-open,
+.arch-component-sidepanel.is-open {
+  transform: translateX(0) !important;
+}
+
+.arch-editor .arch-component-header,
+.arch-component-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  padding: 12px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-component-header .arch-prop-title,
+.arch-component-header .arch-prop-title {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+}
+
+.arch-editor .arch-component-body,
+.arch-component-body {
+  flex: 1 1 0% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 16px !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+}
+
+.arch-editor .arch-component-preview-label,
+.arch-component-preview-label {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  margin-bottom: 8px !important;
+}
+
+.arch-editor .arch-component-preview-wrap,
+.arch-component-preview-wrap {
+  width: 100% !important;
+  flex: 0 0 auto !important;
+  height: auto !important;
+  min-height: 36px !important;
+  max-height: 300px !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  padding: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  transition: height 0.12s ease !important;
+}
+
+.arch-editor .arch-component-preview-iframe,
+.arch-component-preview-iframe {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 36px !important;
+  border: none !important;
+  display: block !important;
+  background: #ffffff !important;
+}
+
+.arch-editor .arch-component-field,
+.arch-component-field {
+  margin-top: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+}
+
+.arch-editor .arch-component-footer,
+.arch-component-footer {
+  padding: 16px !important;
+  border-top: 1px solid #f1f5f9 !important;
+  background: #ffffff !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+}
+
+.arch-editor .arch-component-name-label,
+.arch-component-name-label {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.arch-editor .arch-component-name-input,
+.arch-component-name-input {
+  width: 100% !important;
+  height: 36px !important;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  padding: 0 12px !important;
+  font-size: 13px !important;
+  color: #0f172a !important;
+  box-sizing: border-box !important;
+  outline: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.arch-editor .arch-component-name-input:focus,
+.arch-component-name-input:focus {
+  border-color: #7747ff !important;
+  box-shadow: 0 0 0 2px rgba(119, 71, 255, 0.15) !important;
+}
+
+/* Dark theme overrides */
+.arch-theme--dark .arch-component-sidepanel {
+  background: #18191b !important;
+  color: #e2e8f0 !important;
+}
+.arch-theme--dark .arch-component-header,
+.arch-theme--dark .arch-component-footer {
+  background: #18191b !important;
+  border-color: #27272a !important;
+}
+.arch-theme--dark .arch-component-header .arch-prop-title {
+  color: #f1f5f9 !important;
+}
+.arch-theme--dark .arch-component-name-label {
+  color: #94a3b8 !important;
+}
+.arch-theme--dark .arch-component-preview-wrap {
+  background: #0f172a !important;
+  border-color: #27272a !important;
+}
+.arch-theme--dark .arch-component-name-input {
+  background: #27272a !important;
+  border-color: #3f3f46 !important;
+  color: #f8fafc !important;
+}
+
+/* Template Strings Sidepanel (right sidebar) - minimal clean design */
+.arch-placeholders-sidepanel,
+.arch-placeholders-sidepanel * {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.arch-placeholders-group + .arch-placeholders-group {
+  margin-top: 14px;
+}
+
+.arch-placeholders-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 2px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #0f172a;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.arch-placeholders-group-title::before,
+.arch-placeholders-group-title::after {
+  display: none;
+}
+
+.arch-placeholders-group-name {
+  flex: 0 0 auto;
+  text-align: left;
+  color: #0f172a;
+}
+
+.arch-placeholders-group-count {
+  display: none;
+}
+
+.arch-placeholders-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.arch-placeholder-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.arch-placeholder-item:last-child {
+  border-bottom: none;
+}
+
+.arch-placeholder-item:hover {
+  background: #f8fafc;
+}
+
+.arch-placeholder-item:active {
+  transform: scale(0.99);
+}
+
+.arch-placeholder-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.arch-placeholder-item__code {
+  font-family: 'Inter', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #2563eb;
+  word-break: break-word;
+}
+
+.arch-placeholder-item__desc {
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.arch-placeholder-item__actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.arch-placeholder-item__copy {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.arch-placeholder-item:hover .arch-placeholder-item__copy {
+  opacity: 1;
+}
+
+.arch-placeholder-item__copy:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.arch-placeholder-item__copy.is-copied {
+  opacity: 1;
+  color: #16a34a;
+}
+
+/* Prevent external CRM CSS from highlighting the search input */
+.arch-placeholders-sidepanel .arch-assets-search-input,
+.arch-placeholders-sidepanel .arch-assets-search-input:focus,
+.arch-placeholders-sidepanel .arch-assets-search-input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+.arch-placeholders-sidepanel .arch-assets-search-box,
+.arch-placeholders-sidepanel .arch-assets-search-box:focus-within {
+  box-shadow: none !important;
+  border-color: #e2e8f0 !important;
+}
+
+.arch-placeholders-sidepanel .arch-icon-btn,
+.arch-placeholders-sidepanel .arch-icon-btn.is-active {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.arch-placeholder-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+
+.arch-placeholder-item__copy {
+  flex-shrink: 0;
+  color: #64748b;
+}
+
+.arch-placeholder-item__copy:hover {
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.arch-placeholder-item__copy.is-copied {
+  color: #16a34a;
+}

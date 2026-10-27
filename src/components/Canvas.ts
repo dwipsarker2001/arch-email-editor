@@ -81,6 +81,10 @@ export interface CanvasEvents {
   onResolveSection?: (id: string) => PrebuiltSection | undefined;
   onUndo?: () => void;
   onRedo?: () => void;
+  /** Toggles the right sidebar; returns whether it is now collapsed. */
+  onToggleSidebar?: () => boolean;
+  /** Opens the template-strings sidepanel in the right sidebar. */
+  onOpenPlaceholders?: () => void;
 }
 
 function isTextLeafElement(el: HTMLElement | null): boolean {
@@ -119,6 +123,7 @@ export class Canvas {
   private hoveredDropTarget: HTMLElement | null = null;
   private hoveredDropPosition: 'before' | 'after' = 'after';
   private viewportMode: ViewportMode = 'desktop';
+private zoomLevel: number = 1;
   private isEditingText: boolean = false;
   private suppressNextClick: boolean = false;
   private iframeEventsAbortController: AbortController | null = null;
@@ -189,21 +194,59 @@ export class Canvas {
     this.overlayLayer = document.createElement('div');
     this.overlayLayer.className = 'arch-canvas-overlay';
 
-    // Floating bottom-left Undo / Redo controls (BeeFree / Figma layout)
+    // Floating vertical top-right Canvas Tools (Placeholders, History & Zoom)
     this.floatingHistory = document.createElement('div');
     this.floatingHistory.className = 'arch-canvas-floating-history';
+    this.floatingHistory.style.position = 'absolute';
+    this.floatingHistory.style.top = '10px';
+    this.floatingHistory.style.bottom = 'auto';
+    this.floatingHistory.style.right = '10px';
+    this.floatingHistory.style.left = 'auto';
+    this.floatingHistory.style.width = 'auto';
     this.floatingHistory.innerHTML = `
+      <button class="arch-floating-history-btn arch-btn--sidebar-close" type="button" title="Close sidebar" aria-label="Close sidebar" aria-expanded="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="18" x="3" y="3" rx="2"/>
+          <path d="M15 3v18"/>
+        </svg>
+      </button>
+      <span class="arch-floating-history-divider"></span>
+      <button class="arch-floating-history-btn arch-btn--placeholder" type="button" title="Placeholders ({})" aria-label="Template strings" aria-haspopup="menu" aria-expanded="false">
+        <span style="font-family: monospace; font-size: 13px; font-weight: 700; line-height: 1;">{}</span>
+      </button>
+      <span class="arch-floating-history-divider"></span>
       <button class="arch-floating-history-btn arch-btn--undo" type="button" title="Undo (Ctrl+Z)" disabled>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 14 4 9l5-5"/>
           <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/>
         </svg>
       </button>
-      <span class="arch-floating-history-divider"></span>
       <button class="arch-floating-history-btn arch-btn--redo" type="button" title="Redo (Ctrl+Y)" disabled>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="m15 14 5-5-5-5"/>
           <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13"/>
+        </svg>
+      </button>
+      <span class="arch-floating-history-divider"></span>
+      <button class="arch-floating-history-btn arch-btn--zoom-in" type="button" title="Zoom In">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          <line x1="11" y1="8" x2="11" y2="14"/>
+          <line x1="8" y1="11" x2="14" y2="11"/>
+        </svg>
+      </button>
+      <button class="arch-floating-history-btn arch-btn--zoom-out" type="button" title="Zoom Out">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          <line x1="8" y1="11" x2="14" y2="11"/>
+        </svg>
+      </button>
+      <span class="arch-floating-history-divider"></span>
+      <button class="arch-floating-history-btn arch-btn--ai" type="button" title="AI Assistant" aria-label="AI Assistant">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>
         </svg>
       </button>
     `;
@@ -218,12 +261,63 @@ export class Canvas {
       this.events.onRedo?.();
     });
 
+    const sidebarToggle = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--sidebar-close');
+    sidebarToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const collapsed = this.events.onToggleSidebar?.();
+      if (typeof collapsed === 'boolean') {
+        sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+        const label = collapsed ? 'Open sidebar' : 'Close sidebar';
+        sidebarToggle.title = label;
+        sidebarToggle.setAttribute('aria-label', label);
+      }
+    });
+
     this.containerElement.appendChild(this.iframe);
     this.containerElement.appendChild(this.overlayLayer);
     this.containerElement.appendChild(this.floatingHistory);
     this.element.appendChild(this.containerElement);
 
+    const placeholderButton = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--placeholder');
+    placeholderButton?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.events.onOpenPlaceholders?.();
+    });
+
+    // Zoom controls
+    this.zoomLevel = 1;
+    const zoomInBtn = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--zoom-in');
+    const zoomOutBtn = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--zoom-out');
+    zoomInBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.setZoom(this.zoomLevel + 0.1);
+    });
+    zoomOutBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.setZoom(this.zoomLevel - 0.1);
+    });
+
     this.bindOuterEvents();
+  }
+
+  public setZoom(level: number): void {
+    const clamped = Math.min(2, Math.max(0.5, Math.round(level * 10) / 10));
+    this.zoomLevel = clamped;
+    if (this.iframe) {
+      // CSS `zoom` reflows the iframe so the canvas container can scroll
+      (this.iframe.style as any).zoom = String(clamped);
+      if (this.containerElement) {
+        if (clamped === 1) {
+          this.containerElement.classList.remove('is-zoomed');
+        } else {
+          this.containerElement.classList.add('is-zoomed');
+        }
+      }
+    }
+    const zoomInBtn = this.floatingHistory?.querySelector<HTMLButtonElement>('.arch-btn--zoom-in');
+    const zoomOutBtn = this.floatingHistory?.querySelector<HTMLButtonElement>('.arch-btn--zoom-out');
+    if (zoomInBtn) zoomInBtn.title = `Zoom In (${Math.round(clamped * 100)}%)`;
+    if (zoomOutBtn) zoomOutBtn.title = `Zoom Out (${Math.round(clamped * 100)}%)`;
   }
 
   public updateHistoryState(canUndo: boolean, canRedo: boolean): void {
@@ -1294,6 +1388,18 @@ export class Canvas {
     const styleEl = doc.createElement('style');
     styleEl.id = 'arch-canvas-editor-style';
     styleEl.textContent = `
+      /* Scrollbar fully removed: wheel/touch scrolling still works, but no classic or overlay
+         scrollbar reserves space, so the template always gets the full iframe width. */
+      html, body {
+        overflow-y: auto !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+      }
+      ::-webkit-scrollbar {
+        width: 0 !important;
+        height: 0 !important;
+      }
+
       *, *:focus, *:focus-visible, [contenteditable], [contenteditable="true"] {
         outline: none !important;
         -webkit-tap-highlight-color: transparent !important;
@@ -2348,7 +2454,7 @@ export class Canvas {
       this.selectionOverlay = selOverlay;
     }
 
-    // 1. Bottom Action Bar (Comment, Delete, Duplicate Attached to Bottom Edge)
+    // 1. Bottom Action Bar (Component, Delete, Duplicate Attached to Bottom Edge)
     const effectiveActionUnit =
       (this.activeMoveableUnit && this.activeMoveableUnit.classList?.contains('arch-selected-element') ? this.activeMoveableUnit : null) ||
       (unit && unit.classList?.contains('arch-selected-element') ? unit : null) ||
@@ -2357,8 +2463,8 @@ export class Canvas {
     const bottomActions = document.createElement('div');
     bottomActions.className = 'arch-rge-bottom-actions';
     bottomActions.innerHTML = `
-      <button type="button" class="arch-rge-action-btn btn-rge-comment" title="Add comment">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <button type="button" class="arch-rge-action-btn btn-rge-component btn-rge-comment" title="Component">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.536 11.293a1 1 0 0 0 0 1.414l2.376 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"/><path d="M2.297 11.293a1 1 0 0 0 0 1.414l2.377 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414L6.088 8.916a1 1 0 0 0-1.414 0z"/><path d="M8.916 17.912a1 1 0 0 0 0 1.415l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.415l-2.377-2.376a1 1 0 0 0-1.414 0z"/><path d="M8.916 4.674a1 1 0 0 0 0 1.414l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"/></svg>
       </button>
       <button type="button" class="arch-rge-action-btn btn-rge-del" title="Delete element">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -2378,10 +2484,10 @@ export class Canvas {
       this.duplicateSelectedElement(effectiveActionUnit);
     });
 
-    bottomActions.querySelector('.btn-rge-comment')?.addEventListener('click', (e) => {
+    bottomActions.querySelector('.btn-rge-component, .btn-rge-comment')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      const commentBtn = document.querySelector<HTMLButtonElement>('#btn-prop-comment');
-      commentBtn?.click();
+      const componentBtn = document.querySelector<HTMLButtonElement>('#btn-prop-component, #btn-prop-comment');
+      componentBtn?.click();
     });
 
     this.overlayLayer.appendChild(bottomActions);
@@ -2402,6 +2508,27 @@ export class Canvas {
     if (showTextToolbar && editableHost && ifrDoc) {
       const textToolbar = document.createElement('div');
       textToolbar.className = 'arch-rge-text-toolbar';
+      // Preserve the text selection so color apply works after focus moves to the toolbar
+      const savedSelection = ifrDoc.getSelection();
+      let savedRange = (savedSelection && savedSelection.rangeCount > 0)
+        ? savedSelection.getRangeAt(0).cloneRange()
+        : null;
+      const saveSelection = () => {
+        const s = ifrDoc.getSelection();
+        if (s && s.rangeCount > 0) savedRange = s.getRangeAt(0).cloneRange();
+      };
+      const restoreSelection = () => {
+        if (!savedRange) return;
+        try {
+          const sel = ifrDoc.getSelection();
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(savedRange);
+          }
+        } catch (e) { /* ignore */ }
+      };
+      const onSelChange = () => saveSelection();
+      ifrDoc.addEventListener('selectionchange', onSelChange);
       textToolbar.innerHTML = `
         <div class="arch-rge-toolbar-row">
           <button type="button" class="arch-toolbar-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
@@ -2412,10 +2539,13 @@ export class Canvas {
           <button type="button" class="arch-toolbar-btn arch-toolbar-btn--color" id="btn-tb-text-color" title="Text Color">
             <span style="font-weight: 700; font-size: 11px;">A</span>
             <span class="arch-toolbar-color-indicator" id="tb-color-bar" style="background: #101112;"></span>
+            <input type="color" id="tb-text-input" style="position:absolute;opacity:0;width:0;height:0;border:none;padding:0;margin:0;" value="#101112" />
           </button>
-          <button type="button" class="arch-toolbar-btn arch-toolbar-btn--color" id="btn-tb-hilite-color" title="Highlight Color">
+          <button type="button" class="arch-toolbar-btn arch-toolbar-btn--color" id="btn-tb-hilite-color" title="Highlight Color" style="position:relative;">
+
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 2 4 4-12 12H6v-4L18 2z"/></svg>
             <span class="arch-toolbar-color-indicator" id="tb-hilite-bar" style="background: #facc15;"></span>
+            <input type="color" id="tb-hilite-input" style="position:absolute;opacity:0;width:0;height:0;border:none;padding:0;margin:0;" value="#facc15" />
           </button>
           <span class="arch-toolbar-divider"></span>
           <button type="button" class="arch-toolbar-btn" data-cmd="superscript" title="Superscript">X²</button>
@@ -2469,25 +2599,68 @@ export class Canvas {
 
       textToolbar.querySelector('#btn-tb-text-color')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        const color = prompt('Enter hex text color:', '#7747ff');
-        if (color && ifrDoc) {
-          ifrDoc.execCommand('foreColor', false, color);
-          const bar = textToolbar.querySelector<HTMLElement>('#tb-color-bar');
-          if (bar) bar.style.background = color;
-          this.onStructureChanged();
+        const textColorInput = textToolbar.querySelector<HTMLInputElement>('#tb-text-input');
+        if (textColorInput) {
+          saveSelection();
+          textColorInput.click();
         }
       });
 
-      textToolbar.querySelector('#btn-tb-hilite-color')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const color = prompt('Enter highlight color:', '#fef08a');
+      const applyTextColor = (color: string) => {
         if (color && ifrDoc) {
-          ifrDoc.execCommand('hiliteColor', false, color);
-          const bar = textToolbar.querySelector<HTMLElement>('#tb-hilite-bar');
+          restoreSelection();
+          ifrDoc.execCommand('foreColor', false, color);
+          const bar = textToolbar.querySelector<HTMLElement>('#tb-color-bar');
           if (bar) bar.style.background = color;
+          const input = textToolbar.querySelector<HTMLInputElement>('#tb-text-input');
+          if (input) input.value = color;
           this.onStructureChanged();
         }
+      };
+
+      const textColorInput = textToolbar.querySelector<HTMLInputElement>('#tb-text-input');
+
+      if (textColorInput) {
+        textColorInput.addEventListener('click', (e) => e.stopPropagation());
+        textColorInput.addEventListener('change', () => {
+          const color = textColorInput.value;
+          if (color) applyTextColor(color);
+        });
+      }
+
+      const hiliteInput = textToolbar.querySelector<HTMLInputElement>('#tb-hilite-input');
+      const hiliteBar = textToolbar.querySelector<HTMLElement>('#tb-hilite-bar');
+      const hiliteBtn = textToolbar.querySelector<HTMLButtonElement>('#btn-tb-hilite-color');
+
+      const applyHilite = (color: string) => {
+        if (color && ifrDoc) {
+          restoreSelection();
+          ifrDoc.execCommand('hiliteColor', false, color);
+          if (hiliteBar) hiliteBar.style.background = color;
+          if (hiliteInput) hiliteInput.value = color;
+          this.onStructureChanged();
+        }
+      };
+
+      hiliteBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (hiliteInput) {
+          saveSelection();
+          hiliteInput.click();
+        }
       });
+
+      if (hiliteInput) {
+        hiliteInput.addEventListener('click', (e) => e.stopPropagation());
+        hiliteInput.addEventListener('change', () => {
+          const color = hiliteInput.value;
+          if (color) applyHilite(color);
+        });
+        hiliteInput.addEventListener('input', () => {
+          const bar = textToolbar.querySelector<HTMLElement>('#tb-hilite-bar');
+          if (bar && hiliteInput.value) bar.style.background = hiliteInput.value;
+        });
+      }
 
       textToolbar.querySelector('#btn-tb-align')?.addEventListener('click', (e) => {
         e.stopPropagation();

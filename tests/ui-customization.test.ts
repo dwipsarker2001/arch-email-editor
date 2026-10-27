@@ -39,7 +39,7 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     expect(cssContent).toContain('color:#fff');
   });
 
-  it('shows a border and bottom-left action bar with comment, delete, copy when an item is clicked', () => {
+  it('shows a border and bottom-right action bar with component, delete, copy when an item is clicked', () => {
     const iframe = container.querySelector<HTMLIFrameElement>('.arch-canvas-iframe');
     expect(iframe).not.toBeNull();
 
@@ -61,11 +61,12 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     const bottomActions = container.querySelector<HTMLElement>('.arch-rge-bottom-actions');
     expect(bottomActions).not.toBeNull();
 
-    const commentBtn = bottomActions?.querySelector('.btn-rge-comment');
+    const componentBtn = bottomActions?.querySelector('.btn-rge-component');
     const deleteBtn = bottomActions?.querySelector('.btn-rge-del');
     const copyBtn = bottomActions?.querySelector('.btn-rge-dup');
 
-    expect(commentBtn).not.toBeNull();
+    expect(componentBtn).not.toBeNull();
+    expect(componentBtn?.getAttribute('title')).toBe('Component');
     expect(deleteBtn).not.toBeNull();
     expect(copyBtn).not.toBeNull();
 
@@ -80,6 +81,43 @@ describe('UI Customization: Topbar Buttons & Canvas Selection HUD', () => {
     const cssContent = readFileSync(resolve(__dirname, '../dist/arch-email-editor.css'), 'utf-8');
     expect(cssContent).toContain('.arch-rge-action-btn svg');
   });
+  it('opens component sidepanel with preview and name input when component action is clicked', () => {
+    const iframe = container.querySelector<HTMLIFrameElement>('.arch-canvas-iframe');
+    const ifrDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
+    const targetBlock = ifrDoc?.querySelector<HTMLElement>('h1, h2, h3, p, img, a') || ifrDoc?.body?.querySelector<HTMLElement>('td');
+
+    targetBlock?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    const bottomActions = container.querySelector<HTMLElement>('.arch-rge-bottom-actions');
+    const componentBtn = bottomActions?.querySelector<HTMLButtonElement>('.btn-rge-component');
+    expect(componentBtn).not.toBeNull();
+
+    // Click the Component action button
+    componentBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    // Assert sidepanel opened
+    const sidepanel = container.querySelector<HTMLElement>('.arch-component-sidepanel');
+    expect(sidepanel).not.toBeNull();
+
+    // Verify preview iframe exists and contains the component HTML
+    const previewIframe = sidepanel?.querySelector<HTMLIFrameElement>('#arch-component-preview-iframe');
+    expect(previewIframe).not.toBeNull();
+    const iframeBody = previewIframe?.contentDocument?.body?.innerHTML || '';
+    expect(iframeBody.length).toBeGreaterThan(0);
+
+    // Verify name input exists directly below preview in body
+    const nameInput = sidepanel?.querySelector<HTMLInputElement>('.arch-component-body #inp-component-name');
+    expect(nameInput).not.toBeNull();
+    expect(nameInput?.value.length).toBeGreaterThan(0);
+
+    // Verify close button dismisses sidepanel
+    const closeBtn = sidepanel?.querySelector<HTMLButtonElement>('#btn-component-close');
+    expect(closeBtn).not.toBeNull();
+    closeBtn?.click();
+
+    expect(sidepanel?.classList.contains('is-open')).toBe(false);
+  });
+
   it('hides default action buttons when configured via actions or show* options', () => {
     const customContainer = document.createElement('div');
     document.body.appendChild(customContainer);

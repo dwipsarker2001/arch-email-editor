@@ -28,6 +28,7 @@ import { AssetsSidepanel, AssetItem } from './inspector/AssetsSidepanel';
 import { ImageInspector } from './inspector/ImageInspector';
 import { DocumentInspector } from './inspector/DocumentInspector';
 import { RowInspector } from './inspector/RowInspector';
+import { ComponentSidepanel } from './inspector/ComponentSidepanel';
 
 export interface InspectorEvents {
   onChange: (isDocumentSetting?: boolean) => void;
@@ -55,6 +56,8 @@ export class Inspector {
   private documentInspector: DocumentInspector;
   private rowInspector: RowInspector;
   private assetsPanel: AssetsSidepanel;
+  private componentPanel: ComponentSidepanel;
+  private currentElementInfo: SelectedElementInfo | null = null;
   private element: HTMLElement;
   private events: InspectorEvents;
   private viewportMode: ViewportMode = 'desktop';
@@ -75,6 +78,7 @@ export class Inspector {
     this.documentInspector = new DocumentInspector(this.element, {
       onChange: (isDoc) => this.events.onChange(isDoc)
     });
+    this.componentPanel = new ComponentSidepanel({ container: this.element });
     this.rowInspector = new RowInspector({
       onChange: () => this.events.onChange(),
       openAssetsPanel: (onSelect) => this.openAssetsPanel(onSelect)
@@ -202,6 +206,7 @@ export class Inspector {
    * Renders controls for a live clicked DOM element inside the email template.
    */
   private renderElementSettings(info: SelectedElementInfo): void {
+    this.currentElementInfo = info;
     const activeNode = info.unit || info.element;
     const isDirectAnchor = activeNode.tagName.toLowerCase() === 'a';
     const titleMap: Record<string, string> = {
@@ -242,8 +247,8 @@ export class Inspector {
       <div class="arch-prop-header">
         <div class="arch-prop-title">${typeTitle} PROPERTIES</div>
         <div class="arch-prop-actions">
-          <button type="button" class="arch-icon-btn" id="btn-prop-comment" title="Add Comment">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <button type="button" class="arch-icon-btn" id="btn-prop-component" title="Component">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15.536 11.293a1 1 0 0 0 0 1.414l2.376 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"/><path d="M2.297 11.293a1 1 0 0 0 0 1.414l2.377 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414L6.088 8.916a1 1 0 0 0-1.414 0z"/><path d="M8.916 17.912a1 1 0 0 0 0 1.415l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.415l-2.377-2.376a1 1 0 0 0-1.414 0z"/><path d="M8.916 4.674a1 1 0 0 0 0 1.414l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"/></svg>
           </button>
           <button type="button" class="arch-icon-btn" id="btn-prop-delete" title="Delete Element">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -326,6 +331,10 @@ export class Inspector {
     `;
 
     // Bind Header Action clicks
+    this.element.querySelector('#btn-prop-component')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openComponentPanel();
+    });
     this.element.querySelector('#btn-prop-close')?.addEventListener('click', () => {
       this.events.onDeselect?.();
       const blocksTab = document.querySelector<HTMLButtonElement>('[data-tab="blocks"]');
@@ -1034,6 +1043,16 @@ export class Inspector {
 
   public openAssetsPanel(onSelect: (url: string, name?: string, size?: string) => void): void {
     this.assetsPanel.openAssetsPanel(onSelect);
+  }
+
+  public openComponentPanel(): void {
+    if (!this.currentElementInfo) return;
+    const unit = this.currentElementInfo.unit || this.currentElementInfo.element;
+    this.componentPanel.openComponentPanel({
+      unit,
+      element: this.currentElementInfo.element,
+      type: this.currentElementInfo.type
+    });
   }
 
   public openCropModal(imageUrl: string, onApply: (croppedDataUrl: string) => void): void {
