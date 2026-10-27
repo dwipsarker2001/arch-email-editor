@@ -192,6 +192,47 @@ describe('ArchEmailEditor Core Engine', () => {
     editor.destroy();
   });
 
+  it('drops palette blocks inside unmarked single-cell rows', () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML(`<!DOCTYPE html><html><body>
+      <table class="row"><tbody><tr><td>
+        <table class="row-content"><tbody>
+          <tr><td id="empty-cell"></td></tr>
+          <tr><td id="populated-cell">
+            <table class="heading_block" id="existing-heading"><tbody><tr><td><h2>Existing</h2></td></tr></tbody></table>
+          </td></tr>
+        </tbody></table>
+      </td></tr></tbody></table>
+    </body></html>`);
+
+    const canvas = (editor as any).canvas;
+    const doc = canvas.iframe.contentDocument as Document;
+    const emptyCell = doc.querySelector('#empty-cell') as HTMLElement;
+    const populatedCell = doc.querySelector('#populated-cell') as HTMLElement;
+    const existingHeading = doc.querySelector('#existing-heading') as HTMLElement;
+
+    canvas.updateDropTargetForElement(emptyCell, 0, 1);
+    canvas.executeDrop('text');
+    const emptyCellBlock = emptyCell.querySelector(':scope > table.text_block') as HTMLElement;
+    expect(emptyCellBlock).toBeTruthy();
+
+    canvas.updateDropTargetForElement(existingHeading, 0, -1);
+    canvas.executeDrop('text');
+    const beforeBlock = existingHeading.previousElementSibling as HTMLElement;
+    expect(beforeBlock.matches('table.text_block')).toBe(true);
+
+    canvas.updateDropTargetForElement(existingHeading, 0, 1);
+    canvas.executeDrop('text');
+    const afterBlock = existingHeading.nextElementSibling as HTMLElement;
+    expect(afterBlock.matches('table.text_block')).toBe(true);
+
+    expect(populatedCell.contains(beforeBlock)).toBe(true);
+    expect(populatedCell.contains(afterBlock)).toBe(true);
+    expect(emptyCell.closest('tr')?.children).toHaveLength(1);
+    expect(populatedCell.closest('tr')?.children).toHaveLength(1);
+    editor.destroy();
+  });
+
   it('inherits template row-content width when adding a layout', () => {
     const editor = ArchEmailEditor.create(container);
     editor.importHTML(`<table class="row" id="existing-row"><tbody><tr><td>

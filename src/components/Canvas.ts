@@ -32,6 +32,7 @@ import {
   describeUnitForLayer,
   detectAxis,
   findEditableTextHost,
+  findSingleCellDropSlot,
   getColumnSlotContainer,
   getContainerChain,
   getParentStructuralUnit,
@@ -814,6 +815,12 @@ private zoomLevel: number = 1;
     let targetUnit = effectiveDragged
       ? resolveCompatibleDropTarget(effectiveDragged, rawTarget, preserveSourceUnit)
       : this.findMoveableUnit(rawTarget);
+    if (!effectiveDragged && targetUnit) {
+      const singleCellSlot = findSingleCellDropSlot(rawTarget);
+      if (singleCellSlot && !singleCellSlot.contains(targetUnit)) {
+        targetUnit = singleCellSlot;
+      }
+    }
 
     const isHorizontalDrag = effectiveDragged ? detectAxis(effectiveDragged) === 'horizontal' : false;
 
@@ -3400,8 +3407,8 @@ private zoomLevel: number = 1;
         placeholder.insertAdjacentHTML('afterend', snippet);
         insertedEl = placeholder.nextElementSibling as HTMLElement;
         placeholder.remove();
-      } else if (isColumnElement(refUnit)) {
-        const slot = getColumnSlotContainer(refUnit);
+      } else if (isColumnElement(refUnit) || findSingleCellDropSlot(refUnit) === refUnit) {
+        const slot = isColumnElement(refUnit) ? getColumnSlotContainer(refUnit) : refUnit;
         slot.querySelectorAll('.arch-empty-col-placeholder, [data-arch-placeholder]').forEach((p) => p.remove());
         const snippet = buildContextAwareBlockHtml(type, slot.tagName.toLowerCase());
         const insertPosition = position === 'before' ? 'afterbegin' : 'beforeend';
