@@ -521,7 +521,7 @@ export function findSingleCellDropSlot(target: HTMLElement): HTMLElement | null 
   let current: HTMLElement | null = target;
   while (current && current.tagName && !['body', 'html'].includes(current.tagName.toLowerCase())) {
     const tag = current.tagName.toLowerCase();
-    const parent = current.parentElement;
+    const parent: HTMLElement | null = current.parentElement;
     if (
       (tag === 'td' || tag === 'th') &&
       parent?.tagName.toLowerCase() === 'tr' &&
