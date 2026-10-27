@@ -18,6 +18,7 @@
 
 import {
   findEnclosingColumn,
+  findSingleCellDropSlot,
   getColumnSlotContainer,
   isColumnElement,
   isEditorHelperNode,
@@ -391,6 +392,10 @@ export function resolveCompatibleDropTarget(
   }
 
   const targetBlock = resolveUnit(rawTarget);
+  const singleCellSlot = findSingleCellDropSlot(rawTarget);
+  if (singleCellSlot && (targetBlock === singleCellSlot || !singleCellSlot.contains(targetBlock))) {
+    return singleCellSlot;
+  }
 
   // If the user hovered over empty padding of a Column (`td.column`) or `<div class="border">`,
   // resolve to the last visible block inside `getColumnSlotContainer(col)`, or the Column itself if empty!
@@ -491,8 +496,12 @@ export function moveUnitToTarget(
 
   // If sourceUnit is not a Column and targetUnit is a Column or Structural Slot Wrapper (`div.border`),
   // redirect targetUnit to a slot child (or append the source envelope into an empty slot).
-  if (!isColumnElement(sourceUnit) && (isColumnElement(targetUnit) || isStructuralSlotWrapper(targetUnit))) {
-    const slot = getColumnSlotContainer(targetUnit);
+  const isSingleCellSlot = findSingleCellDropSlot(targetUnit) === targetUnit;
+  if (
+    !isColumnElement(sourceUnit) &&
+    (isColumnElement(targetUnit) || isStructuralSlotWrapper(targetUnit) || isSingleCellSlot)
+  ) {
+    const slot = isSingleCellSlot ? targetUnit : getColumnSlotContainer(targetUnit);
     slot.querySelectorAll('.arch-empty-col-placeholder, [data-arch-placeholder]').forEach((p) => p.remove());
     const slotChildren = Array.from(slot.children).filter(
       (c) => !isEditorHelperNode(c) && !isHiddenBlockElement(c as HTMLElement)

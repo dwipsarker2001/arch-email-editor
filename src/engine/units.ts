@@ -517,6 +517,30 @@ export function findEnclosingColumn(el: HTMLElement | null): HTMLElement | null 
   return null;
 }
 
+export function findSingleCellDropSlot(target: HTMLElement): HTMLElement | null {
+  let current: HTMLElement | null = target;
+  while (current && current.tagName && !['body', 'html'].includes(current.tagName.toLowerCase())) {
+    const tag = current.tagName.toLowerCase();
+    const parent = current.parentElement;
+    if (
+      (tag === 'td' || tag === 'th') &&
+      parent?.tagName.toLowerCase() === 'tr' &&
+      !isGutterCell(current) &&
+      !isColumnElement(current) &&
+      !current.closest(ESP_BLOCK_SELECTOR) &&
+      !current.querySelector('table.row-content')
+    ) {
+      const contentCells = Array.from(parent.children).filter((child) => {
+        const childTag = child.tagName.toLowerCase();
+        return (childTag === 'td' || childTag === 'th') && !isGutterCell(child as HTMLElement);
+      });
+      if (contentCells.length === 1) return current;
+    }
+    current = parent;
+  }
+  return null;
+}
+
 /**
  * Climbs one structural level up in the 5-level taxonomy (`Leaf (a/img)` -> `Block (td/table)` -> `Column` -> `Row` -> `Body`).
  */

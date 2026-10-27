@@ -1,6 +1,62 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ArchEmailEditor } from '../src/editor';
-import { moveUnitToTarget, removeUnit } from '../src/engine/glue';
+import { moveUnitToTarget, removeUnit, resolveCompatibleDropTarget } from '../src/engine/glue';
+
+const SINGLE_CELL_ROW_FIXTURE = `<!DOCTYPE html><html><body>
+  <table class="row"><tbody><tr><td>
+    <table class="row-content"><tbody><tr><td id="empty-slot"></td></tr></tbody></table>
+  </td></tr></tbody></table>
+  <table class="row"><tbody><tr><td>
+    <table class="row-content"><tbody><tr><td id="populated-slot">
+      <table class="heading_block" id="existing"><tbody><tr><td><h2>Existing</h2></td></tr></tbody></table>
+    </td></tr></tbody></table>
+  </td></tr></tbody></table>
+  <table class="row"><tbody><tr><td class="column">
+    <table class="text_block" id="source"><tbody><tr><td><p>Move me</p></td></tr></tbody></table>
+  </td></tr></tbody></table>
+  <table class="row"><tbody><tr><td class="column">
+    <table class="text_block" id="source-empty"><tbody><tr><td><p>Move me too</p></td></tr></tbody></table>
+  </td></tr></tbody></table>
+</body></html>`;
+
+describe('Single-cell row drops', () => {
+  it('resolves an empty unmarked cell as its drop slot and moves the block inside it', () => {
+    const doc = new DOMParser().parseFromString(SINGLE_CELL_ROW_FIXTURE, 'text/html');
+    const emptySlot = doc.querySelector('#empty-slot') as HTMLElement;
+    const source = doc.querySelector('#source-empty') as HTMLElement;
+
+    const target = resolveCompatibleDropTarget(source, emptySlot, true);
+
+    expect(target).toBe(emptySlot);
+    if (!target) throw new Error('Expected the empty cell to resolve as a drop slot');
+    expect(moveUnitToTarget(source, target, 'after', true)).toBe(true);
+    expect(emptySlot.contains(source)).toBe(true);
+    expect(emptySlot.closest('table.row-content')?.querySelectorAll(':scope > tbody > tr')).toHaveLength(1);
+  });
+
+  it('keeps hovered block placement inside the cell without targeting wrapper cells', () => {
+    const doc = new DOMParser().parseFromString(SINGLE_CELL_ROW_FIXTURE, 'text/html');
+    const populatedSlot = doc.querySelector('#populated-slot') as HTMLElement;
+    const source = doc.querySelector('#source') as HTMLElement;
+    const sourceEmpty = doc.querySelector('#source-empty') as HTMLElement;
+    const existing = doc.querySelector('#existing') as HTMLElement;
+
+    const target = resolveCompatibleDropTarget(source, existing, true);
+
+    expect(target).toBe(existing);
+    if (!target) throw new Error('Expected the hovered block to remain the target');
+    expect(moveUnitToTarget(source, target, 'after', true)).toBe(true);
+    expect(existing.nextElementSibling).toBe(source);
+    expect(populatedSlot.contains(source)).toBe(true);
+
+    const innerBlockCell = existing.querySelector('td') as HTMLElement;
+    expect(resolveCompatibleDropTarget(sourceEmpty, innerBlockCell, true)).toBe(existing);
+
+    const outerWrapperCell = doc.querySelector('table.row-content')?.parentElement as HTMLElement;
+    expect(resolveCompatibleDropTarget(sourceEmpty, outerWrapperCell, true)).not.toBe(outerWrapperCell);
+    expect(populatedSlot.closest('table.row-content')?.querySelectorAll(':scope > tbody > tr')).toHaveLength(1);
+  });
+});
 
 const PUMPKIN_EXCERPT = `<!DOCTYPE html>
 <html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" lang="en">
