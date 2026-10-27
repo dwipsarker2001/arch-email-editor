@@ -317,7 +317,8 @@ export function moveUnit(unit: HTMLElement, direction: 'up' | 'down'): boolean {
  */
 export function resolveCompatibleDropTarget(
   draggedUnit: HTMLElement,
-  rawTarget: HTMLElement
+  rawTarget: HTMLElement,
+  preserveSourceUnit = false
 ): HTMLElement | null {
   if (!rawTarget || !rawTarget.tagName) return null;
   const tag = rawTarget.tagName.toLowerCase();
@@ -325,7 +326,16 @@ export function resolveCompatibleDropTarget(
 
   // 1. If explicitly dragging a Row (`table.row`), target the hovered Row
   if (isRowElement(draggedUnit)) {
-    const effectiveRow = resolveEffectiveMoveUnit(draggedUnit);
+    const targetColumn = findEnclosingColumn(rawTarget);
+    if (targetColumn && !draggedUnit.contains(targetColumn)) {
+      const targetUnit = resolveUnit(rawTarget);
+      if (targetUnit && targetUnit !== draggedUnit && !draggedUnit.contains(targetUnit)) {
+        return targetUnit;
+      }
+      return targetColumn;
+    }
+
+    const effectiveRow = preserveSourceUnit ? draggedUnit : resolveEffectiveMoveUnit(draggedUnit);
     if (effectiveRow.tagName.toLowerCase() === 'tr' && effectiveRow.parentElement) {
       let cur: HTMLElement | null = rawTarget;
       while (cur && cur.parentElement && cur.parentElement !== effectiveRow.parentElement) {
@@ -372,7 +382,7 @@ export function resolveCompatibleDropTarget(
   // 3. Dragging a Block (`table.*_block`, `tr`, `div`, `p`, `a`, etc.)
   // If `draggedUnit` (or its effective move unit) is a Column of a multi-column row, and the user hovers
   // over a sibling Column in the SAME row, resolve to that sibling Column so dragging swaps/reorders the Columns!
-  const effectiveForDrag = resolveEffectiveMoveUnit(draggedUnit);
+  const effectiveForDrag = preserveSourceUnit ? draggedUnit : resolveEffectiveMoveUnit(draggedUnit);
   if (isColumnElement(effectiveForDrag)) {
     const hoveredCol = findEnclosingColumn(rawTarget);
     if (hoveredCol && hoveredCol !== effectiveForDrag && hoveredCol.parentElement === effectiveForDrag.parentElement) {
@@ -401,7 +411,7 @@ export function resolveCompatibleDropTarget(
   // If the user hovered over empty padding of a Row (`table.row`),
   // find the last visible block inside that Row's slot container!
   if (isRowElement(targetBlock)) {
-    const effectiveDragged = resolveEffectiveMoveUnit(draggedUnit);
+    const effectiveDragged = preserveSourceUnit ? draggedUnit : resolveEffectiveMoveUnit(draggedUnit);
     if (isRowElement(effectiveDragged) && effectiveDragged !== targetBlock) {
       return targetBlock;
     }
@@ -428,7 +438,8 @@ export function resolveCompatibleDropTarget(
 export function moveUnitToTarget(
   sourceUnit: HTMLElement,
   targetUnit: HTMLElement,
-  position: 'before' | 'after'
+  position: 'before' | 'after',
+  preserveSourceUnit = false
 ): boolean {
   if (!sourceUnit || !targetUnit || sourceUnit === targetUnit) return false;
 
@@ -443,7 +454,7 @@ export function moveUnitToTarget(
 
   // If targetUnit is a Row (`table.row`) and sourceUnit is a Block inside another Row,
   // check if sourceUnit is the sole block of its Row -> move the entire Row!
-  if (isRowElement(targetUnit) && !isRowElement(sourceUnit)) {
+  if (!preserveSourceUnit && isRowElement(targetUnit) && !isRowElement(sourceUnit)) {
     const effective = resolveEffectiveMoveUnit(sourceUnit);
     if (isRowElement(effective)) {
       sourceUnit = effective;
@@ -452,7 +463,7 @@ export function moveUnitToTarget(
 
   // If sourceUnit is the sole block (or inner leaf `<a>`) inside a Column of a multi-column row and targetUnit is in a sibling Column
   // of the SAME row (or targetUnit is that sibling Column), escalate both to Column so they swap/reorder cleanly as Columns!
-  if (!isRowElement(sourceUnit) && !isColumnElement(sourceUnit)) {
+  if (!preserveSourceUnit && !isRowElement(sourceUnit) && !isColumnElement(sourceUnit)) {
     const effectiveSource = resolveEffectiveMoveUnit(sourceUnit);
     if (isColumnElement(effectiveSource)) {
       const targetCol = isColumnElement(targetUnit) ? targetUnit : findEnclosingColumn(targetUnit);
@@ -478,9 +489,9 @@ export function moveUnitToTarget(
     sourceUnit = sourceBlock;
   }
 
-  // If sourceUnit is a Block and targetUnit resolved to a Column or Structural Slot Wrapper (`div.border`),
-  // redirect targetUnit to the last/first child inside `getColumnSlotContainer(targetUnit)` (or append into slot if empty!)
-  if (!isRowElement(sourceUnit) && !isColumnElement(sourceUnit) && (isColumnElement(targetUnit) || isStructuralSlotWrapper(targetUnit))) {
+  // If sourceUnit is not a Column and targetUnit is a Column or Structural Slot Wrapper (`div.border`),
+  // redirect targetUnit to a slot child (or append the source envelope into an empty slot).
+  if (!isColumnElement(sourceUnit) && (isColumnElement(targetUnit) || isStructuralSlotWrapper(targetUnit))) {
     const slot = getColumnSlotContainer(targetUnit);
     slot.querySelectorAll('.arch-empty-col-placeholder, [data-arch-placeholder]').forEach((p) => p.remove());
     const slotChildren = Array.from(slot.children).filter(
@@ -493,8 +504,14 @@ export function moveUnitToTarget(
       migrateScopedMediaRules(sourceUnit, slot);
       preserveBlockLegibilityOnMove(sourceUnit, slot);
       const envSource = collectUnitEnvelope(sourceUnit);
-      for (const n of getEnvelopeNodes(envSource)) {
-        slot.appendChild(n);
+      const adaptedUnit = adaptUnitForContainer(sourceUnit, slot);
+      if (adaptedUnit === sourceUnit) {
+        for (const n of getEnvelopeNodes(envSource)) {
+          slot.appendChild(n);
+        }
+      } else {
+        slot.appendChild(adaptedUnit);
+        removeEnvelope(envSource);
       }
       cleanupEmptiedSourceRow(oldRow);
       normalizeCardGroupBorders(slot.ownerDocument?.body || null);

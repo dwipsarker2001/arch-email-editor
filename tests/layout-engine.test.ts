@@ -1296,6 +1296,87 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
 });
 
 describe('Figma vertical displacement', () => {
+  it('nests a dragged row in the column under the pointer', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+    editor.importHTML(`<div id="source-host">
+      <table class="row" id="source-row"><tbody><tr>
+        <td class="column"><table class="paragraph_block"><tbody><tr><td><p>Source</p></td></tr></tbody></table></td>
+      </tr></tbody></table>
+    </div>
+    <div id="target-host">
+      <table class="row" id="target-row"><tbody><tr>
+        <td class="column" id="target-column"><table class="paragraph_block" id="target-block"><tbody><tr><td><p>Target</p></td></tr></tbody></table></td>
+      </tr></tbody></table>
+    </div>`);
+
+    const doc = (container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement).contentDocument!;
+    const sourceRow = doc.querySelector('#source-row') as HTMLElement;
+    const targetRow = doc.querySelector('#target-row') as HTMLElement;
+    const targetColumn = doc.querySelector('#target-column') as HTMLElement;
+    const targetContent = targetColumn.querySelector('p') as HTMLElement;
+    const canvas = (editor as any).canvas;
+
+    sourceRow.querySelector('p')!.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    sourceRow.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 10, clientY: 10 }));
+    canvas.handlePointerDragMove(10, 30);
+    canvas.updateDropTargetForElement(targetContent, 10, 10);
+
+    expect(canvas.hoveredDropTarget === targetRow).toBe(false);
+    canvas.finishPointerDrag();
+    expect(targetColumn.contains(sourceRow)).toBe(true);
+    expect(targetRow.contains(sourceRow)).toBe(true);
+    expect(sourceRow.querySelector('p')!.textContent).toBe('Source');
+    editor.destroy();
+  });
+
+  it('nests a dragged row into an empty column slot', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+    editor.importHTML(`<div id="source-host">
+      <table class="row" id="source-row"><tbody><tr>
+        <td class="column"><table class="paragraph_block"><tbody><tr><td><p>Source</p></td></tr></tbody></table></td>
+      </tr></tbody></table>
+    </div>
+    <div id="target-host">
+      <table class="row"><tbody><tr><td class="column" id="target-column"></td></tr></tbody></table>
+    </div>`);
+
+    const doc = (container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement).contentDocument!;
+    const sourceRow = doc.querySelector('#source-row') as HTMLElement;
+    const targetColumn = doc.querySelector('#target-column') as HTMLElement;
+
+    expect(moveUnitToTarget(sourceRow, targetColumn, 'after', true)).toBe(true);
+    expect(targetColumn.contains(sourceRow)).toBe(true);
+    expect(sourceRow.querySelector('p')!.textContent).toBe('Source');
+    editor.destroy();
+  });
+
+  it('wraps a dragged table row when nesting it in an empty column', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+    editor.importHTML(`<table><tbody><tr id="source-row">
+      <td class="column"><p>Left</p></td>
+      <td class="column"><p>Right</p></td>
+    </tr></tbody></table>
+    <div id="target-host">
+      <table class="row"><tbody><tr><td class="column" id="target-column"></td></tr></tbody></table>
+    </div>`);
+
+    const doc = (container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement).contentDocument!;
+    const sourceRow = doc.querySelector('#source-row') as HTMLElement;
+    const targetColumn = doc.querySelector('#target-column') as HTMLElement;
+
+    expect(moveUnitToTarget(sourceRow, targetColumn, 'after', true)).toBe(true);
+    const nestedTable = targetColumn.querySelector(':scope > table');
+    expect(nestedTable).not.toBeNull();
+    expect(nestedTable?.querySelector('#source-row')?.textContent).toContain('Left');
+    editor.destroy();
+  });
+
   it('slides sibling rows/blocks vertically during up/down drag, ignores displaced geometry when hit-testing, and cleans up on drop & export', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -1556,6 +1637,75 @@ describe('Figma vertical displacement', () => {
     expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
     expect(a1.style.getPropertyValue('caret-color')).toBe('');
 
+    editor.destroy();
+  });
+
+  it('moves the selected single-child block instead of its enclosing column', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+    editor.importHTML(`<table class="row"><tbody><tr>
+      <td class="column col-left"><table class="paragraph_block" id="source"><tbody><tr><td><p>Source</p></td></tr></tbody></table></td>
+      <td class="column col-right"><table class="paragraph_block" id="target"><tbody><tr><td><p>Target</p></td></tr></tbody></table></td>
+    </tr></tbody></table>`);
+
+    const doc = (container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement).contentDocument!;
+    const source = doc.querySelector('#source') as HTMLElement;
+    const target = doc.querySelector('#target') as HTMLElement;
+    const sourceContent = source.querySelector('p') as HTMLElement;
+    const row = doc.querySelector('table.row') as HTMLElement;
+    const leftColumn = doc.querySelector('.col-left') as HTMLElement;
+    const rightColumn = doc.querySelector('.col-right') as HTMLElement;
+    const canvas = (editor as any).canvas;
+
+    sourceContent.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(canvas.activeMoveableUnit === row).toBe(true);
+    sourceContent.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(canvas.activeMoveableUnit === leftColumn).toBe(true);
+    sourceContent.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(canvas.activeMoveableUnit === source).toBe(true);
+    sourceContent.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 10, clientY: 10 }));
+    canvas.handlePointerDragMove(30, 10);
+    expect(canvas.draggedUnit === source).toBe(true);
+
+    canvas.updateDropTargetForElement(target, 100, 10);
+    canvas.finishPointerDrag();
+
+    expect(leftColumn.querySelector('#source')).toBeNull();
+    expect(rightColumn.querySelector('#source')).toBe(source);
+    expect(rightColumn.querySelector('#target')).toBe(target);
+    editor.destroy();
+  });
+
+  it('keeps the selected row as the drag unit', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+    editor.importHTML(`<table class="row" id="source-row"><tbody><tr>
+      <td class="column col-left"><table class="paragraph_block"><tbody><tr><td><p>Source</p></td></tr></tbody></table></td>
+      <td class="column col-right"><table class="paragraph_block"><tbody><tr><td><p>Right</p></td></tr></tbody></table></td>
+    </tr></tbody></table>
+    <table class="row" id="target-row"><tbody><tr>
+      <td class="column"><table class="paragraph_block"><tbody><tr><td><p>Other row</p></td></tr></tbody></table></td>
+    </tr></tbody></table>`);
+
+    const doc = (container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement).contentDocument!;
+    const sourceRow = doc.querySelector('#source-row') as HTMLElement;
+    const targetRow = doc.querySelector('#target-row') as HTMLElement;
+    const sourceContent = sourceRow.querySelector('p') as HTMLElement;
+    const canvas = (editor as any).canvas;
+
+    sourceContent.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(canvas.activeMoveableUnit === sourceRow).toBe(true);
+    sourceContent.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 10, clientY: 10 }));
+    canvas.handlePointerDragMove(30, 10);
+
+    expect(canvas.draggedUnit === sourceRow).toBe(true);
+    canvas.updateDropTargetForElement(targetRow, 10, 100);
+    canvas.finishPointerDrag();
+
+    expect(sourceRow.parentElement).toBe(targetRow.parentElement);
+    expect(sourceRow.compareDocumentPosition(targetRow) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     editor.destroy();
   });
 

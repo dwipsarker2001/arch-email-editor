@@ -192,6 +192,54 @@ describe('ArchEmailEditor Core Engine', () => {
     editor.destroy();
   });
 
+  it('inherits template row-content width when adding a layout', () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML(`<table class="row" id="existing-row"><tbody><tr><td>
+      <table class="row-content" align="left" width="480" style="width:480px;margin:0;">
+        <tbody><tr><td class="column"><p>Existing</p></td></tr></tbody>
+      </table>
+    </td></tr></tbody></table>`);
+
+    const canvas = (editor as any).canvas;
+    const doc = canvas.iframe.contentDocument as Document;
+    const existingRow = doc.querySelector('#existing-row') as HTMLElement;
+    const existingContent = doc.querySelector('.row-content') as HTMLElement;
+    canvas.insertRowLayout('2-col-50-50', existingRow, 'before');
+
+    const insertedRow = existingRow.previousElementSibling as HTMLElement;
+    const insertedContent = insertedRow.querySelector('.row-content') as HTMLElement;
+    expect(insertedContent.getAttribute('width')).toBe('480');
+    expect(insertedContent.style.width).toBe('480px');
+    expect(insertedContent.getAttribute('align')).toBe('left');
+    expect(insertedContent.style.margin).toBe('0px');
+    expect(existingContent.getAttribute('width')).toBe('480');
+
+    const defaultWrapper = doc.createElement('div');
+    defaultWrapper.innerHTML = buildRowLayoutHtml('2-col-50-50', false);
+    const defaultContent = defaultWrapper.querySelector('.row-content') as HTMLElement;
+    expect(defaultContent.getAttribute('width')).toBe('600');
+    expect(defaultContent.getAttribute('align')).toBe('center');
+    editor.destroy();
+  });
+
+  it('uses the default layout width when the template has no row-content width', () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML(`<table class="row" id="existing-row"><tbody><tr>
+      <td class="column"><p>Existing</p></td>
+    </tr></tbody></table>`);
+
+    const canvas = (editor as any).canvas;
+    const doc = canvas.iframe.contentDocument as Document;
+    const existingRow = doc.querySelector('#existing-row') as HTMLElement;
+    canvas.insertRowLayout('2-col-50-50', existingRow, 'before');
+
+    const insertedContent = (existingRow.previousElementSibling as HTMLElement).querySelector('.row-content') as HTMLElement;
+    expect(insertedContent.getAttribute('width')).toBe('600');
+    expect(insertedContent.style.width).toBe('600px');
+    expect(insertedContent.getAttribute('align')).toBe('center');
+    editor.destroy();
+  });
+
   it('imports complex multi-column HTML email template losslessly without breaking styles or tables', () => {
     const editor = ArchEmailEditor.create(container);
 

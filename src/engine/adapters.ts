@@ -974,7 +974,12 @@ export function ensureEmptyColumnPlaceholders(root: Document | HTMLElement): voi
   });
 }
 
-export function buildRowLayoutHtml(layout: RowLayoutType, wrapInTr: boolean): string {
+export function buildRowLayoutHtml(
+  layout: RowLayoutType,
+  wrapInTr: boolean,
+  contentWidth = '600px',
+  contentAlign = 'center'
+): string {
   const widthsMap: Record<RowLayoutType, number[]> = {
     '1-col': [100],
     '2-col-50-50': [50, 50],
@@ -985,6 +990,12 @@ export function buildRowLayoutHtml(layout: RowLayoutType, wrapInTr: boolean): st
   };
   const cols = widthsMap[layout] || [100];
   const isNarrowLayout = layout === '3-col' || layout === '4-col';
+  const safeContentWidth = /^\d+(?:\.\d+)?(?:px|%)$/i.test(contentWidth) ? contentWidth : '600px';
+  const safeContentAlign = ['left', 'center', 'right'].includes(contentAlign) ? contentAlign : 'center';
+  const contentMargin = safeContentAlign === 'left' ? '0' : safeContentAlign === 'right' ? '0 0 0 auto' : '0 auto';
+  const contentWidthAttribute = /px$/i.test(safeContentWidth)
+    ? safeContentWidth.slice(0, -2)
+    : safeContentWidth;
 
   const colsHtml = cols
     .map(
@@ -1000,7 +1011,7 @@ export function buildRowLayoutHtml(layout: RowLayoutType, wrapInTr: boolean): st
       <tbody>
         <tr style="height: 100%;">
           <td>
-            <table class="row-content stack" align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #ffffff; color: #000000; width: 600px; margin: 0 auto; border-collapse: collapse; height: 100%;" width="600">
+            <table class="row-content stack" align="${safeContentAlign}" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #ffffff; color: #000000; width: ${safeContentWidth}; margin: ${contentMargin}; border-collapse: collapse; height: 100%;" width="${contentWidthAttribute}">
               <tbody>
                 <tr style="height: 100%;">
                   ${colsHtml}

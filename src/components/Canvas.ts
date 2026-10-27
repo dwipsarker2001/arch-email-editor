@@ -32,7 +32,6 @@ import {
   describeUnitForLayer,
   detectAxis,
   findEditableTextHost,
-  findEnclosingColumn,
   getColumnSlotContainer,
   getContainerChain,
   getParentStructuralUnit,
@@ -558,37 +557,6 @@ private zoomLevel: number = 1;
     if (!cand.active) {
       if (Math.hypot(dx, dy) < 5) return;
 
-      // Resolve the effective unit for dragging
-      const effectiveCand = resolveEffectiveMoveUnit(cand.unit);
-      const candPeers = getMoveableSiblings(effectiveCand);
-      const hasHorizontalPeers = candPeers.length >= 2 && detectAxis(effectiveCand) === 'horizontal';
-
-      // Direction-aware Auto-Column Drag Initiator:
-      // ONLY escalate to `enclosingCol` if the dragged unit is explicitly a Row (`isRowElement`),
-      // OR if the unit has NO horizontal peers in its own container to reorder between!
-      if (Math.abs(dx) > Math.abs(dy) * 1.1) {
-        if (!hasHorizontalPeers && isRowElement(cand.unit)) {
-          const enclosingCol = findEnclosingColumn(cand.startTarget);
-          if (enclosingCol && getMoveableSiblings(enclosingCol).length >= 2) {
-            cand.unit = enclosingCol;
-          } else {
-            cand.unit = effectiveCand;
-          }
-        } else {
-          cand.unit = effectiveCand;
-        }
-      } else {
-        // Vertical drag: escalate single-child inner units to their effective moveable unit
-        if (!hasHorizontalPeers) {
-          const effective = resolveEffectiveMoveUnit(cand.unit);
-          if (effective && effective !== cand.unit) {
-            cand.unit = effective;
-          }
-        } else {
-          cand.unit = effectiveCand;
-        }
-      }
-
       this.selectUnit(cand.unit, cand.unit);
       this.removeFloatingToolbar();
 
@@ -841,9 +809,10 @@ private zoomLevel: number = 1;
    * Updates the Figma Auto-Layout Insertion Line and Live Column Displacement Preview on the compatible target unit.
    */
   public updateDropTargetForElement(rawTarget: HTMLElement, iframeRelativeX: number, iframeRelativeY: number): void {
-    const effectiveDragged = this.draggedUnit ? resolveEffectiveMoveUnit(this.draggedUnit) : null;
+    const preserveSourceUnit = Boolean(this.draggedUnit);
+    const effectiveDragged = this.draggedUnit;
     let targetUnit = effectiveDragged
-      ? resolveCompatibleDropTarget(effectiveDragged, rawTarget)
+      ? resolveCompatibleDropTarget(effectiveDragged, rawTarget, preserveSourceUnit)
       : this.findMoveableUnit(rawTarget);
 
     const isHorizontalDrag = effectiveDragged ? detectAxis(effectiveDragged) === 'horizontal' : false;
@@ -1269,7 +1238,7 @@ private zoomLevel: number = 1;
       source.classList.remove('arch-dragging-source');
       if (targetUnit && source !== targetUnit) {
         const snapshotBefore = this.getCleanHTML();
-        const moved = moveUnitToTarget(source, targetUnit, position);
+        const moved = moveUnitToTarget(source, targetUnit, position, true);
         if (moved) {
           const ifrDoc = this.iframe.contentDocument;
           if (ifrDoc && !validateEmailStructure(ifrDoc).valid) {
@@ -3551,13 +3520,28 @@ private zoomLevel: number = 1;
       rawRow && (isRowElement(rawRow) || rawRow.tagName.toLowerCase() === 'tr')
         ? resolveEffectiveMoveUnit(rawRow)
         : null;
+    const rowContent =
+      refUnit?.closest<HTMLElement>('.row-content') ||
+      rawRow?.querySelector<HTMLElement>('.row-content') ||
+      ifrDoc.body.querySelector<HTMLElement>('.row-content');
+    const rawContentWidth = rowContent?.style.width || rowContent?.getAttribute('width')?.trim() || '';
+    const normalizedContentWidth = /^\d+(?:\.\d+)?$/.test(rawContentWidth)
+      ? `${rawContentWidth}px`
+      : rawContentWidth;
+    const contentWidth = /^\d+(?:\.\d+)?(?:px|%)$/i.test(normalizedContentWidth)
+      ? normalizedContentWidth
+      : undefined;
+    const rawContentAlign = rowContent?.getAttribute('align')?.toLowerCase() || '';
+    const contentAlign = ['left', 'center', 'right'].includes(rawContentAlign)
+      ? rawContentAlign
+      : undefined;
 
     let insertedRow: HTMLElement | null = null;
 
     if (effectiveRow && effectiveRow.parentElement && effectiveRow !== ifrDoc.body) {
       const parentTag = effectiveRow.parentElement.tagName.toLowerCase();
       const wrapInTr = parentTag === 'tbody' || parentTag === 'table';
-      const html = buildRowLayoutHtml(layout, wrapInTr);
+      const html = buildRowLayoutHtml(layout, wrapInTr, contentWidth, contentAlign);
       const insertPosition = position === 'before' ? 'beforebegin' : 'afterend';
       effectiveRow.insertAdjacentHTML(insertPosition, html);
       insertedRow = position === 'before'
@@ -3571,7 +3555,7 @@ private zoomLevel: number = 1;
           : resolveEffectiveMoveUnit(existingRows[existingRows.length - 1]);
         const parentTag = targetRow.parentElement?.tagName.toLowerCase() || 'td';
         const wrapInTr = parentTag === 'tbody' || parentTag === 'table';
-        const html = buildRowLayoutHtml(layout, wrapInTr);
+        const html = buildRowLayoutHtml(layout, wrapInTr, contentWidth, contentAlign);
         const insertPosition = position === 'before' ? 'beforebegin' : 'afterend';
         targetRow.insertAdjacentHTML(insertPosition, html);
         insertedRow = position === 'before'
@@ -3584,7 +3568,7 @@ private zoomLevel: number = 1;
           : container;
         const containerTag = rowContainer.tagName.toLowerCase();
         const wrapInTr = containerTag === 'tbody' || containerTag === 'table';
-        const html = buildRowLayoutHtml(layout, wrapInTr);
+        const html = buildRowLayoutHtml(layout, wrapInTr, contentWidth, contentAlign);
         const insertPosition = position === 'before' ? 'afterbegin' : 'beforeend';
         rowContainer.insertAdjacentHTML(insertPosition, html);
         insertedRow = position === 'before'
