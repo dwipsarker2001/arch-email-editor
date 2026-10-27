@@ -10,13 +10,13 @@ Allow users to drop a palette block or move an existing canvas block into a `<tr
 - Dropping on empty space in the cell appends the block inside that cell.
 - The cell remains in its original row; the drop must not create a sibling row or insert content beside the row.
 - Existing multi-column and explicitly marked column behavior remains unchanged.
-- Cells inside known block tables and structural wrapper tables are not treated as single-cell drop slots.
+- Cells inside known block tables and outer structural wrapper cells (including the cell containing `.row-content`) are not treated as single-cell drop slots. An unmarked content cell inside `.row-content` may be a drop slot.
 
 ## Design
 
 Use drop-specific recognition for an unmarked, single-content-cell row instead of globally changing column classification. Resolve the cell as the drop slot for both palette and canvas drag target paths. Reuse the existing insertion and move operations so content-model adaptation, selection, and structure-change handling remain consistent.
 
-The slot check must exclude gutter cells, known ESP block tables, and structural wrapper cells (including the outer cell that contains `.row-content`). Hovering a block within a qualifying cell retains the existing before/after placement behavior; hovering the cell's empty area resolves to the cell slot itself.
+The slot check must exclude gutter cells, known ESP block tables, and structural wrapper cells (including the outer cell that contains `.row-content`). The unmarked cell within `.row-content` remains eligible when it is the content cell for a one-cell row. Hovering a block within a qualifying cell retains the existing before/after placement behavior; hovering the cell's empty area resolves to the cell slot itself.
 
 ## Implementation Scope
 
