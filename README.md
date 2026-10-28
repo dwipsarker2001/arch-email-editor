@@ -301,7 +301,7 @@ onMounted(() => {
 
 ## 🧩 Modular Prebuilt Sections & Custom Sections Library
 
-The right sidebar features a dedicated **`SECTIONS`** tab populated with modular, production-ready email sections (Headers, Hero Banners, 2-Col and 3-Col Features, Call to Action, Story Articles, and Footers), plus Empty Column Layouts.
+The sidebar features a dedicated **`SECTIONS`** tab populated with modular, production-ready email sections (Headers, Hero Banners, 2-Col and 3-Col Features, Call to Action, Story Articles, and Footers), plus Empty Column Layouts.
 
 You can configure, override, or append your own custom sections using JavaScript options and runtime methods.
 
@@ -731,6 +731,54 @@ If no placeholders are provided, the sidepanel shows: "No template strings. Pass
 
 ---
 
+## ↔️ Sidebar Position
+
+The Blocks / Sections / Settings sidebar can sit on either side of the canvas. The floating canvas toolbar and the sidebar toggle follow it automatically.
+
+### Configuration
+
+```javascript
+const editor = ArchEmailEditor.create('#editor', {
+  sidebarPosition: 'left' // 'right' (default) | 'left'
+});
+```
+
+Users can also switch sides at runtime from the two sidebar buttons in the top toolbar (next to the Desktop / Tablet / Mobile switcher).
+
+### Runtime API
+
+```javascript
+editor.setSidebarPosition('left');
+editor.getSidebarPosition(); // 'left'
+
+// Optional: change back on a breakpoint or user preference
+window.addEventListener('resize', () => {
+  editor.setSidebarPosition(window.innerWidth < 1024 ? 'right' : 'left');
+});
+```
+
+### React
+
+```tsx
+<ReactEmailEditor ref={editorRef} sidebarPosition="left" />
+
+editorRef.current?.setSidebarPosition('right');
+editorRef.current?.getSidebarPosition(); // 'right'
+```
+
+### Vue
+
+```vue
+<VueEmailEditor ref="editorRef" sidebar-position="left" />
+
+<script setup>
+editorRef.value?.setSidebarPosition('right');
+editorRef.value?.getSidebarPosition(); // 'right'
+</script>
+```
+
+---
+
 ## 📖 API Reference
 
 ### `ArchEmailEditor.create(target, options)`
@@ -759,6 +807,7 @@ Initializes and mounts the editor.
 | `sections` | `PrebuiltSection[]` | Built-in sections | Custom modular sections catalog (replaces defaults). |
 | `customSections` | `PrebuiltSection[]` | `[]` | Additional modular sections appended to the catalog. |
 | `theme` | `'light' \| 'dark'` | `'light'` | UI chrome theme. |
+| `sidebarPosition` | `'left' \| 'right'` | `'right'` | Places the Blocks/Sections/Settings sidebar on the left or right of the canvas. |
 | `readOnly` | `boolean` | `false` | Disables editing mode. |
 | `onChange` | `(doc: EmailDocument) => void` | `undefined` | Fired when any content or structure changes. |
 | `onSelectBlock` | `(block: BlockNode \| null) => void` | `undefined` | Fired when an element or block is selected. |
@@ -831,6 +880,8 @@ Initializes and mounts the editor.
 | `undo()` | `void` | Reverts the last change. |
 | `redo()` | `void` | Redoes the previously undone change. |
 | `setViewportMode(mode)` | `void` | Changes viewport mode (`'desktop'` \| `'tablet'` \| `'mobile'`). |
+| `getSidebarPosition()` | `'left' \| 'right'` | Returns the current sidebar side. |
+| `setSidebarPosition(position)` | `void` | Moves the sidebar to the left or right of the canvas. |
 | `destroy()` | `void` | Unbinds all listeners and removes the editor from DOM. |
 | `setAssets(assets)` | `void` | Updates the media gallery assets catalog dynamically. |
 | `getAssets()` | `AssetItem[]` | Returns the currently loaded media library assets array. |

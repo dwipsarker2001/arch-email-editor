@@ -100,6 +100,7 @@ export class Canvas {
   private element: HTMLElement;
   private containerElement: HTMLElement;
   private floatingHistory: HTMLElement | null = null;
+  private sidebarPosition: 'left' | 'right' = 'right';
   private iframe: HTMLIFrameElement;
   private overlayLayer: HTMLElement;
   private floatingToolbar: HTMLElement | null = null;
@@ -267,7 +268,7 @@ private zoomLevel: number = 1;
       const collapsed = this.events.onToggleSidebar?.();
       if (typeof collapsed === 'boolean') {
         sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
-        const label = collapsed ? 'Open sidebar' : 'Close sidebar';
+        const label = collapsed ? 'Open sidebar' : `Close ${this.sidebarPosition} sidebar`;
         sidebarToggle.title = label;
         sidebarToggle.setAttribute('aria-label', label);
       }
@@ -356,6 +357,17 @@ private zoomLevel: number = 1;
 
   public getElement(): HTMLElement {
     return this.element;
+  }
+
+  /** Updates the sidebar toggle label to match the sidebar side. */
+  public setSidebarPosition(position: 'left' | 'right'): void {
+    this.sidebarPosition = position;
+    const toggle = this.floatingHistory?.querySelector<HTMLButtonElement>('.arch-btn--sidebar-close');
+    if (!toggle) return;
+    const collapsed = toggle.getAttribute('aria-expanded') === 'false';
+    const label = collapsed ? 'Open sidebar' : `Close ${position} sidebar`;
+    toggle.title = label;
+    toggle.setAttribute('aria-label', label);
   }
 
   public getIFrame(): HTMLIFrameElement {

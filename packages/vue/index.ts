@@ -31,6 +31,11 @@ export const VueEmailEditor = defineComponent({
     readOnly: {
       type: Boolean,
       default: false
+    },
+    /** Sidebar position ('left' | 'right') */
+    sidebarPosition: {
+      type: String as PropType<'left' | 'right'>,
+      default: 'right'
     }
   },
   emits: ['change', 'select'],
@@ -46,6 +51,7 @@ export const VueEmailEditor = defineComponent({
         initialData: props.initialData,
         theme: props.theme,
         readOnly: props.readOnly,
+        sidebarPosition: props.sidebarPosition,
         onChange: (doc) => emit('change', doc),
         onSelectBlock: (block) => emit('select', block)
       });
@@ -70,6 +76,8 @@ export const VueEmailEditor = defineComponent({
       getTemplateName: () => editorInstance?.getTemplateName() ?? '',
       addCustomButton: (button: any) => editorInstance?.addCustomButton(button),
       removeCustomButton: (id: string) => editorInstance?.removeCustomButton(id),
+      getSidebarPosition: () => editorInstance?.getSidebarPosition() ?? null,
+      setSidebarPosition: (position: 'left' | 'right') => editorInstance?.setSidebarPosition(position),
       getEditor: () => editorInstance
     });
 

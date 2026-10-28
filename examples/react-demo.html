@@ -79,6 +79,7 @@
 
         const Editor = window.ArchEmailEditor.create ? window.ArchEmailEditor : window.ArchEmailEditor.ArchEmailEditor;
         editorRef.current = Editor.create(containerRef.current, {
+          sidebarPosition: 'left',
           onChange: (doc) => {
             if (onChange) onChange(doc);
           }

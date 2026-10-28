@@ -87,6 +87,7 @@
 
           const Editor = window.ArchEmailEditor.create ? window.ArchEmailEditor : window.ArchEmailEditor.ArchEmailEditor;
           editorInstance = Editor.create(editorEl.value, {
+            sidebarPosition: 'left',
             onChange: (doc) => {
               blockCount.value = doc.blocks.length;
             }

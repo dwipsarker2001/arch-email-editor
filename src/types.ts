@@ -286,6 +286,8 @@ export interface EditorOptions {
   initialData?: EmailDocument;
   /** UI theme */
   theme?: 'light' | 'dark';
+  /** Position of the sidebar panel: 'left' or 'right' (default: 'right') */
+  sidebarPosition?: 'left' | 'right';
   /** Read-only mode */
   readOnly?: boolean;
   /** Template name / title displayed in the editor toolbar (default: "Arch Email Editor") */

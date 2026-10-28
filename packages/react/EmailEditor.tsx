@@ -52,6 +52,10 @@ export interface ReactEmailEditorRef {
   addSection: (section: PrebuiltSection) => void;
   /** Removes a modular section by id */
   removeSection: (id: string) => void;
+  /** Gets the current sidebar position */
+  getSidebarPosition: () => 'left' | 'right' | null;
+  /** Moves the sidebar to the left or right side */
+  setSidebarPosition: (position: 'left' | 'right') => void;
 }
 
 export const ReactEmailEditor = forwardRef<ReactEmailEditorRef, ReactEmailEditorProps>(
@@ -60,6 +64,7 @@ export const ReactEmailEditor = forwardRef<ReactEmailEditorRef, ReactEmailEditor
       initialData,
       theme,
       readOnly,
+      sidebarPosition,
       templateName,
       editableTemplateName,
       onTemplateNameChange,
@@ -94,6 +99,7 @@ export const ReactEmailEditor = forwardRef<ReactEmailEditorRef, ReactEmailEditor
         initialData,
         theme,
         readOnly,
+        sidebarPosition,
         templateName,
         editableTemplateName,
         customButtons,
@@ -159,6 +165,12 @@ export const ReactEmailEditor = forwardRef<ReactEmailEditorRef, ReactEmailEditor
       },
       removeSection(id: string) {
         editorInstance.current?.removeSection(id);
+      },
+      getSidebarPosition() {
+        return editorInstance.current ? editorInstance.current.getSidebarPosition() : null;
+      },
+      setSidebarPosition(position: 'left' | 'right') {
+        editorInstance.current?.setSidebarPosition(position);
       }
     }));
 

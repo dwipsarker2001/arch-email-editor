@@ -419,7 +419,9 @@
   font-weight: 700;
 }
 
-.arch-btn--viewport.is-active {
+.arch-btn--viewport.is-active,
+.arch-btn--sidebar-left.is-active,
+.arch-btn--sidebar-right.is-active {
   background-color: #eff6ff;
   border-color: var(--arch-primary);
   color: var(--arch-primary);
@@ -540,6 +542,21 @@
   width: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
+}
+
+/* Sidebar on the left: canvas toolbar follows it to the left edge */
+.arch-editor.arch-editor--sidebar-left .arch-canvas-floating-history {
+  right: auto !important;
+  left: 10px !important;
+}
+
+.arch-editor--sidebar-left .arch-editor__right-panel {
+  border-left: none;
+  border-right: 1px solid #e5e7eb;
+}
+
+.arch-editor--sidebar-left .arch-editor__right-panel.is-collapsed {
+  border-right: 1px solid transparent;
 }
 
 .arch-editor .arch-right-tabs,

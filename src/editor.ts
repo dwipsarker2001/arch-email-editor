@@ -157,6 +157,48 @@ export class ArchEmailEditor {
     return this.options.theme === 'dark' ? 'dark' : 'light';
   }
 
+  /** Returns the current sidebar position. */
+  public getSidebarPosition(): 'left' | 'right' {
+    return this.options.sidebarPosition === 'left' ? 'left' : 'right';
+  }
+
+  /** Returns the sidebar panel instance. */
+  public getSidebar(): RightPanel | null {
+    return this.rightPanel;
+  }
+
+  /** Moves the sidebar to the left or right side of the canvas. */
+  public setSidebarPosition(position: 'left' | 'right'): void {
+    this.options.sidebarPosition = position;
+    this.applySidebarPosition();
+  }
+
+  private applySidebarPosition(): void {
+    const root = this.rootElement;
+    if (!root) return;
+
+    const position = this.getSidebarPosition();
+    root.classList.toggle('arch-editor--sidebar-left', position === 'left');
+    root.classList.toggle('arch-editor--sidebar-right', position === 'right');
+
+    const body = root.querySelector<HTMLElement>('.arch-editor__body');
+    const canvasEl = this.canvas?.getElement();
+    const panelEl = this.rightPanel?.getElement();
+    if (body && canvasEl && panelEl) {
+      // appendChild moves existing nodes, so sidebar state survives the swap.
+      if (position === 'left') {
+        body.appendChild(panelEl);
+        body.appendChild(canvasEl);
+      } else {
+        body.appendChild(canvasEl);
+        body.appendChild(panelEl);
+      }
+    }
+
+    this.canvas?.setSidebarPosition(position);
+    this.toolbar?.setSidebarPosition(position);
+  }
+
   public getOptions(): EditorOptions {
     return this.options;
   }
@@ -537,6 +579,7 @@ export class ArchEmailEditor {
         onUndo: () => this.undo(),
         onRedo: () => this.redo(),
         onViewportChange: (mode) => this.setViewportMode(mode),
+        onSidebarPositionChange: (position) => this.setSidebarPosition(position),
         onTemplateNameChange: (name) => {
           this.options.templateName = name;
           this.options.onTemplateNameChange?.(name);
@@ -556,6 +599,7 @@ export class ArchEmailEditor {
         templateName: this.options.templateName,
         editableTemplateName: this.options.editableTemplateName,
         customButtons: this.options.customButtons,
+        sidebarPosition: this.getSidebarPosition(),
         actions: {
           importHtml: this.options.showImportHtml !== undefined ? this.options.showImportHtml : (this.options.actions?.importHtml !== false),
           exportJson: this.options.showExportJson !== undefined ? this.options.showExportJson : (this.options.actions?.exportJson !== false),
@@ -658,6 +702,7 @@ export class ArchEmailEditor {
     bodyEl.appendChild(this.rightPanel.getElement());
 
     this.rootElement.appendChild(bodyEl);
+    this.applySidebarPosition();
 
     // Initial render pass and initial history snapshot
     this.updateViews(true);

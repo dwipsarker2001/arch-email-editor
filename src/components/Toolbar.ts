@@ -59,6 +59,7 @@ export interface ToolbarEvents {
   onRedo?: () => void;
   onViewportChange?: (mode: ViewportMode) => void;
   onTemplateNameChange?: (name: string) => void;
+  onSidebarPositionChange?: (position: 'left' | 'right') => void;
 }
 
 export interface ToolbarOptions {
@@ -67,6 +68,7 @@ export interface ToolbarOptions {
   customButtons?: ToolbarCustomButton[];
   actions?: ToolbarActionsOptions;
   editorInstance?: any;
+  sidebarPosition?: 'left' | 'right';
 }
 
 export class Toolbar {
@@ -78,6 +80,7 @@ export class Toolbar {
   private customButtons: ToolbarCustomButton[] = [];
   private actions: ToolbarActionsOptions = {};
   private editorInstance?: any;
+  private sidebarPosition: 'left' | 'right' = 'right';
 
   constructor(events: ToolbarEvents, options: ToolbarOptions = {}) {
     this.events = events;
@@ -91,6 +94,7 @@ export class Toolbar {
       clear: options.actions?.clear !== false,
     };
     this.editorInstance = options.editorInstance;
+    this.sidebarPosition = options.sidebarPosition === 'left' ? 'left' : 'right';
 
     this.element = document.createElement('div');
     this.element.className = 'arch-editor__toolbar';
@@ -266,6 +270,20 @@ export class Toolbar {
             <span>Mobile</span>
           </button>
         </div>
+        <div class="arch-btn-group arch-sidebar-switcher" role="group" aria-label="Sidebar position">
+          <button class="arch-btn arch-btn--icon arch-btn--sidebar-left" type="button" data-sidebar-position="left" title="Sidebar on left" aria-label="Sidebar on left" aria-pressed="false">
+            <svg class="arch-btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2"/>
+              <path d="M9 3v18"/>
+            </svg>
+          </button>
+          <button class="arch-btn arch-btn--icon arch-btn--sidebar-right" type="button" data-sidebar-position="right" title="Sidebar on right" aria-label="Sidebar on right" aria-pressed="false">
+            <svg class="arch-btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2"/>
+              <path d="M15 3v18"/>
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="arch-editor__actions">
         ${this.actions.importHtml ? `
@@ -308,6 +326,7 @@ export class Toolbar {
 
     this.renderCustomButtons();
     this.bindTemplateNameEditing();
+    this.setSidebarPosition(this.sidebarPosition);
 
     this.element.querySelectorAll<HTMLButtonElement>('[data-viewport]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -316,6 +335,12 @@ export class Toolbar {
         this.element.querySelectorAll('[data-viewport]').forEach((b) => b.classList.remove('is-active'));
         btn.classList.add('is-active');
         this.events.onViewportChange?.(mode);
+      });
+    });
+
+    this.element.querySelectorAll<HTMLButtonElement>('[data-sidebar-position]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.events.onSidebarPositionChange?.(btn.getAttribute('data-sidebar-position') as 'left' | 'right');
       });
     });
 
@@ -340,6 +365,16 @@ export class Toolbar {
 
   public getViewport(): ViewportMode {
     return this.currentViewport;
+  }
+
+  /** Syncs the sidebar switcher buttons with the active position. */
+  public setSidebarPosition(position: 'left' | 'right'): void {
+    this.sidebarPosition = position;
+    this.element.querySelectorAll<HTMLButtonElement>('[data-sidebar-position]').forEach((btn) => {
+      const active = btn.getAttribute('data-sidebar-position') === position;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    });
   }
 
   public destroy(): void {

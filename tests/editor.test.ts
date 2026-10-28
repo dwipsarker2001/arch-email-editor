@@ -1098,7 +1098,7 @@ describe('ArchEmailEditor Core Engine', () => {
     sidebarToggle.click();
     expect(rightPanel.classList.contains('is-collapsed')).toBe(false);
     expect(sidebarToggle.getAttribute('aria-expanded')).toBe('true');
-    expect(sidebarToggle.title).toBe('Close sidebar');
+    expect(sidebarToggle.title).toBe('Close right sidebar');
 
     // Initially undo and redo are disabled (at initial state)
     expect(undoBtn.disabled).toBe(true);
