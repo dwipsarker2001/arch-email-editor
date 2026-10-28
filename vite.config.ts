@@ -2,6 +2,14 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 
 export default defineConfig({
+  resolve: {
+    alias: [
+      {
+        find: /^lucide$/,
+        replacement: 'lucide/dist/cjs/lucide.js'
+      }
+    ]
+  },
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
