@@ -3294,7 +3294,7 @@ private zoomLevel: number = 1;
       replacement.matches('script') ||
       replacement.querySelector('script') ||
       Array.from(template.content.querySelectorAll('*')).some((element) =>
-        element.matches('iframe[srcdoc]') ||
+        element.matches('iframe, object, embed') ||
         Array.from(element.attributes).some((attribute) =>
           attribute.name.toLowerCase().startsWith('on') ||
           hasJavaScriptProtocol(attribute.value)

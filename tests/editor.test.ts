@@ -217,6 +217,23 @@ describe('ArchEmailEditor Core Engine', () => {
     editor.destroy();
   });
 
+  it('rejects embedded-document replacements before changing the original HTML', () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML('<p id="selected">Original</p>');
+    const canvas = (editor as any).canvas;
+    const selected = canvas.iframe.contentDocument.querySelector('#selected') as HTMLElement;
+    canvas.selectUnit(selected, selected);
+    const originalHtml = editor.getHTML();
+
+    expect(() => canvas.replaceSelectedElement(
+      selected,
+      '<iframe src="data:text/html,<script>parent.document.body.innerHTML=\'pwned\'</script>"></iframe>',
+    )).toThrow();
+    expect(editor.getHTML()).toBe(originalHtml);
+
+    editor.destroy();
+  });
+
   it('rejects control-character-obfuscated javascript URLs before changing the original HTML', () => {
     const editor = ArchEmailEditor.create(container);
     editor.importHTML('<p id="selected">Original</p>');
