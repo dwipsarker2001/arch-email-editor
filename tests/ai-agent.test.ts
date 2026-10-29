@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createEditorTools } from '../src/ai/editorTools';
 import { runAgentTurn } from '../src/ai/runAgentTurn';
+import { ArchEmailEditor } from '../src/editor';
 import type { AiAssistantTurn, AiMessage, AiProvider, AiToolCall, AiToolDefinition } from '../src/ai/types';
 
 const definitions: AiToolDefinition[] = [];
@@ -166,6 +167,29 @@ describe('runAgentTurn', () => {
 });
 
 describe('createEditorTools', () => {
+  it('passes the editor context as serialized JSON to the AI tool result', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML('<p id="selected">Selected copy</p>');
+    const canvas = (editor as any).canvas;
+    const selected = canvas.iframe.contentDocument.querySelector('#selected') as HTMLElement;
+    canvas.selectUnit(selected, selected);
+
+    const tools = createEditorTools((editor as any).createAiEditorToolCallbacks());
+    const context = await tools.executors.get_email_context('{}');
+
+    expect(JSON.parse(context)).toMatchObject({
+      html: editor.getHTML(),
+      selectedHtml: selected.outerHTML,
+      selectedText: 'Selected copy',
+      selectionToken: expect.any(String),
+    });
+
+    editor.destroy();
+    container.remove();
+  });
+
   it('exposes only the three permitted editor tools', () => {
     const { tools } = toolSet();
 

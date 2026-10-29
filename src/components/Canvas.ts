@@ -3268,6 +3268,42 @@ private zoomLevel: number = 1;
   }
 
   /**
+   * Replaces the selected element only when the expected DOM reference is still current.
+   */
+  public replaceSelectedElement(expectedElement: HTMLElement, html: string): HTMLElement {
+    const ifrDoc = this.iframe.contentDocument;
+    if (!ifrDoc || !ifrDoc.body.contains(expectedElement) || this.selectedElement !== expectedElement) {
+      throw new Error('Cannot replace a stale selected element');
+    }
+
+    const template = ifrDoc.createElement('template');
+    template.innerHTML = html;
+    if (template.content.childElementCount !== 1) {
+      throw new Error('Replacement HTML must contain exactly one root element');
+    }
+
+    const replacement = template.content.firstElementChild as HTMLElement;
+    if (
+      replacement.matches('script') ||
+      replacement.querySelector('script') ||
+      Array.from(template.content.querySelectorAll('*')).some((element) =>
+        Array.from(element.attributes).some((attribute) =>
+          attribute.name.toLowerCase().startsWith('on') ||
+          /^\s*javascript\s*:/i.test(attribute.value)
+        )
+      )
+    ) {
+      throw new Error('Replacement HTML contains executable markup');
+    }
+
+    expectedElement.replaceWith(replacement);
+    this.selectedElement = replacement;
+    if (this.activeMoveableUnit === expectedElement) this.activeMoveableUnit = replacement;
+    this.onStructureChanged();
+    return replacement;
+  }
+
+  /**
    * Invoked whenever the DOM structure or styling is altered.
    */
   public onStructureChanged(): void {

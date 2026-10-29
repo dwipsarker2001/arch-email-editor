@@ -40,6 +40,7 @@ import { RightPanel } from './components/RightPanel';
 import { ImportModal } from './components/ImportModal';
 import { ExportModal } from './components/ExportModal';
 import { HistoryManager } from './engine/history';
+import type { EditorToolCallbacks } from './ai/editorTools';
 
 export class ArchEmailEditor {
   /** Target container element where the editor is rendered */
@@ -52,6 +53,8 @@ export class ArchEmailEditor {
   private selectedBlockId: string | null = null;
   /** Currently selected DOM element on canvas */
   private selectedElement: SelectedElementInfo | null = null;
+  private selectionRevision = 0;
+  private suppressSelectionRevision = false;
   /** The root editor DOM node */
   private rootElement: HTMLElement | null = null;
   /** Event bus mapping event names to subscriber callbacks */
@@ -232,6 +235,44 @@ export class ArchEmailEditor {
       if (clean) return clean;
     }
     return this.document.rawHtml || compileToEmailHtml(this.document);
+  }
+
+  public createAiEditorToolCallbacks(): EditorToolCallbacks {
+    const selectionToken = String(this.selectionRevision);
+    const selectionInfo = this.selectedElement;
+    let targetElement = selectionInfo?.element ?? null;
+
+    return {
+      getEmailContext: () => JSON.stringify({
+        html: this.getHTML(),
+        selectedHtml: targetElement?.outerHTML ?? null,
+        selectedText: this.selectedElement?.element === targetElement
+          ? this.selectedElement.text
+          : selectionInfo?.text ?? null,
+        selectedType: this.selectedElement?.element === targetElement
+          ? this.selectedElement.type
+          : selectionInfo?.type ?? null,
+        selectionToken,
+      }),
+      replaceSelectedElement: async ({ selectionToken: requestedToken, html }) => {
+        if (this.options.readOnly) throw new Error('Cannot modify a read-only editor');
+        if (requestedToken !== selectionToken || requestedToken !== String(this.selectionRevision)) {
+          throw new Error('Selection changed; selected element target is stale');
+        }
+        if (!targetElement || !this.canvas) throw new Error('No selected element to replace');
+
+        this.suppressSelectionRevision = true;
+        try {
+          targetElement = this.canvas.replaceSelectedElement(targetElement, html);
+        } finally {
+          this.suppressSelectionRevision = false;
+        }
+      },
+      replaceEmailHtml: async (html) => {
+        if (this.options.readOnly) throw new Error('Cannot modify a read-only editor');
+        this.importHTML(html);
+      },
+    };
   }
 
   /**
@@ -735,6 +776,9 @@ export class ArchEmailEditor {
   }
 
   private selectBlock(id: string | null): void {
+    if (!this.suppressSelectionRevision && (this.selectedBlockId !== id || this.selectedElement !== null)) {
+      this.selectionRevision++;
+    }
     this.selectedBlockId = id;
     this.selectedElement = null;
     const block = id ? this.document.blocks.find((b) => b.id === id) || null : null;
@@ -743,6 +787,12 @@ export class ArchEmailEditor {
   }
 
   private selectElement(info: SelectedElementInfo | null): void {
+    if (
+      !this.suppressSelectionRevision &&
+      (this.selectedBlockId !== null || this.selectedElement?.element !== info?.element)
+    ) {
+      this.selectionRevision++;
+    }
     this.selectedElement = info;
     this.selectedBlockId = null;
     this.rightPanel?.update(this.document, null, info);

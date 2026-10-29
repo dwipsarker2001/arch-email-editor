@@ -108,6 +108,129 @@ describe('ArchEmailEditor Core Engine', () => {
     editor.destroy();
   });
 
+  it('provides serialized email and selected-element context for an AI turn', () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML('<p id="selected">Selected copy</p><p id="other">Other copy</p>');
+    const canvas = (editor as any).canvas;
+    const selected = canvas.iframe.contentDocument.querySelector('#selected') as HTMLElement;
+    canvas.selectUnit(selected, selected);
+
+    const callbacks = (editor as any).createAiEditorToolCallbacks();
+    const context = JSON.parse(callbacks.getEmailContext());
+
+    expect(context).toMatchObject({
+      html: editor.getHTML(),
+      selectedHtml: selected.outerHTML,
+      selectedText: 'Selected copy',
+      selectionToken: expect.any(String),
+    });
+    expect(context.selectedType).toEqual(expect.any(String));
+    expect(context).not.toHaveProperty('element');
+
+    editor.destroy();
+  });
+
+  it('replaces the selected element through history and keeps the AI target current for the turn', async () => {
+    const onChange = vi.fn();
+    const editor = ArchEmailEditor.create(container, { onChange });
+    editor.importHTML('<p id="selected">Original</p>');
+    const canvas = (editor as any).canvas;
+    const selected = canvas.iframe.contentDocument.querySelector('#selected') as HTMLElement;
+    canvas.selectUnit(selected, selected);
+    const callbacks = (editor as any).createAiEditorToolCallbacks();
+    const { selectionToken } = JSON.parse(callbacks.getEmailContext());
+    const initialHtml = editor.getHTML();
+    onChange.mockClear();
+
+    await callbacks.replaceSelectedElement({ selectionToken, html: '<p id="selected">Updated</p>' });
+    expect(editor.getHTML()).toContain('Updated');
+    expect(onChange).toHaveBeenCalledOnce();
+
+    await callbacks.replaceSelectedElement({ selectionToken, html: '<p id="selected">Updated again</p>' });
+    expect(editor.getHTML()).toContain('Updated again');
+
+    editor.undo();
+    expect(editor.getHTML()).toContain('Updated');
+    editor.undo();
+    expect(editor.getHTML()).toBe(initialHtml);
+
+    editor.destroy();
+  });
+
+  it('rejects selected replacement after the user changes selection', async () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML('<p id="first">First</p><p id="second">Second</p>');
+    const canvas = (editor as any).canvas;
+    const iframeDocument = canvas.iframe.contentDocument as Document;
+    const first = iframeDocument.querySelector('#first') as HTMLElement;
+    const second = iframeDocument.querySelector('#second') as HTMLElement;
+    canvas.selectUnit(first, first);
+    const callbacks = (editor as any).createAiEditorToolCallbacks();
+    const { selectionToken } = JSON.parse(callbacks.getEmailContext());
+
+    canvas.selectUnit(second, second);
+    await expect(callbacks.replaceSelectedElement({
+      selectionToken,
+      html: '<p id="first">Changed</p>',
+    })).rejects.toThrow(/stale/i);
+    expect(editor.getHTML()).toContain('First');
+    expect(editor.getHTML()).toContain('Second');
+
+    editor.destroy();
+  });
+
+  it('rejects empty, multi-root, and executable selected replacement markup', () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML('<p id="selected">Original</p>');
+    const canvas = (editor as any).canvas;
+    const selected = canvas.iframe.contentDocument.querySelector('#selected') as HTMLElement;
+    canvas.selectUnit(selected, selected);
+
+    for (const html of [
+      '',
+      '<p>One</p><p>Two</p>',
+      '<script>alert(1)</script>',
+      '<img src="x" onerror="alert(1)">',
+      '<a href="javascript:alert(1)">Unsafe</a>',
+    ]) {
+      expect(() => canvas.replaceSelectedElement(selected, html)).toThrow();
+    }
+    expect(editor.getHTML()).toContain('Original');
+
+    editor.destroy();
+  });
+
+  it('replaces the whole email through import history', async () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML('<p>Before</p>');
+    const callbacks = (editor as any).createAiEditorToolCallbacks();
+    const previousHtml = editor.getHTML();
+
+    await callbacks.replaceEmailHtml('<h1>After</h1>');
+    expect(editor.getHTML()).toContain('After');
+    editor.undo();
+    expect(editor.getHTML()).toBe(previousHtml);
+
+    editor.destroy();
+  });
+
+  it('rejects AI mutation callbacks in read-only mode', async () => {
+    const editor = ArchEmailEditor.create(container, { readOnly: true });
+    editor.importHTML('<p id="selected">Original</p>');
+    const callbacks = (editor as any).createAiEditorToolCallbacks();
+    const { selectionToken } = JSON.parse(callbacks.getEmailContext());
+    const originalHtml = editor.getHTML();
+
+    await expect(callbacks.replaceSelectedElement({
+      selectionToken,
+      html: '<p>Changed</p>',
+    })).rejects.toThrow(/read.only/i);
+    await expect(callbacks.replaceEmailHtml('<p>Changed</p>')).rejects.toThrow(/read.only/i);
+    expect(editor.getHTML()).toBe(originalHtml);
+
+    editor.destroy();
+  });
+
   it('reorders blocks when dragged and dropped on canvas', () => {
     const editor = ArchEmailEditor.create(container);
     const initialDoc = editor.getJSON();
