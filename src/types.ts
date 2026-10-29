@@ -279,6 +279,12 @@ export interface ToolbarActionsOptions {
   clear?: boolean;
 }
 
+export interface AiOptions {
+  endpoint?: string;
+  model?: string;
+  apiKey?: string;
+}
+
 export interface EditorOptions {
   /** DOM element or selector string to mount the editor into */
   target?: HTMLElement | string;
@@ -300,6 +306,8 @@ export interface EditorOptions {
   customButtons?: ToolbarCustomButton[];
   /** Options to toggle visibility of default action buttons in the top-right toolbar */
   actions?: ToolbarActionsOptions;
+  /** AI provider configuration */
+  ai?: AiOptions;
   /** Shortcut to show/hide "Import HTML" button (default: true) */
   showImportHtml?: boolean;
   /** Shortcut to show/hide "Export HTML" button (default: true) */
