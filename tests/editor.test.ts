@@ -200,6 +200,23 @@ describe('ArchEmailEditor Core Engine', () => {
     editor.destroy();
   });
 
+  it('rejects iframe srcdoc replacement before changing the original HTML', () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML('<p id="selected">Original</p>');
+    const canvas = (editor as any).canvas;
+    const selected = canvas.iframe.contentDocument.querySelector('#selected') as HTMLElement;
+    canvas.selectUnit(selected, selected);
+    const originalHtml = editor.getHTML();
+
+    expect(() => canvas.replaceSelectedElement(
+      selected,
+      '<iframe srcdoc="<script>parent.document.body.innerHTML = \'pwned\'</script>"></iframe>',
+    )).toThrow();
+    expect(editor.getHTML()).toBe(originalHtml);
+
+    editor.destroy();
+  });
+
   it('replaces the whole email through import history', async () => {
     const editor = ArchEmailEditor.create(container);
     editor.importHTML('<p>Before</p>');
