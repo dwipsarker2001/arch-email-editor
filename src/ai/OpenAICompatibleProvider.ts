@@ -39,7 +39,8 @@ export class OpenAICompatibleProvider implements AiProvider {
     }
 
     const message = result.choices[0].message;
-    if (!isRecord(message) || (message.content !== null && typeof message.content !== 'string')) {
+    if (!isRecord(message) || (message.content !== undefined && message.content !== null
+      && typeof message.content !== 'string')) {
       throw invalidResponse();
     }
 
@@ -59,7 +60,7 @@ export class OpenAICompatibleProvider implements AiProvider {
       });
     }
 
-    const content = message.content as string | null;
+    const content = typeof message.content === 'string' ? message.content : null;
     if (content === null && toolCalls.length === 0) throw invalidResponse();
     return { content, toolCalls };
   }

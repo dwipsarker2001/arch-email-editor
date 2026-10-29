@@ -92,6 +92,35 @@ describe('AI provider boundary', () => {
       });
   });
 
+  it('accepts OpenAI tool calls when assistant content is omitted', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        choices: [{
+          message: {
+            role: 'assistant',
+            tool_calls: [{
+              id: 'call-1',
+              type: 'function',
+              function: { name: 'replace_content', arguments: '{"html":"<p>Hi</p>"}' },
+            }],
+          },
+        }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+      const provider = new OpenAICompatibleProvider({
+        endpoint: 'https://ai.example.test/v1/chat/completions',
+        model: 'mail-model',
+      });
+
+      await expect(provider.complete(messages, tools, new AbortController().signal))
+        .resolves.toEqual({
+          content: null,
+          toolCalls: [{
+            id: 'call-1',
+            name: 'replace_content',
+            arguments: '{"html":"<p>Hi</p>"}',
+          }],
+        });
+  });
+
   it('rejects non-success HTTP responses with a visible status', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('Unavailable', { status: 503 })));
     const provider = new OpenAICompatibleProvider({
@@ -146,5 +175,30 @@ describe('AI provider boundary', () => {
     await expect(second).resolves.toEqual({ content: 'Hello back', toolCalls: [] });
     expect(chat).toHaveBeenCalledTimes(2);
     expect(chat).toHaveBeenCalledWith(messages, expect.objectContaining({ tools, signal, normalize: true }));
+  });
+
+  it('accepts Puter tool calls when assistant content is omitted', async () => {
+    const chat = vi.fn().mockResolvedValue({
+      message: {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call-1',
+          type: 'function',
+          function: { name: 'replace_content', arguments: '{"html":"<p>Hi</p>"}' },
+        }],
+      },
+    });
+    (window as Window & { puter?: { ai: { chat: typeof chat } } }).puter = { ai: { chat } };
+    const provider = new PuterProvider();
+
+    await expect(provider.complete(messages, tools, new AbortController().signal))
+      .resolves.toEqual({
+        content: null,
+        toolCalls: [{
+          id: 'call-1',
+          name: 'replace_content',
+          arguments: '{"html":"<p>Hi</p>"}',
+        }],
+      });
   });
 });

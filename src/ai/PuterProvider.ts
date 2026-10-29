@@ -81,11 +81,12 @@ export class PuterProvider implements AiProvider {
     const puter = await getPuterClient();
     const result = await puter.ai.chat(messages, { tools, signal, normalize: true });
     const message = isRecord(result) && isRecord(result.message) ? result.message : null;
-    if (!message || (message.content !== null && typeof message.content !== 'string')) {
+    if (!message || (message.content !== undefined && message.content !== null
+      && typeof message.content !== 'string')) {
       throw invalidResponse();
     }
 
-    const content = message.content as string | null;
+    const content = typeof message.content === 'string' ? message.content : null;
     const toolCalls = normalizeToolCalls(message.tool_calls);
     if (content === null && toolCalls.length === 0) throw invalidResponse();
     return { content, toolCalls };
