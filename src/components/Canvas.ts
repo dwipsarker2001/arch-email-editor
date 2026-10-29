@@ -3283,6 +3283,13 @@ private zoomLevel: number = 1;
     }
 
     const replacement = template.content.firstElementChild as HTMLElement;
+    const hasJavaScriptProtocol = (value: string): boolean => {
+      try {
+        return new URL(value, ifrDoc.baseURI).protocol === 'javascript:';
+      } catch {
+        return false;
+      }
+    };
     if (
       replacement.matches('script') ||
       replacement.querySelector('script') ||
@@ -3290,7 +3297,7 @@ private zoomLevel: number = 1;
         element.matches('iframe[srcdoc]') ||
         Array.from(element.attributes).some((attribute) =>
           attribute.name.toLowerCase().startsWith('on') ||
-          /^\s*javascript\s*:/i.test(attribute.value)
+          hasJavaScriptProtocol(attribute.value)
         )
       )
     ) {

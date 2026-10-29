@@ -217,6 +217,40 @@ describe('ArchEmailEditor Core Engine', () => {
     editor.destroy();
   });
 
+  it('rejects control-character-obfuscated javascript URLs before changing the original HTML', () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML('<p id="selected">Original</p>');
+    const canvas = (editor as any).canvas;
+    const selected = canvas.iframe.contentDocument.querySelector('#selected') as HTMLElement;
+    canvas.selectUnit(selected, selected);
+    const originalHtml = editor.getHTML();
+
+    for (const controlCharacter of ['&#x09;', '&#x0A;']) {
+      expect(() => canvas.replaceSelectedElement(
+        selected,
+        `<a href="java${controlCharacter}script:alert(1)">Unsafe</a>`,
+      )).toThrow();
+      expect(editor.getHTML()).toBe(originalHtml);
+    }
+
+    editor.destroy();
+  });
+
+  it('allows ordinary relative and absolute URLs in selected replacements', () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML('<p id="selected">Original</p>');
+    const canvas = (editor as any).canvas;
+    let selected = canvas.iframe.contentDocument.querySelector('#selected') as HTMLElement;
+    canvas.selectUnit(selected, selected);
+
+    for (const href of ['/newsletter', 'https://example.com/newsletter']) {
+      selected = canvas.replaceSelectedElement(selected, `<a href="${href}">Newsletter</a>`);
+      expect(selected.getAttribute('href')).toBe(href);
+    }
+
+    editor.destroy();
+  });
+
   it('replaces the whole email through import history', async () => {
     const editor = ArchEmailEditor.create(container);
     editor.importHTML('<p>Before</p>');
