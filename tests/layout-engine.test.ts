@@ -417,6 +417,43 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     editor.destroy();
   });
 
+  it('edits mixed text and nested block content through one host', () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML(`<!DOCTYPE html><html><body>
+      <table class="row"><tbody><tr><td>
+        <table class="text_block"><tbody><tr><td>
+          <div class="mixed-content" data-edit="banner_headline">
+            British <span><strong>citizen</strong></span>
+            <div><span>nationality</span></div> application
+          </div>
+          <div class="block-wrapper"><div class="inner-only">Standalone text</div></div>
+        </td></tr></tbody></table>
+      </td></tr></tbody></table>
+    </body></html>`);
+
+    const ifrDoc = (container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement).contentDocument!;
+    const host = ifrDoc.querySelector('.mixed-content') as HTMLElement;
+    const nestedBlock = host.querySelector('div') as HTMLElement;
+    const blockWrapper = ifrDoc.querySelector('.block-wrapper') as HTMLElement;
+
+    expect(host.getAttribute('contenteditable')).toBe('true');
+    expect(host.querySelectorAll('[contenteditable="true"]')).toHaveLength(0);
+    expect(blockWrapper.getAttribute('contenteditable')).toBeNull();
+    expect(blockWrapper.querySelector('.inner-only')?.getAttribute('contenteditable')).toBe('true');
+
+    host.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(host.classList.contains('arch-editing-text')).toBe(true);
+
+    nestedBlock.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(host.classList.contains('arch-editing-text')).toBe(true);
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBe(host);
+    expect(host.textContent).toContain('British');
+    expect(host.textContent).toContain('nationality');
+    expect(host.textContent).toContain('application');
+
+    editor.destroy();
+  });
+
   it('R20: moves blocks up/down within a column and migrates scoped @media rules when moving across rows', () => {
     const editor = ArchEmailEditor.create(container);
     editor.importHTML(PUMPKIN_EXCERPT);
@@ -1206,7 +1243,7 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     editor.destroy();
   });
 
-  it('enters text edit mode on one click and keeps structural padding selection', () => {
+  it('enters text edit mode on one click and keeps structural padding selection', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const editor = new ArchEmailEditor(container);
@@ -1248,9 +1285,15 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     expect(overlay.querySelector('.arch-selection-overlay')).toBeTruthy();
     expect((overlay.querySelector('.arch-selection-overlay') as HTMLElement)
       .classList.contains('arch-selection-overlay--move-target')).toBe(true);
+    expect(await import('node:fs/promises').then(({ readFile }) =>
+      readFile('src/style.css', 'utf8')
+    )).toMatch(/\.arch-selection-overlay--move-target\s*\{[^}]*border:\s*2px solid/m);
 
     const moveHandle = overlay.querySelector<HTMLButtonElement>('.arch-canvas-move-handle');
     expect(moveHandle).toBeTruthy();
+    expect(moveHandle!.textContent).toBe('');
+    expect(moveHandle!.querySelector('svg')?.getAttribute('stroke')).toBe('#ffffff');
+    expect(moveHandle!.querySelectorAll('path')).toHaveLength(6);
     moveHandle!.dispatchEvent(new MouseEvent('mousedown', {
       bubbles: true,
       cancelable: true,
@@ -1316,6 +1359,38 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
 
     editor.destroy();
     container.remove();
+  });
+
+  it('keeps the selected content overlay aligned when canvas zoom changes', () => {
+    const editor = ArchEmailEditor.create(container);
+    editor.importHTML('<p class="zoom-target">Zoom me</p>');
+
+    const canvas = (editor as any).canvas;
+    const iframe = canvas.iframe as HTMLIFrameElement;
+    const p = iframe.contentDocument!.querySelector('.zoom-target') as HTMLElement;
+    const rect = (left: number, top: number, width: number, height: number) => ({
+      left, top, width, height, right: left + width, bottom: top + height
+    }) as DOMRect;
+
+    canvas.containerElement.getBoundingClientRect = () => rect(100, 50, 800, 600);
+    iframe.getBoundingClientRect = () => rect(120, 70, 600, 400);
+    p.getBoundingClientRect = () => rect(10, 20, 100, 40);
+    p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    const overlay = container.querySelector('.arch-canvas-overlay .arch-selection-overlay') as HTMLElement;
+
+    canvas.setZoom(1.5);
+    expect(overlay.style.left).toBe('35px');
+    expect(overlay.style.top).toBe('50px');
+    expect(overlay.style.width).toBe('150px');
+    expect(overlay.style.height).toBe('60px');
+
+    canvas.setZoom(0.5);
+    expect(overlay.style.left).toBe('25px');
+    expect(overlay.style.top).toBe('30px');
+    expect(overlay.style.width).toBe('50px');
+    expect(overlay.style.height).toBe('20px');
+
+    editor.destroy();
   });
 
   it('animates 3-column displacement transitions live during left/right drag and cleans up on drop & export', () => {

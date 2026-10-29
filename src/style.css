@@ -1923,7 +1923,7 @@ input:checked + .arch-toggle-slider:before {
 
 .arch-selection-overlay--move-target {
   background-color: transparent;
-  border: 1px solid #7747ff;
+  border: 2px solid #7747ff;
 }
 
 .arch-canvas-move-handle {

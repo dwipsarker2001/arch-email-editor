@@ -897,12 +897,14 @@ export function getUnitAncestry(unit: HTMLElement, selectedLeaf?: HTMLElement | 
  * - Linked images (`<a><img/></a>`) are NEVER `contenteditable`.
  * - Dividers (`td.divider_inner`, `.divider_block`) and Spacers are NEVER `contenteditable`.
  * - Social icon strips are NEVER `contenteditable`.
- * - Only a single host per text block (`<p>`, `<h1>`..`<h6>`, `<li>`, or button text leaf) gets
- *   `contenteditable="true"`, never nesting `contenteditable` on child `<span>`, `<em>`, `<strong>`.
+ * - Only one host per text block gets `contenteditable="true"`, including mixed text with nested
+ *   `<div>` fragments; inline and nested children never receive their own editable boundary.
  */
 export function isEditableTextHost(el: HTMLElement): boolean {
   if (!el || !el.tagName) return false;
   if (isEditorHelperNode(el)) return false;
+  const editableAncestor = el.parentElement?.closest<HTMLElement>('[contenteditable="true"]');
+  if (editableAncestor && isMixedTextHost(editableAncestor)) return false;
 
   const tag = el.tagName.toLowerCase();
 
@@ -951,6 +953,9 @@ export function isEditableTextHost(el: HTMLElement): boolean {
     return false;
   }
 
+  // Keep mixed text and nested divs in one editable host instead of editing only the inner block.
+  if (isMixedTextHost(el)) return true;
+
   // Leaf `div` or `td` or `th` that directly contains visible text and no child block elements
   if ((tag === 'div' || tag === 'td' || tag === 'th' || tag === 'span' || tag === 'a') && el.children.length === 0) {
     return getVisibleText(el).length > 0;
@@ -965,6 +970,15 @@ export function isEditableTextHost(el: HTMLElement): boolean {
   }
 
   return false;
+}
+
+function isMixedTextHost(el: HTMLElement): boolean {
+  if (el.tagName.toLowerCase() !== 'div' || !el.querySelector('div')) return false;
+  const textOutsideBlocks = el.cloneNode(true) as HTMLElement;
+  textOutsideBlocks
+    .querySelectorAll('div, p, h1, h2, h3, h4, h5, h6, li, blockquote')
+    .forEach((block) => block.remove());
+  return getVisibleText(textOutsideBlocks).length > 0;
 }
 
 /**

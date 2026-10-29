@@ -83,6 +83,8 @@ export interface CanvasEvents {
   onToggleSidebar?: () => boolean;
   /** Opens the template-strings sidepanel in the right sidebar. */
   onOpenPlaceholders?: () => void;
+  /** Opens the AI sidepanel in the right sidebar. */
+  onOpenAi?: () => void;
 }
 
 function isTextLeafElement(el: HTMLElement | null): boolean {
@@ -284,6 +286,11 @@ private zoomLevel: number = 1;
       this.events.onOpenPlaceholders?.();
     });
 
+    this.floatingHistory.querySelector('.arch-btn--ai')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.events.onOpenAi?.();
+    });
+
     // Zoom controls
     this.zoomLevel = 1;
     const zoomInBtn = this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--zoom-in');
@@ -318,6 +325,33 @@ private zoomLevel: number = 1;
     const zoomOutBtn = this.floatingHistory?.querySelector<HTMLButtonElement>('.arch-btn--zoom-out');
     if (zoomInBtn) zoomInBtn.title = `Zoom In (${Math.round(clamped * 100)}%)`;
     if (zoomOutBtn) zoomOutBtn.title = `Zoom Out (${Math.round(clamped * 100)}%)`;
+    this.syncHUDPosition();
+  }
+
+  /** Ctrl/Cmd + wheel zooms in 10% steps and blocks the browser's page zoom. */
+  private handleZoomWheel(e: WheelEvent): void {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    this.setZoom(this.zoomLevel + (e.deltaY < 0 ? 0.1 : -0.1));
+  }
+
+  /** Undo/redo shortcuts, shared by the parent window and the canvas iframe. */
+  private handleHistoryShortcut(e: KeyboardEvent, active: HTMLElement | null): void {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+
+    const isEditingField =
+      !!active &&
+      (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+    if (isEditingField || this.isEditingText) return;
+
+    const key = e.key.toLowerCase();
+    if (key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      this.events.onUndo?.();
+    } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+      e.preventDefault();
+      this.events.onRedo?.();
+    }
   }
 
   public updateHistoryState(canUndo: boolean, canRedo: boolean): void {
@@ -458,29 +492,11 @@ private zoomLevel: number = 1;
         }
       }
 
-      // Global Undo/Redo Shortcuts (Ctrl+Z / Cmd+Z, Ctrl+Y / Cmd+Shift+Z)
-      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
-        const key = e.key.toLowerCase();
-        const active = document.activeElement;
-        const isEditingInp = active && (
-          active.tagName === 'INPUT' ||
-          active.tagName === 'TEXTAREA' ||
-          (active as HTMLElement).isContentEditable
-        );
-        if (!isEditingInp && !this.isEditingText) {
-          if (key === 'z' && !e.shiftKey) {
-            e.preventDefault();
-            this.events.onUndo?.();
-            return;
-          }
-          if (key === 'y' || (key === 'z' && e.shiftKey)) {
-            e.preventDefault();
-            this.events.onRedo?.();
-            return;
-          }
-        }
-      }
+      this.handleHistoryShortcut(e, document.activeElement as HTMLElement | null);
     });
+
+    // Ctrl/Cmd + wheel zooms the canvas, including when the pointer sits over the iframe.
+    this.containerElement.addEventListener('wheel', (e) => this.handleZoomWheel(e), { passive: false });
 
     this.element.addEventListener('click', (e) => {
       const target = e.target as HTMLElement | null;
@@ -1865,6 +1881,8 @@ private zoomLevel: number = 1;
           }
         }
 
+        this.handleHistoryShortcut(e, doc.activeElement as HTMLElement | null);
+
         const active = doc.activeElement as HTMLElement | null;
         if (!active || active.getAttribute('contenteditable') !== 'true') return;
 
@@ -1886,6 +1904,7 @@ private zoomLevel: number = 1;
     };
     doc.addEventListener('scroll', onScroll, { passive: true, signal });
     this.iframe.contentWindow?.addEventListener('scroll', onScroll, { passive: true, signal });
+    doc.addEventListener('wheel', (e) => this.handleZoomWheel(e), { passive: false, signal });
 
     this.bindIframeDragDrop(doc, signal);
   }
@@ -2487,7 +2506,7 @@ private zoomLevel: number = 1;
       const moveHandle = document.createElement('button');
       moveHandle.type = 'button';
       moveHandle.className = 'arch-canvas-move-handle';
-      moveHandle.textContent = '+';
+      moveHandle.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20"/><path d="m15 19-3 3-3-3"/><path d="m19 9 3 3-3 3"/><path d="M2 12h20"/><path d="m5 9-3 3 3 3"/><path d="m9 5 3-3 3 3"/></svg>';
       moveHandle.setAttribute('aria-label', 'Drag to move text parent');
       moveHandle.title = 'Drag to move text parent';
       moveHandle.addEventListener('mousedown', (e: MouseEvent) => {
@@ -3007,6 +3026,7 @@ private zoomLevel: number = 1;
 
     const offsetX = iframeRect.left - containerRect.left;
     const offsetY = iframeRect.top - containerRect.top;
+    const zoom = this.zoomLevel;
 
     // 1. Resolve selected element and target bounding box (Figma-style hierarchy)
     const isRowOrCol = isRowElement(unit) || isColumnElement(unit);
@@ -3059,16 +3079,22 @@ private zoomLevel: number = 1;
       elRect && (elRect.width > 0 || elRect.height > 0)
         ? elRect
         : unitRect;
+    const targetLeft = offsetX + targetRect.left * zoom;
+    const targetTop = offsetY + targetRect.top * zoom;
+    const targetWidth = targetRect.width * zoom;
+    const targetHeight = targetRect.height * zoom;
+    const targetRight = targetLeft + targetWidth;
+    const targetBottom = targetTop + targetHeight;
 
     // 2. Bottom-right action bar (attached directly to the bottom-right corner of the selected item)
     if (this.bottomActions) {
       const actionsHeight = 28;
       const actionsWidth = this.bottomActions.offsetWidth || 84;
-      let actionsTop = offsetY + targetRect.bottom;
+      let actionsTop = targetBottom;
       if (actionsTop + actionsHeight > containerRect.height - 4) {
-        actionsTop = Math.max(4, offsetY + targetRect.bottom - actionsHeight);
+        actionsTop = Math.max(4, targetBottom - actionsHeight);
       }
-      let actionsLeft = offsetX + targetRect.right - actionsWidth;
+      let actionsLeft = targetRight - actionsWidth;
       if (actionsLeft + actionsWidth > containerRect.width - 4) {
         actionsLeft = Math.max(4, containerRect.width - actionsWidth - 4);
       }
@@ -3087,13 +3113,16 @@ private zoomLevel: number = 1;
         effectiveTargetEl ||
         unit;
       const tbRect = tbUnit.getBoundingClientRect();
+      const tbTop = offsetY + tbRect.top * zoom;
+      const tbLeft = offsetX + tbRect.left * zoom;
+      const tbBottom = tbTop + tbRect.height * zoom;
       const tbWidth = tb.offsetWidth || 340;
       const tbHeight = tb.offsetHeight || 60;
-      const fitsAbove = offsetY + tbRect.top >= tbHeight + 8;
+      const fitsAbove = tbTop >= tbHeight + 8;
       const top = fitsAbove
-        ? Math.max(4, offsetY + tbRect.top - tbHeight - 6)
-        : Math.min(containerRect.height - tbHeight - 4, offsetY + tbRect.bottom + 32);
-      const left = Math.max(4, Math.min(offsetX + tbRect.left, containerRect.width - tbWidth - 4));
+        ? Math.max(4, tbTop - tbHeight - 6)
+        : Math.min(containerRect.height - tbHeight - 4, tbBottom + 32);
+      const left = Math.max(4, Math.min(tbLeft, containerRect.width - tbWidth - 4));
       tb.style.top = `${top}px`;
       tb.style.left = `${left}px`;
     }
@@ -3104,11 +3133,11 @@ private zoomLevel: number = 1;
       if (!textMoveTarget && effectiveTargetEl?.classList?.contains('arch-has-hovered-child')) {
         this.selectionOverlay.style.display = 'none';
       } else {
-        const width = targetRect.width > 0 ? `${targetRect.width}px` : '100%';
-        const height = targetRect.height > 0 ? `${targetRect.height}px` : 'auto';
+        const width = targetWidth > 0 ? `${targetWidth}px` : '100%';
+        const height = targetHeight > 0 ? `${targetHeight}px` : 'auto';
         this.selectionOverlay.style.display = 'block';
-        this.selectionOverlay.style.top = `${offsetY + targetRect.top}px`;
-        this.selectionOverlay.style.left = `${offsetX + targetRect.left}px`;
+        this.selectionOverlay.style.top = `${targetTop}px`;
+        this.selectionOverlay.style.left = `${targetLeft}px`;
         this.selectionOverlay.style.width = width;
         this.selectionOverlay.style.height = height;
 
@@ -3129,11 +3158,11 @@ private zoomLevel: number = 1;
       const size = 24;
       const left = Math.max(0, Math.min(
         containerRect.width - size,
-        offsetX + targetRect.right - size / 2
+        targetRight - size / 2
       ));
       const top = Math.max(0, Math.min(
         containerRect.height - size,
-        offsetY + targetRect.top + targetRect.height / 2 - size / 2
+        targetTop + targetHeight / 2 - size / 2
       ));
       this.moveHandle.style.left = `${left}px`;
       this.moveHandle.style.top = `${top}px`;
@@ -3145,25 +3174,25 @@ private zoomLevel: number = 1;
       let hLeft = 0;
 
       if (side === 'nw' || side === 'ne') {
-        hTop = offsetY + targetRect.top - 5;
+        hTop = targetTop - 5;
       } else if (side === 'sw' || side === 'se') {
-        hTop = offsetY + targetRect.bottom - 5;
+        hTop = targetBottom - 5;
       } else if (side === 'e' || side === 'w') {
-        hTop = offsetY + targetRect.top + targetRect.height / 2 - 9;
+        hTop = targetTop + targetHeight / 2 - 9;
       } else if (side === 's') {
-        hTop = offsetY + targetRect.bottom - 4;
+        hTop = targetBottom - 4;
       }
 
       if (side === 'nw' || side === 'sw') {
-        hLeft = offsetX + targetRect.left - 5;
+        hLeft = targetLeft - 5;
       } else if (side === 'ne' || side === 'se') {
-        hLeft = offsetX + targetRect.right - 5;
+        hLeft = targetRight - 5;
       } else if (side === 'e') {
-        hLeft = offsetX + targetRect.right - 4;
+        hLeft = targetRight - 4;
       } else if (side === 'w') {
-        hLeft = offsetX + targetRect.left - 4;
+        hLeft = targetLeft - 4;
       } else if (side === 's') {
-        hLeft = offsetX + targetRect.left + targetRect.width / 2 - 9;
+        hLeft = targetLeft + targetWidth / 2 - 9;
       }
 
       handle.style.top = `${hTop}px`;
@@ -3187,9 +3216,9 @@ private zoomLevel: number = 1;
             const leftRect = leftCol.getBoundingClientRect();
             const rightRect = rightCol.getBoundingClientRect();
 
-            const boundaryX = offsetX + (leftRect.right + rightRect.left) / 2;
-            const topY = offsetY + Math.min(leftRect.top, rightRect.top);
-            const height = Math.max(leftRect.height, rightRect.height);
+            const boundaryX = offsetX + ((leftRect.right + rightRect.left) / 2) * zoom;
+            const topY = offsetY + Math.min(leftRect.top, rightRect.top) * zoom;
+            const height = Math.max(leftRect.height, rightRect.height) * zoom;
 
             handle.style.left = `${boundaryX}px`;
             handle.style.top = `${topY}px`;

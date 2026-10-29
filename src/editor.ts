@@ -636,7 +636,8 @@ export class ArchEmailEditor {
       onUndo: () => this.undo(),
       onRedo: () => this.redo(),
       onToggleSidebar: () => this.rightPanel?.toggleCollapsed() ?? false,
-      onOpenPlaceholders: () => this.rightPanel?.openPlaceholdersPanel()
+      onOpenPlaceholders: () => this.rightPanel?.openPlaceholdersPanel(),
+      onOpenAi: () => this.rightPanel?.openAiPanel()
     });
 
     // 4. Initialize Unified Right Panel (Blocks | Sections | Settings)

@@ -48,6 +48,8 @@ export class RightPanel {
   private elementInspector: Inspector;
   // Template strings sidepanel (slides over the Content tab)
   private placeholdersPanel: PlaceholdersSidepanel | null = null;
+  // Empty AI sidepanel (slides over the Content tab)
+  private aiPanel: HTMLElement | null = null;
   // Document inspector displays in the Settings tab for global design settings
   private documentInspector: Inspector;
 
@@ -163,6 +165,7 @@ export class RightPanel {
   /** Opens (or toggles) the template-strings sidepanel in the right sidebar. */
   public openPlaceholdersPanel(): void {
     this.element.classList.remove('is-collapsed');
+    this.closeAiPanel();
     if (this.activeTab !== 'blocks') {
       this.setActiveTab('blocks');
     }
@@ -171,6 +174,49 @@ export class RightPanel {
     } else {
       this.placeholdersPanel?.open();
     }
+  }
+
+  /** Opens (or toggles) the empty AI sidepanel in the right sidebar. */
+  public openAiPanel(): void {
+    this.element.classList.remove('is-collapsed');
+    if (this.activeTab !== 'blocks') {
+      this.setActiveTab('blocks');
+    }
+    if (this.aiPanel) {
+      this.closeAiPanel();
+      return;
+    }
+
+    this.placeholdersPanel?.close();
+    const contentPanel = this.element.querySelector<HTMLElement>('#arch-panel-blocks');
+    if (!contentPanel) return;
+
+    const panel = document.createElement('div');
+    panel.className = 'arch-assets-sidepanel arch-ai-sidepanel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'AI Assistant');
+    panel.innerHTML = `
+      <div class="arch-prop-header arch-assets-header">
+        <div class="arch-prop-title">AI Assistant</div>
+        <div class="arch-prop-actions arch-assets-header-actions">
+          <button type="button" class="arch-icon-btn" id="btn-ai-close" title="Close">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="arch-assets-body"></div>
+    `;
+
+    contentPanel.appendChild(panel);
+    this.aiPanel = panel;
+    panel.querySelector('#btn-ai-close')?.addEventListener('click', () => this.closeAiPanel());
+    panel.classList.add('is-open');
+  }
+
+  /** Closes the AI sidepanel. */
+  public closeAiPanel(): void {
+    this.aiPanel?.remove();
+    this.aiPanel = null;
   }
 
   public getAssets(): any[] {
@@ -192,6 +238,7 @@ export class RightPanel {
 
     if (this.activeTab === "blocks" && normalizedTab !== "blocks") {
       this.placeholdersPanel?.close();
+      this.closeAiPanel();
     }
 
     this.activeTab = normalizedTab;
