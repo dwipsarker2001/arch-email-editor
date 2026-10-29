@@ -1921,6 +1921,35 @@ input:checked + .arch-toggle-slider:before {
   transition: opacity 0.12s ease;
 }
 
+.arch-selection-overlay--move-target {
+  background-color: transparent;
+  border: 1px solid #7747ff;
+}
+
+.arch-canvas-move-handle {
+  position: absolute;
+  z-index: 10000;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #7747ff;
+  color: #fff;
+  cursor: grab;
+  pointer-events: auto;
+  line-height: 1;
+  font-size: 16px;
+}
+
+.arch-canvas-move-handle:active {
+  cursor: grabbing;
+}
+
+.arch-canvas-move-handle:focus-visible {
+  outline: 2px solid #0d99ff;
+  outline-offset: 2px;
+}
 
 /* Unlayer-style Bottom Action Bar (Attached to bottom-right corner of selected item) */
 .arch-editor .arch-rge-bottom-actions,

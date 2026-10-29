@@ -14,7 +14,7 @@ Handle content clicks before the canvas's existing structural hierarchy selectio
 - Read-only mode remains non-editable.
 - Once text editing has started, normal browser caret placement and double-click word selection continue to work.
 
-Add a visible, accessible "+" move handle at the right edge of the selected text's canvas frame. Dragging this handle moves the nearest movable structural parent, rather than the text leaf. If no movable parent exists, move the text host itself. Start this drag only from the handle so ordinary text clicks and drags remain available for caret placement, text selection, and editing.
+Show an outline around the same unit the text move handle will move, not just around the text leaf. Place a visible, accessible "+" move handle on that outlined frame's right edge. Dragging this handle moves the nearest movable structural parent. If no movable parent exists, outline and move the text host itself. Start this drag only from the handle so ordinary text clicks and drags remain available for caret placement, text selection, and editing.
 
 Use the existing editable-host lookup, text-edit entry, image selection, inspector update, and custom pointer-drag paths where possible. Do not change the selection model for non-content areas.
 

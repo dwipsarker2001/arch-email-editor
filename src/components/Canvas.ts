@@ -10,9 +10,7 @@
  *   - Dragging any Block, Column, or Row (or its Figma Frame Pill `⠿`) shows a 60fps Floating Ghost Card
  *     and a Figma Auto-Layout Insertion Line (`2px solid #0d99ff` with circular end-caps + target slot label).
  *   - Completely bypasses browser `contenteditable` native drop corruption so tables are NEVER dropped inside `<p>`/`<h1>`.
- * - Two-State Text Interaction:
- *   - Single-click selects the Frame/Block (and allows immediate typing or dragging).
- *   - Double-click (or clicking `✎`) locks into Text Selection Mode for highlighting characters inside text.
+ * - Single-click enters inline editing for text; the parent move handle remains separate from text selection.
  */
 
 import { BlockType, EmailDocument, LayerNode, PrebuiltSection, RowLayoutType, SelectedElementInfo, ViewportMode } from '../types';
@@ -108,6 +106,7 @@ export class Canvas {
   private textToolbar: HTMLElement | null = null;
   private dimensionsBadge: HTMLElement | null = null;
   private selectionOverlay: HTMLElement | null = null;
+  private moveHandle: HTMLButtonElement | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private contentResizeObserver: ResizeObserver | null = null;
   private iframeMutationObserver: MutationObserver | null = null;
@@ -608,7 +607,7 @@ private zoomLevel: number = 1;
       return;
     }
 
-    this.suppressNextClick = true;
+    this.suppressNextClick = cand.startTarget.ownerDocument === this.iframe.contentDocument;
     cand.unit.classList.remove('arch-dragging-source');
     this.overlayLayer.style.pointerEvents = 'none';
     this.removeDragGhost();
@@ -1451,6 +1450,9 @@ private zoomLevel: number = 1;
         outline: 2px solid #7747ff !important;
         outline-offset: -2px !important;
       }
+      .arch-editing-text.arch-selected-element {
+        outline: none !important;
+      }
       .arch-selected-element.arch-has-hovered-child {
         outline: none !important;
       }
@@ -1939,6 +1941,11 @@ private zoomLevel: number = 1;
     return resolveUnit(el);
   }
 
+  private resolveTextMoveTarget(textHost: HTMLElement): HTMLElement {
+    const parentUnit = this.findMoveableUnit(textHost);
+    return parentUnit === textHost ? textHost : resolveEffectiveMoveUnit(parentUnit);
+  }
+
   /**
    * Highlights a unit on the canvas when hovered in the Left Sidebar Figma Layers Tree.
    */
@@ -2120,12 +2127,7 @@ private zoomLevel: number = 1;
     }
   }
 
-  /**
-   * Handles single-click selection inside the iframe using Figma's Top-Down Hierarchical Frame model:
-   * - 1st click on a section selects the Top Container (`Row Frame`).
-   * - Clicking a sibling at the currently active hierarchy depth (`Column` or `Block`) switches to that sibling.
-   * - Holding `Cmd`/`Ctrl` while clicking jumps directly to the innermost `Block`.
-   */
+  /** Handles direct content clicks before falling back to structural hierarchy selection. */
   private handleIframeClick(e: MouseEvent): void {
     const target = e.target as HTMLElement | null;
     if (!target) return;
@@ -2143,11 +2145,21 @@ private zoomLevel: number = 1;
     // If user is currently editing text inside the selected unit, let them place the caret freely!
     if (
       this.isEditingText &&
+      !target.closest('img') &&
       ((this.activeMoveableUnit && this.activeMoveableUnit.contains(target)) ||
         (this.selectedElement && this.selectedElement.contains(target)) ||
         Boolean(target.closest('.arch-editing-text')))
     ) {
       const host = findEditableTextHost(target, this.activeMoveableUnit);
+      const currentHost = this.iframe.contentDocument?.querySelector<HTMLElement>('.arch-editing-text');
+      if (host && host !== currentHost) {
+        this.exitTextEditMode();
+        this.enterTextEditMode(host, this.findMoveableUnit(host), {
+          clientX: e.clientX,
+          clientY: e.clientY
+        });
+        return;
+      }
       if (host && !host.contains(target)) {
         host.focus();
       }
@@ -2194,6 +2206,24 @@ private zoomLevel: number = 1;
       const deepUnit = this.findMoveableUnit(selectable);
       this.exitTextEditMode();
       this.selectUnit(selectable, deepUnit);
+      return;
+    }
+
+    const image = target.closest<HTMLImageElement>('img');
+    if (image) {
+      this.exitTextEditMode();
+      this.selectUnit(image, image);
+      return;
+    }
+
+    const textHost = target.closest<HTMLElement>('[contenteditable="true"]');
+    if (!this.readOnly && textHost) {
+      this.exitTextEditMode();
+      const moveUnit = this.findMoveableUnit(textHost);
+      this.enterTextEditMode(textHost, moveUnit, {
+        clientX: e.clientX,
+        clientY: e.clientY
+      });
       return;
     }
 
@@ -2445,12 +2475,35 @@ private zoomLevel: number = 1;
     const editableHost = findEditableTextHost(innerTarget || this.selectedElement || unit, unit);
     const ifrDoc = this.iframe.contentDocument;
 
-    // 0. Low-opacity selection overlay (visible on select, completely gone during text edit mode)
-    if (!this.selectionOverlay && !this.isEditingText) {
+    // 0. Selection overlay also outlines the frame that the text move handle will move.
+    if (!this.selectionOverlay) {
       const selOverlay = document.createElement('div');
       selOverlay.className = 'arch-selection-overlay';
       this.overlayLayer.prepend(selOverlay);
       this.selectionOverlay = selOverlay;
+    }
+
+    if (editableHost && (this.isEditingText || this.selectedElement === editableHost)) {
+      const moveHandle = document.createElement('button');
+      moveHandle.type = 'button';
+      moveHandle.className = 'arch-canvas-move-handle';
+      moveHandle.textContent = '+';
+      moveHandle.setAttribute('aria-label', 'Drag to move text parent');
+      moveHandle.title = 'Drag to move text parent';
+      moveHandle.addEventListener('mousedown', (e: MouseEvent) => {
+        if (e.button !== 0 || this.readOnly) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.pointerDragCandidate = {
+          unit: this.resolveTextMoveTarget(editableHost),
+          startTarget: moveHandle,
+          startX: e.clientX,
+          startY: e.clientY,
+          active: false
+        };
+      });
+      this.overlayLayer.appendChild(moveHandle);
+      this.moveHandle = moveHandle;
     }
 
     // 1. Bottom Action Bar (Component, Delete, Duplicate Attached to Bottom Edge)
@@ -2698,7 +2751,7 @@ private zoomLevel: number = 1;
           (isButtonComponent(unit) && !unit.classList.contains('image_block')));
       const targetBtn = isButton ? resolveButtonAnatomy(selectedEl, unit).anchor : null;
 
-      // Only show text resize handles when the text element itself is directly selected (double-clicked),
+      // Only show text resize handles when the text element itself is directly selected,
       // NEVER when only the parent block/row is clicked!
       const isDirectTextSelected =
         !targetImg &&
@@ -2975,7 +3028,7 @@ private zoomLevel: number = 1;
       (isButtonComponent(selectedEl) ||
         (isButtonComponent(unit) && !unit.classList.contains('image_block')));
 
-    // Only show text resize handles when the text element itself is directly selected (double-clicked),
+    // Only show text resize handles when the text element itself is directly selected,
     // NEVER when only the parent block/row is clicked!
     const isDirectTextSelected =
       !isRowOrCol &&
@@ -2984,6 +3037,12 @@ private zoomLevel: number = 1;
       !this.isEditingText &&
       (isTextLeafElement(unit) ||
         (isTextLeafElement(selectedEl) && (unit === selectedEl || unit.contains(selectedEl))));
+
+    const editableHost = findEditableTextHost(selectedEl, unit);
+    const textMoveTarget = editableHost &&
+      (this.isEditingText || this.selectedElement === editableHost)
+      ? this.resolveTextMoveTarget(editableHost)
+      : null;
 
     let targetNode: HTMLElement | null = null;
     if (targetImg) {
@@ -2994,8 +3053,7 @@ private zoomLevel: number = 1;
       targetNode = TextAdapter.getTextHost(selectedEl, unit) || selectedEl;
     }
 
-    const effectiveTargetEl = targetNode || selectedEl;
-
+    const effectiveTargetEl = textMoveTarget || targetNode || selectedEl;
     const elRect = effectiveTargetEl?.getBoundingClientRect();
     const targetRect =
       elRect && (elRect.width > 0 || elRect.height > 0)
@@ -3040,9 +3098,10 @@ private zoomLevel: number = 1;
       tb.style.left = `${left}px`;
     }
 
-    // 4. Selection overlay (Low-opacity tint over selected element; hidden during inline text editing)
+    // 4. Selection overlay (tint for selections; move-target border during text editing)
     if (this.selectionOverlay) {
-      if (this.isEditingText || effectiveTargetEl?.classList?.contains('arch-has-hovered-child')) {
+      this.selectionOverlay.classList.toggle('arch-selection-overlay--move-target', Boolean(textMoveTarget));
+      if (!textMoveTarget && effectiveTargetEl?.classList?.contains('arch-has-hovered-child')) {
         this.selectionOverlay.style.display = 'none';
       } else {
         const width = targetRect.width > 0 ? `${targetRect.width}px` : '100%';
@@ -3064,6 +3123,20 @@ private zoomLevel: number = 1;
           this.selectionOverlay.style.borderRadius = '0px';
         }
       }
+    }
+
+    if (this.moveHandle) {
+      const size = 24;
+      const left = Math.max(0, Math.min(
+        containerRect.width - size,
+        offsetX + targetRect.right - size / 2
+      ));
+      const top = Math.max(0, Math.min(
+        containerRect.height - size,
+        offsetY + targetRect.top + targetRect.height / 2 - size / 2
+      ));
+      this.moveHandle.style.left = `${left}px`;
+      this.moveHandle.style.top = `${top}px`;
     }
 
     for (const handle of this.resizeHandles) {
@@ -3147,6 +3220,10 @@ private zoomLevel: number = 1;
     if (this.selectionOverlay) {
       this.selectionOverlay.remove();
       this.selectionOverlay = null;
+    }
+    if (this.moveHandle) {
+      this.moveHandle.remove();
+      this.moveHandle = null;
     }
     if (this.resizeHandles.length > 0) {
       this.resizeHandles.forEach((h) => h.remove());

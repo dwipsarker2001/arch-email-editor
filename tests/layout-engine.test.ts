@@ -793,21 +793,20 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     // Button anchor must have draggable="false" so native browser link drag never blocks text selection
     expect(btnAnchor.getAttribute('draggable')).toBe('false');
 
-    // LEVEL 1: First single click (detail: 1) inside the button selects the outermost Top Container (Row Frame: row-5)
-    btnLabel.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    // Structural clicks retain hierarchy selection while text clicks edit immediately.
+    const row5Cell = row5.querySelector('td') as HTMLElement;
+    row5Cell.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(row5);
 
-    // LEVEL 2: First double-click drills down from Row Frame -> Column Frame (col-1)
-    btnLabel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    col1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(col1);
 
     // Clicking inside sibling column (col-2) while at Column depth switches directly to sibling Column Frame (col-2)!
-    const col2Img = ifrDoc.querySelector('.col2-img') as HTMLElement;
-    col2Img.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    col2.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(col2);
 
     // Switch back to col-1 at Column depth
-    btnLabel.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    col1.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(col1);
 
     // HORIZONTAL COLUMN FRAME SWAP: Dragging/moving col-1 onto col-2 (even with 'before' on adjacent sibling) swaps the two columns
@@ -832,29 +831,16 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     expect(colsAfterSwapBack[0]).toBe(col1);
     expect(colsAfterSwapBack[1]).toBe(col2);
 
-    // LEVEL 3: Second double-click on the button drills down from Column Frame (col-1) -> Block Frame (button_block)
-    btnLabel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(btnBlock);
-
-    // LEVEL 4: Third double-click drills down inside Block/td to select the `<a class="button">` tag itself!
-    btnLabel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(btnAnchor);
-
-    // LEVEL 5: Fourth double-click (or clicking inside the already-selected `<a>` tag) enters Inline Text Edit Mode on the button text!
-    btnLabel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    btnLabel.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     const editingEl = ifrDoc.querySelector('.arch-editing-text') as HTMLElement;
-    expect(editingEl).toBeTruthy();
+    expect(editingEl).toBe(btnLabel);
     expect(editingEl.getAttribute('contenteditable')).toBe('true');
     expect(editingEl.textContent).toContain('Book Assembly Now');
 
-    // Pressing Escape once exits Inline Text Edit Mode while keeping the `<a>` tag selected
     ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(btnAnchor);
-
-    // Pressing Escape climbs up step-by-step: Link (`<a>`) -> Block Frame -> Column Frame -> Row Frame
-    ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(btnBlock);
+
     ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(col1);
     ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -863,7 +849,7 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     editor.destroy();
   });
 
-  it('positions bottom action options at the parent container on parent click, and switches to child item on drill-down', () => {
+  it('positions bottom action options around text selected by a single click', () => {
     const editor = ArchEmailEditor.create(container);
     const html = `<!DOCTYPE html>
 <html>
@@ -888,6 +874,7 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     const ifrDoc = iframe.contentDocument!;
     const row = ifrDoc.querySelector('table.row-1') as HTMLElement;
     const p = ifrDoc.querySelector('p.test-p') as HTMLElement;
+    const textBlock = ifrDoc.querySelector('.text_block') as HTMLElement;
 
     const canvas = (editor as any).canvas;
     const containerEl = canvas.containerElement as HTMLElement;
@@ -917,29 +904,38 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
         height: 40,
       }) as DOMRect;
 
-    // 1. Single click on child <p> selects the parent row
+    textBlock.getBoundingClientRect = () =>
+      ({
+        left: 40,
+        right: 560,
+        width: 520,
+        top: 80,
+        bottom: 190,
+        height: 110,
+      }) as DOMRect;
+
+    // A single click selects and edits the text rather than its outer row.
     p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(row);
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
 
     const bottomActions = container.querySelector('.arch-rge-bottom-actions') as HTMLElement;
     expect(bottomActions).toBeTruthy();
-    // Bottom actions must be positioned at the parent row's bottom/right, NOT child <p>
-    expect(parseFloat(bottomActions.style.top)).toBe(250);
-    expect(parseFloat(bottomActions.style.left)).toBe(506);
+    expect(parseFloat(bottomActions.style.top)).toBe(190);
+    expect(parseFloat(bottomActions.style.left)).toBe(476);
+    const moveHandle = container.querySelector('.arch-canvas-move-handle') as HTMLElement;
+    expect(parseFloat(moveHandle.style.left)).toBe(548);
+    expect(parseFloat(moveHandle.style.top)).toBe(123);
+    const selectionOverlay = container.querySelector('.arch-selection-overlay') as HTMLElement;
+    expect(selectionOverlay).toBeTruthy();
+    expect(selectionOverlay.classList.contains('arch-selection-overlay--move-target')).toBe(true);
+    expect(selectionOverlay.style.left).toBe('40px');
+    expect(selectionOverlay.style.top).toBe('80px');
+    expect(selectionOverlay.style.width).toBe('520px');
+    expect(selectionOverlay.style.height).toBe('110px');
 
-    // 2. First double click drills down from Row to Block Frame
     p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).not.toBe(row);
-
-    // 3. Second double click drills down from Block Frame to leaf <p>
-    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect((editor as any).canvas.isEditingText).toBe(true);
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
-
-    // After drilling down into child <p>, re-query bottom actions since toolbar re-renders
-    const childBottomActions = container.querySelector('.arch-rge-bottom-actions') as HTMLElement;
-    expect(childBottomActions).toBeTruthy();
-    expect(parseFloat(childBottomActions.style.left)).toBe(276);
-    expect(parseFloat(childBottomActions.style.top)).toBe(160);
 
     editor.destroy();
   });
@@ -968,6 +964,7 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
     const ifrDoc = iframe.contentDocument!;
     const p = ifrDoc.querySelector('p.test-p') as HTMLElement;
+    const textBlock = ifrDoc.querySelector('.text_block') as HTMLElement;
 
     const canvas = (editor as any).canvas;
     const containerEl = canvas.containerElement as HTMLElement;
@@ -986,17 +983,26 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
         bottom: 60 + pHeight,
         height: pHeight,
       }) as DOMRect;
+    textBlock.getBoundingClientRect = () =>
+      ({
+        left: 40,
+        right: 500,
+        width: 460,
+        top: 50,
+        bottom: 60 + pHeight,
+        height: 10 + pHeight,
+      }) as DOMRect;
 
-    // Drill down to select <p> directly
     p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(canvas.isEditingText).toBe(true);
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
 
     const bottomActions = container.querySelector('.arch-rge-bottom-actions') as HTMLElement;
     expect(bottomActions).toBeTruthy();
     // Initially when there is a lot of text, bottomActions is placed at bottom (60 + 240 = 300)
     expect(parseFloat(bottomActions.style.top)).toBe(300);
+    const selectionOverlay = container.querySelector('.arch-selection-overlay') as HTMLElement;
+    expect(selectionOverlay.style.height).toBe('250px');
 
     // Now simulate deleting almost all text, shrinking height from 240px to 30px
     pHeight = 30;
@@ -1005,6 +1011,7 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
 
     // Bottom actions must have immediately moved up to match the new content height (60 + 30 = 90)
     expect(parseFloat(bottomActions.style.top)).toBe(90);
+    expect(selectionOverlay.style.height).toBe('40px');
 
     editor.destroy();
   });
@@ -1150,13 +1157,13 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     const img = ifrDoc.querySelector('img') as HTMLImageElement;
     const sizeWrapper = ifrDoc.querySelector('.fullWidth') as HTMLElement;
 
-    // 1. Clicking on an image inside `<a href="...">` MUST prevent browser link navigation (`defaultPrevented === true`)
-    //    and select ONLY the outer Row Frame (NOT `td` and `img` together!)
+    // A linked image click prevents navigation and selects the image directly.
     const clickEv = new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 });
     img.dispatchEvent(clickEv);
     expect(clickEv.defaultPrevented).toBe(true);
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('table.row-1'));
-    expect(container.querySelector('.arch-resize-handle--se')).toBeNull();
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(img);
+    expect(container.querySelector('.arch-resize-handle--se')).toBeTruthy();
+    expect(container.querySelector('#inp-img-width')).toBeTruthy();
 
     // 2. Even after a drag/mouseup that sets `suppressNextClick`, the subsequent click MUST still prevent link navigation!
     img.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 100, clientY: 100 }));
@@ -1166,19 +1173,6 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     img.dispatchEvent(postDragClick);
     expect(postDragClick.defaultPrevented).toBe(true);
 
-    // 3. Double-clicking drills down one by one: Row -> Image Block (td) -> Link (<a>) -> Image (<img>)!
-    //    While on Image Block (td) or Link (<a>), `img` resize handles are NOT shown (never selects td and img together)
-    img.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('table.image_block'));
-    expect(container.querySelector('.arch-resize-handle--se')).toBeNull();
-
-    img.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('a.promo-link'));
-    expect(container.querySelector('.arch-resize-handle--se')).toBeNull();
-
-    // Next double-click selects ONLY `<img>` and renders the 4 corner `.arch-resize-handle` handles on `<img>`
-    img.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(img);
     const seHandle = container.querySelector('.arch-resize-handle--se') as HTMLElement;
     expect(seHandle).toBeTruthy();
 
@@ -1212,7 +1206,7 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     editor.destroy();
   });
 
-  it('selects text parent to child (Row -> td/Block -> p) and enters text edit mode only on double-clicking selected p', () => {
+  it('enters text edit mode on one click and keeps structural padding selection', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const editor = new ArchEmailEditor(container);
@@ -1225,6 +1219,7 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
       <table class="text_block" width="100%">
         <tbody><tr><td class="pad">
           <p class="para-text">Click to select, double click to edit me!</p>
+          <p class="para-other">Edit this text with one click too.</p>
         </td></tr></tbody>
       </table>
     </td></tr></tbody>
@@ -1235,48 +1230,92 @@ describe('Pro-Level HTML Email Layout & Customization Engine', () => {
     editor.importHTML(sampleHtml);
     const iframe = container.querySelector('iframe.arch-canvas-iframe') as HTMLIFrameElement;
     const ifrDoc = iframe.contentDocument!;
+    const canvas = (editor as any).canvas;
+    const overlay = container.querySelector('.arch-canvas-overlay') as HTMLElement;
     const p = ifrDoc.querySelector('.para-text') as HTMLElement;
+    const otherText = ifrDoc.querySelector('.para-other') as HTMLElement;
     expect(p).toBeTruthy();
 
-    // 1. Single click on text selects the outer Row frame, does NOT enter edit mode
-    p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('table.row-1'));
-    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
+    p.dispatchEvent(new MouseEvent('click', {
+      bubbles: true,
+      detail: 1,
+      clientX: 24,
+      clientY: 18
+    }));
+    expect(canvas.isEditingText).toBe(true);
+    expect(p.classList.contains('arch-editing-text')).toBe(true);
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
+    expect(overlay.querySelector('.arch-selection-overlay')).toBeTruthy();
+    expect((overlay.querySelector('.arch-selection-overlay') as HTMLElement)
+      .classList.contains('arch-selection-overlay--move-target')).toBe(true);
 
-    // 2. Clicking again while selected keeps it selected, still does NOT enter edit mode
-    p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('table.row-1'));
-    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
+    const moveHandle = overlay.querySelector<HTMLButtonElement>('.arch-canvas-move-handle');
+    expect(moveHandle).toBeTruthy();
+    moveHandle!.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 40,
+      clientY: 20
+    }));
+    const textBlock = ifrDoc.querySelector('.text_block');
+    expect((canvas as any).pointerDragCandidate.unit).toBe(textBlock);
+    (canvas as any).handlePointerDragMove(60, 20);
+    expect(canvas.draggedUnit).toBe(textBlock);
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    expect(canvas.draggedUnit).toBeNull();
 
-    // 3. 1st Double-click drills down to the parent `td`/Block (`table.text_block`), NOT edit mode
+    otherText.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(canvas.isEditingText).toBe(true);
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBe(otherText);
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(otherText);
+
+    ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('.text_block'));
+    expect(canvas.isEditingText).toBe(false);
+
     expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
 
-    // Double-clicking in the empty left/right space of parent `td.pad` keeps the parent selected (does NOT select `<p>`)
     const tdPad = ifrDoc.querySelector('td.pad') as HTMLElement;
-    tdPad.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('.text_block'));
+    tdPad.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(canvas.isEditingText).toBe(false);
     expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
-
-    // 4. Actually double-clicking ON `<p>` drills down from `td`/Block to select `<p>` itself (still NOT edit mode!)
-    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
-    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
-
-    // 5. 3rd Double-click (while `<p>` is selected) makes `<p>` editable (`.arch-editing-text` is active)
-    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-editing-text')).toBe(p);
-
-    // 6. Pressing Escape exits text edit mode while keeping `<p>` selected, then climbs up `p -> td/Block -> Row`
-    ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
-
-    ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('.text_block'));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('.row-1'));
 
     editor.destroy();
+  });
+
+  it('uses the text host as the move target when it has no movable parent', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const editor = new ArchEmailEditor(container);
+    editor.importHTML('<p class="standalone-text">Move this text</p>');
+
+    const canvas = (editor as any).canvas;
+    const ifrDoc = canvas.iframe.contentDocument as Document;
+    const overlay = container.querySelector('.arch-canvas-overlay') as HTMLElement;
+    const p = ifrDoc.querySelector('.standalone-text') as HTMLElement;
+    expect(canvas.findMoveableUnit(p)).toBe(p);
+
+    p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    const moveHandle = overlay.querySelector<HTMLButtonElement>('.arch-canvas-move-handle');
+    expect(moveHandle).toBeTruthy();
+    expect(overlay.querySelector('.arch-selection-overlay--move-target')).toBeTruthy();
+    moveHandle!.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 40,
+      clientY: 20
+    }));
+    expect(canvas.pointerDragCandidate.unit).toBe(p);
+    canvas.handlePointerDragMove(60, 20);
+    expect(canvas.draggedUnit).toBe(p);
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    expect(canvas.draggedUnit).toBeNull();
+
+    editor.destroy();
+    container.remove();
   });
 
   it('animates 3-column displacement transitions live during left/right drag and cleans up on drop & export', () => {
@@ -1633,7 +1672,7 @@ describe('Figma vertical displacement', () => {
     editor.destroy();
   });
 
-  it('shows a visible blinking black cursor matching text height and places caret on double click', () => {
+  it('shows a visible blinking black cursor and places caret on a single click', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const editor = new ArchEmailEditor(container);
@@ -1655,6 +1694,9 @@ describe('Figma vertical displacement', () => {
     expect(styleEl.textContent).toContain('a.arch-editing-text');
     expect(styleEl.textContent).toContain('display: inline-flex !important;');
     expect(styleEl.textContent).toContain('line-height: normal !important;');
+    expect(styleEl.textContent).toMatch(
+      /\.arch-editing-text\.arch-selected-element\s*\{\s*outline:\s*none\s*!important;/
+    );
 
     // Mock caret placement API in test DOM environment
     ifrDoc.caretRangeFromPoint = (_x: number, _y: number) => {
@@ -1664,18 +1706,7 @@ describe('Figma vertical displacement', () => {
       return range;
     };
 
-    // 1. Single click selects the outer container (div.menu-links)
-    a1.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('.menu-links'));
-    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
-
-    // 2. Double-click drills down to select the link (a1)
-    a1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(a1);
-    expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
-
-    // 3. Double-clicking on selected a1 enters inline text edit mode with blinking black cursor
-    a1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2, clientX: 50, clientY: 20 }));
+    a1.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientX: 50, clientY: 20 }));
     expect(ifrDoc.querySelector('.arch-editing-text')).toBe(a1);
     expect(a1.classList.contains('arch-editing-text')).toBe(true);
 
@@ -1688,7 +1719,7 @@ describe('Figma vertical displacement', () => {
     const activeRange = sel?.getRangeAt(0);
     expect(a1.contains(activeRange!.startContainer)).toBe(true);
 
-    // 3. Exiting text edit mode removes .arch-editing-text and clears caret-color property
+    // Exiting text edit mode removes .arch-editing-text and clears caret-color property
     canvas.exitTextEditMode();
     expect(ifrDoc.querySelector('.arch-editing-text')).toBeNull();
     expect(a1.style.getPropertyValue('caret-color')).toBe('');
@@ -1714,7 +1745,7 @@ describe('Figma vertical displacement', () => {
     const rightColumn = doc.querySelector('.col-right') as HTMLElement;
     const canvas = (editor as any).canvas;
 
-    sourceContent.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    row.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     expect(canvas.activeMoveableUnit === row).toBe(true);
     sourceContent.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
     expect(canvas.activeMoveableUnit === leftColumn).toBe(true);
@@ -1751,7 +1782,7 @@ describe('Figma vertical displacement', () => {
     const sourceContent = sourceRow.querySelector('p') as HTMLElement;
     const canvas = (editor as any).canvas;
 
-    sourceContent.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    sourceRow.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     expect(canvas.activeMoveableUnit === sourceRow).toBe(true);
     sourceContent.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 10, clientY: 10 }));
     canvas.handlePointerDragMove(30, 10);
@@ -1812,16 +1843,12 @@ describe('Figma vertical displacement', () => {
     const imgX = iconX.querySelector('img') as HTMLElement;
     const canvas = (editor as any).canvas;
 
-    // 1. Single click on X icon selects the outer Row frame (Figma container model)
+    // A single click selects the image directly.
     imgX.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(ifrDoc.querySelector('table.row'));
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(imgX);
 
-    // 2. Double-click drills down to Right Column
-    imgX.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(colRight);
-
-    // 3. Double-click again drills down into the X icon table itself
-    imgX.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    // Select the icon table as the drag unit before testing icon reordering.
+    canvas.selectUnit(iconX, iconX);
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(iconX);
 
     // Mock horizontal rects for the 3 icons (40px wide each, at x=400, 440, 480)
@@ -2253,7 +2280,7 @@ describe('Figma vertical displacement', () => {
     container.remove();
   });
 
-  it('Figma model: hovering hovers parent element, single-click selects parent item (no child resize options), double-click selects text element and shows resize options', () => {
+  it('Figma model: hovering resolves the text parent and one click starts inline editing', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
 
@@ -2280,7 +2307,6 @@ describe('Figma vertical displacement', () => {
     const ifrDoc = canvas.iframe.contentDocument as Document;
     const overlay = container.querySelector('.arch-canvas-overlay') as HTMLElement;
 
-    const row = ifrDoc.querySelector('.row-1') as HTMLElement;
     const textBlock = ifrDoc.querySelector('.text_block') as HTMLElement;
     const p = ifrDoc.querySelector('.para-item') as HTMLElement;
 
@@ -2289,38 +2315,23 @@ describe('Figma vertical displacement', () => {
     expect(textBlock.classList.contains('arch-hover-element')).toBe(true);
     expect(p.classList.contains('arch-hover-element')).toBe(false);
 
-    // 2. Single click on text selects parent item (Row Frame / parent container)
+    // One click edits the paragraph directly.
     p.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(row);
-    // On parent click, child text element does NOT show resize options
-    expect(overlay.querySelector('.arch-resize-handle')).toBeNull();
-    // Low-opacity selection overlay is visible on select
-    expect(overlay.querySelector('.arch-selection-overlay')).not.toBeNull();
-    expect((overlay.querySelector('.arch-selection-overlay') as HTMLElement).style.display).not.toBe('none');
-
-    // 3. First double-click drills down to parent block (.text_block)
-    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
-    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(textBlock);
-    // While on parent block, child text element still does NOT show resize options
-    expect(overlay.querySelector('.arch-resize-handle')).toBeNull();
-    expect(overlay.querySelector('.arch-selection-overlay')).not.toBeNull();
-
-    // 4. Second double-click drills down to select the text element itself (<p>)
-    p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    expect(canvas.isEditingText).toBe(true);
     expect(ifrDoc.querySelector('.arch-selected-element')).toBe(p);
-    // THIS TIME, text element is selected and shows resize options
-    expect(overlay.querySelector('.arch-resize-handle--e')).toBeTruthy();
-    expect(overlay.querySelector('.arch-resize-handle--se')).toBeTruthy();
-    expect(overlay.querySelector('.arch-selection-overlay')).not.toBeNull();
+    expect(ifrDoc.querySelector('.arch-editing-text')).toBe(p);
+    expect(overlay.querySelector('.arch-resize-handle')).toBeNull();
+    expect(overlay.querySelector('.arch-selection-overlay')).toBeTruthy();
 
-    // 5. Next double-click enters inline text edit mode: low opacity overlay is GONE on text edit mode!
     p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
     expect(canvas.isEditingText).toBe(true);
-    expect(overlay.querySelector('.arch-selection-overlay')).toBeNull();
+    expect(overlay.querySelector('.arch-selection-overlay')).toBeTruthy();
+    expect((overlay.querySelector('.arch-selection-overlay') as HTMLElement)
+      .classList.contains('arch-selection-overlay--move-target')).toBe(true);
 
-    // 6. Exiting text edit mode (e.g. Escape key): low opacity overlay returns on select
     ifrDoc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(canvas.isEditingText).toBe(false);
+    expect(ifrDoc.querySelector('.arch-selected-element')).toBe(textBlock);
     expect(overlay.querySelector('.arch-selection-overlay')).not.toBeNull();
 
     editor.destroy();

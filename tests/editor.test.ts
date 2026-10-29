@@ -1215,6 +1215,13 @@ describe('ArchEmailEditor Core Engine', () => {
     expect(roEditor.isReadOnly()).toBe(true);
     expect(rootEl?.classList.contains('arch-editor--readonly')).toBe(true);
 
+    roEditor.importHTML('<h1>Read-only heading</h1>');
+    const heading = ifrDoc?.querySelector('h1') as HTMLElement;
+    heading.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(heading.classList.contains('arch-editing-text')).toBe(false);
+    expect(heading.getAttribute('contenteditable')).not.toBe('true');
+    expect(roContainer.querySelector('.arch-canvas-move-handle')).toBeNull();
+
     roEditor.destroy();
     roContainer.remove();
   });
