@@ -4042,3 +4042,181 @@ body.arch-canvas-dragging *,
 .arch-placeholder-item__copy.is-copied {
   color: #16a34a;
 }
+
+.arch-ai-sidepanel .arch-assets-body {
+  display: flex !important;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden !important;
+  padding: 0 !important;
+  background: #f8fafc;
+}
+
+.arch-ai-chat {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  flex-direction: column;
+  color: #1e293b;
+  background: #f8fafc;
+  font-family: inherit;
+}
+
+.arch-ai-context {
+  padding: 10px 12px 0;
+}
+
+.arch-ai-context-badge {
+  display: block;
+  overflow: hidden;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-size: 11px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arch-ai-transcript {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 12px;
+  overscroll-behavior: contain;
+}
+
+.arch-ai-message {
+  max-width: 100%;
+  border-radius: 8px;
+  padding: 8px 10px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.arch-ai-message--user {
+  align-self: flex-end;
+  color: #fff;
+  background: #2563eb;
+}
+
+.arch-ai-message--assistant {
+  align-self: flex-start;
+  border: 1px solid #e2e8f0;
+  color: #1e293b;
+  background: #fff;
+}
+
+.arch-ai-message--error {
+  align-self: stretch;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.arch-ai-message--status {
+  align-self: flex-start;
+  padding: 2px 4px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.arch-ai-compose {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 7px;
+  border-top: 1px solid #e2e8f0;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.arch-ai-label {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.arch-ai-input {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px;
+  color: #1e293b;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.arch-ai-input:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 1px;
+  border-color: #3b82f6;
+}
+
+.arch-ai-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.arch-ai-button {
+  min-width: 56px;
+  min-height: 30px;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  padding: 5px 10px;
+  color: #334155;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.arch-ai-send {
+  border-color: #2563eb;
+  color: #fff;
+  background: #2563eb;
+}
+
+.arch-ai-button:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.arch-ai-button:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+.arch-ai-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.arch-ai-attribution {
+  flex: 0 0 auto;
+  padding: 0 12px 9px;
+  color: #64748b;
+  font-size: 10px;
+  text-align: right;
+  text-decoration: none;
+}
+
+.arch-ai-attribution:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}

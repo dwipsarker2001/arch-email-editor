@@ -693,6 +693,8 @@ export class ArchEmailEditor {
       {
         onAddBlock: (type) => this.addBlock(type),
         onAddRowLayout: (layout) => this.addRowLayout(layout),
+        aiOptions: this.options.ai ?? {},
+        createAiEditorToolCallbacks: () => this.createAiEditorToolCallbacks(),
         onInsertSection: (section) => {
           this.insertHTML(section.html);
         },

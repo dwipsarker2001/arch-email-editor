@@ -8,16 +8,20 @@
  * 3. Settings: Global email document settings (Content width, alignment, colors, fonts, preheader).
  */
 
-import { BlockType, RowLayoutType, ViewportMode, EmailDocument, SelectedElementInfo, PrebuiltSection } from '../types';
+import { BlockType, RowLayoutType, ViewportMode, EmailDocument, SelectedElementInfo, PrebuiltSection, AiOptions } from '../types';
+import type { EditorToolCallbacks } from '../ai/editorTools';
 import { Inspector, InspectorEvents } from './Inspector';
 import { PlaceholdersSidepanel } from './inspector/PlaceholdersSidepanel';
 import { getDefaultSections } from '../engine/sections';
+import { AiAssistant } from './AiAssistant';
 
 export type RightPanelTab = 'content' | 'rows' | 'settings' | 'blocks' | 'sections';
 
 export interface RightPanelEvents extends InspectorEvents {
   onAddBlock: (type: BlockType) => void;
   onAddRowLayout: (layout: RowLayoutType) => void;
+  aiOptions: AiOptions;
+  createAiEditorToolCallbacks: () => EditorToolCallbacks;
   onInsertSection?: (section: PrebuiltSection) => void;
   onDeselect?: () => void;
   placeholders?: any;
@@ -48,8 +52,9 @@ export class RightPanel {
   private elementInspector: Inspector;
   // Template strings sidepanel (slides over the Content tab)
   private placeholdersPanel: PlaceholdersSidepanel | null = null;
-  // Empty AI sidepanel (slides over the Content tab)
+  // AI sidepanel (slides over the Content tab)
   private aiPanel: HTMLElement | null = null;
+  private aiAssistant: AiAssistant | null = null;
   // Document inspector displays in the Settings tab for global design settings
   private documentInspector: Inspector;
 
@@ -123,6 +128,7 @@ export class RightPanel {
 
   public setReadOnly(readOnly: boolean): void {
     this.readOnly = readOnly;
+    this.aiAssistant?.setReadOnly(readOnly);
     if (readOnly) {
       this.element.classList.add('arch-right-panel--readonly');
       this.element.querySelectorAll<HTMLElement>('.arch-block-card').forEach((card) => {
@@ -176,7 +182,7 @@ export class RightPanel {
     }
   }
 
-  /** Opens (or toggles) the empty AI sidepanel in the right sidebar. */
+  /** Opens (or toggles) the AI sidepanel in the right sidebar. */
   public openAiPanel(): void {
     this.element.classList.remove('is-collapsed');
     if (this.activeTab !== 'blocks') {
@@ -199,7 +205,7 @@ export class RightPanel {
       <div class="arch-prop-header arch-assets-header">
         <div class="arch-prop-title">AI Assistant</div>
         <div class="arch-prop-actions arch-assets-header-actions">
-          <button type="button" class="arch-icon-btn" id="btn-ai-close" title="Close">
+          <button type="button" class="arch-icon-btn" id="btn-ai-close" title="Close" aria-label="Close AI Assistant">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -209,12 +215,20 @@ export class RightPanel {
 
     contentPanel.appendChild(panel);
     this.aiPanel = panel;
+    this.aiAssistant = new AiAssistant(
+      panel.querySelector<HTMLElement>('.arch-assets-body')!,
+      this.events.aiOptions,
+      this.events.createAiEditorToolCallbacks,
+      this.readOnly,
+    );
     panel.querySelector('#btn-ai-close')?.addEventListener('click', () => this.closeAiPanel());
     panel.classList.add('is-open');
   }
 
   /** Closes the AI sidepanel. */
   public closeAiPanel(): void {
+    this.aiAssistant?.dispose();
+    this.aiAssistant = null;
     this.aiPanel?.remove();
     this.aiPanel = null;
   }
@@ -669,6 +683,7 @@ export class RightPanel {
   }
 
   public destroy(): void {
+    this.closeAiPanel();
     this.elementInspector.destroy();
     this.documentInspector.destroy();
     this.element.remove();
