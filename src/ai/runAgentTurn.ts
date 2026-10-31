@@ -6,7 +6,17 @@ const MAX_TOOL_EXECUTIONS = 8;
 export type AiToolProgressStatus = 'running' | 'complete' | 'error';
 
 function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null) {
+    const rec = error as Record<string, unknown>;
+    if (typeof rec.message === 'string') return rec.message;
+    if (typeof rec.error === 'string') return rec.error;
+    if (typeof rec.error === 'object' && rec.error !== null) {
+      const inner = rec.error as Record<string, unknown>;
+      if (typeof inner.message === 'string') return inner.message;
+    }
+  }
+  return String(error);
 }
 
 function throwIfAborted(signal: AbortSignal): void {

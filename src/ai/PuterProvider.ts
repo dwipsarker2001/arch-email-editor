@@ -1,8 +1,9 @@
+import { toWireMessages } from './toWireMessages';
 import type { AiAssistantTurn, AiMessage, AiProvider, AiToolCall, AiToolDefinition } from './types';
 
 interface PuterAi {
   chat(
-    messages: AiMessage[],
+    messages: unknown[],
     options: { tools: AiToolDefinition[]; signal: AbortSignal; normalize: true }
   ): Promise<unknown>;
 }
@@ -79,7 +80,21 @@ export class PuterProvider implements AiProvider {
     signal: AbortSignal
   ): Promise<AiAssistantTurn> {
     const puter = await getPuterClient();
-    const result = await puter.ai.chat(messages, { tools, signal, normalize: true });
+    const result = await puter.ai.chat(toWireMessages(messages), { tools, signal, normalize: true });
+
+    if (isRecord(result)) {
+      if (result.error !== undefined || result.code === 'bad_request') {
+        const errorMsg = typeof result.message === 'string'
+          ? result.message
+          : typeof result.error === 'string'
+            ? result.error
+            : isRecord(result.error) && typeof result.error.message === 'string'
+              ? result.error.message
+              : 'Puter AI request failed';
+        throw new Error(errorMsg);
+      }
+    }
+
     const message = isRecord(result) && isRecord(result.message) ? result.message : null;
     if (!message || (message.content !== undefined && message.content !== null
       && typeof message.content !== 'string')) {

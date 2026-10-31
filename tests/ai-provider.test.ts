@@ -201,4 +201,102 @@ describe('AI provider boundary', () => {
         }],
       });
   });
+
+  it('ensures assistant tool calls sent to Puter include type function and function property', async () => {
+    const chat = vi.fn().mockResolvedValue({ message: { role: 'assistant', content: 'Updated' } });
+    (window as Window & { puter?: { ai: { chat: typeof chat } } }).puter = { ai: { chat } };
+    const provider = new PuterProvider();
+
+    const historyWithToolCall: AiMessage[] = [
+      { role: 'user', content: 'Update text' },
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [{ id: 'call-1', name: 'replace_selected_element', arguments: '{"html":"<b>test</b>"}' }],
+      },
+      { role: 'tool', tool_call_id: 'call-1', content: 'Selected element replaced.' },
+    ];
+
+    await provider.complete(historyWithToolCall, tools, new AbortController().signal);
+
+    expect(chat).toHaveBeenCalledWith([
+      { role: 'user', content: 'Update text' },
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [{
+          id: 'call-1',
+          type: 'function',
+          function: {
+            name: 'replace_selected_element',
+            arguments: '{"html":"<b>test</b>"}',
+          },
+        }],
+      },
+      { role: 'tool', tool_call_id: 'call-1', content: 'Selected element replaced.' },
+    ], expect.objectContaining({ tools, normalize: true }));
+  });
+
+  it('ensures assistant tool calls sent to custom endpoint include type function and function property', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { role: 'assistant', content: 'Done' } }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetch);
+
+    const provider = new OpenAICompatibleProvider({
+      endpoint: 'https://ai.example.test/v1/chat/completions',
+      model: 'mail-model',
+    });
+
+    const historyWithToolCall: AiMessage[] = [
+      { role: 'user', content: 'Update text' },
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [{ id: 'call-1', name: 'replace_email_html', arguments: '{"html":"<p>new</p>"}' }],
+      },
+      { role: 'tool', tool_call_id: 'call-1', content: 'Email HTML replaced.' },
+    ];
+
+    await provider.complete(historyWithToolCall, tools, new AbortController().signal);
+
+    expect(fetch).toHaveBeenCalledWith(
+      'https://ai.example.test/v1/chat/completions',
+      expect.objectContaining({
+        body: JSON.stringify({
+          model: 'mail-model',
+          messages: [
+            { role: 'user', content: 'Update text' },
+            {
+              role: 'assistant',
+              content: null,
+              tool_calls: [{
+                id: 'call-1',
+                type: 'function',
+                function: {
+                  name: 'replace_email_html',
+                  arguments: '{"html":"<p>new</p>"}',
+                },
+              }],
+            },
+            { role: 'tool', tool_call_id: 'call-1', content: 'Email HTML replaced.' },
+          ],
+          tools,
+        }),
+      }),
+    );
+  });
+
+  it('extracts error message when Puter returns an error payload', async () => {
+    const chat = vi.fn().mockResolvedValue({
+      error: 'each tool_call must have a \'function\' property',
+      message: 'each tool_call must have a \'function\' property',
+      code: 'bad_request',
+    });
+    (window as Window & { puter?: { ai: { chat: typeof chat } } }).puter = { ai: { chat } };
+    const provider = new PuterProvider();
+
+    await expect(provider.complete(messages, tools, new AbortController().signal))
+      .rejects.toThrow('each tool_call must have a \'function\' property');
+  });
 });

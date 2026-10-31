@@ -1,3 +1,4 @@
+import { toWireMessages } from './toWireMessages';
 import type { AiAssistantTurn, AiMessage, AiProvider, AiToolCall, AiToolDefinition } from './types';
 
 interface OpenAICompatibleOptions {
@@ -28,7 +29,7 @@ export class OpenAICompatibleProvider implements AiProvider {
     const response = await fetch(this.options.endpoint, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ model: this.options.model, messages, tools }),
+      body: JSON.stringify({ model: this.options.model, messages: toWireMessages(messages), tools }),
       signal,
     });
     if (!response.ok) throw new Error(`AI request failed with HTTP ${response.status}`);

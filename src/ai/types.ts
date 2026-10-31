@@ -9,6 +9,11 @@ export interface AiToolCall {
   id: string;
   name: string;
   arguments: string;
+  type?: 'function';
+  function?: {
+    name: string;
+    arguments: string;
+  };
 }
 
 export interface AiToolDefinition {

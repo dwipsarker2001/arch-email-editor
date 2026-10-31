@@ -15,6 +15,20 @@ const SYSTEM_INSTRUCTIONS = [
 type EntryKind = 'user' | 'assistant' | 'error' | 'status';
 let nextPromptId = 0;
 
+function formatError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null) {
+    const rec = error as Record<string, unknown>;
+    if (typeof rec.message === 'string') return rec.message;
+    if (typeof rec.error === 'string') return rec.error;
+    if (typeof rec.error === 'object' && rec.error !== null) {
+      const inner = rec.error as Record<string, unknown>;
+      if (typeof inner.message === 'string') return inner.message;
+    }
+  }
+  return String(error);
+}
+
 export class AiAssistant {
   private readonly transcript: HTMLElement;
   private readonly prompt: HTMLTextAreaElement;
@@ -40,7 +54,7 @@ export class AiAssistant {
     try {
       provider = createProvider(options);
     } catch (error) {
-      configurationError = error instanceof Error ? error.message : String(error);
+      configurationError = formatError(error);
     }
     this.provider = provider;
     const promptId = `arch-ai-prompt-${++nextPromptId}`;
@@ -193,7 +207,7 @@ export class AiAssistant {
       if (controller.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
         if (!this.cancelled && !this.disposed) this.appendEntry('status', 'Request cancelled.');
       } else if (!this.disposed) {
-        this.appendEntry('error', error instanceof Error ? error.message : String(error));
+        this.appendEntry('error', formatError(error));
       }
     } finally {
       if (this.activeController === controller) {
