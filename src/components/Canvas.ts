@@ -66,6 +66,7 @@ import {
 } from '../engine/adapters';
 import { validateEmailStructure } from '../engine/history';
 import { CanvasCodeEditor } from './CanvasCodeEditor';
+import { highlightSpellingErrors, clearSpellingHighlights } from '../engine/spellcheck';
 
 export interface CanvasEvents {
   onSelectBlock: (id: string | null) => void;
@@ -88,6 +89,7 @@ export interface CanvasEvents {
   onOpenPlaceholders?: () => void;
   /** Opens the AI sidepanel in the right sidebar. */
   onOpenAi?: () => void;
+  spellcheck?: boolean;
 }
 
 function isTextLeafElement(el: HTMLElement | null): boolean {
@@ -166,6 +168,8 @@ private zoomLevel: number = 1;
   } | null = null;
   private columnResizeHandles: HTMLElement[] = [];
   private readOnly: boolean = false;
+  private spellcheck: boolean = false;
+  private spellcheckDebounce: any = null;
   private activeColumnResize: {
     handle: HTMLElement;
     row: HTMLElement;
@@ -182,6 +186,7 @@ private zoomLevel: number = 1;
 
   constructor(events: CanvasEvents) {
     this.events = events;
+    this.spellcheck = Boolean(events.spellcheck);
 
     // Root canvas wrapper
     this.element = document.createElement('div');
@@ -196,6 +201,7 @@ private zoomLevel: number = 1;
     this.iframe = document.createElement('iframe');
     this.iframe.className = 'arch-canvas-iframe';
     this.iframe.setAttribute('title', 'Email Canvas Preview');
+    if (this.spellcheck) this.iframe.setAttribute('spellcheck', 'true');
 
     // Non-invasive parent-document Figma HUD overlay layer (zero pollution inside iframe DOM)
     this.overlayLayer = document.createElement('div');
@@ -449,6 +455,47 @@ private zoomLevel: number = 1;
 
   public isReadOnly(): boolean {
     return this.readOnly;
+  }
+
+  public setSpellcheck(enabled: boolean): void {
+    this.spellcheck = enabled;
+    if (enabled) {
+      this.iframe.setAttribute('spellcheck', 'true');
+    } else {
+      this.iframe.removeAttribute('spellcheck');
+    }
+    const doc = this.iframe.contentDocument;
+    if (doc) {
+      doc.documentElement?.setAttribute('spellcheck', enabled ? 'true' : 'false');
+      if (enabled && !doc.documentElement?.getAttribute('lang')) {
+        doc.documentElement?.setAttribute('lang', 'en');
+      }
+      if (doc.body) {
+        doc.body.setAttribute('spellcheck', enabled ? 'true' : 'false');
+        if (enabled && !doc.body.getAttribute('lang')) {
+          doc.body.setAttribute('lang', 'en');
+        }
+        doc.body.querySelectorAll('[contenteditable]').forEach((el) => {
+          el.setAttribute('spellcheck', enabled ? 'true' : 'false');
+          if (enabled) el.setAttribute('lang', 'en');
+        });
+      }
+    }
+    if (enabled) {
+      this.runSpellcheck();
+    } else {
+      clearSpellingHighlights(this.iframe.contentDocument);
+    }
+  }
+
+  public isSpellcheckEnabled(): boolean {
+    return this.spellcheck;
+  }
+
+  public runSpellcheck(): void {
+    if (this.spellcheck) {
+      highlightSpellingErrors(this.iframe.contentDocument);
+    }
   }
 
   public getElement(): HTMLElement {
@@ -1461,6 +1508,7 @@ private zoomLevel: number = 1;
 
     // 7. Always bind delegated iframe events after `ifrDoc.open()/write()/close()`
     this.bindIframeEvents(ifrDoc);
+    if (this.spellcheck) this.runSpellcheck();
 
     this.adjustHeight();
     this.emitLayersUpdate();
@@ -1668,6 +1716,12 @@ private zoomLevel: number = 1;
       }
     `;
     (doc.head || doc.documentElement).appendChild(styleEl);
+    if (!doc.getElementById('arch-spellcheck-style')) {
+      const spStyle = doc.createElement('style');
+      spStyle.id = 'arch-spellcheck-style';
+      spStyle.textContent = '::highlight(arch-spellcheck){text-decoration:underline wavy #ef4444 !important;text-decoration-thickness:1.5px !important;text-underline-offset:3px !important;}';
+      (doc.head || doc.documentElement).appendChild(spStyle);
+    }
   }
 
   /**
@@ -1692,13 +1746,22 @@ private zoomLevel: number = 1;
       el.removeAttribute('spellcheck');
     });
 
+    if (doc.documentElement) {
+      doc.documentElement.setAttribute('spellcheck', this.spellcheck ? 'true' : 'false');
+      if (this.spellcheck && !doc.documentElement.getAttribute('lang')) doc.documentElement.setAttribute('lang', 'en');
+    }
+    if (doc.body) {
+      doc.body.setAttribute('spellcheck', this.spellcheck ? 'true' : 'false');
+      if (this.spellcheck && !doc.body.getAttribute('lang')) doc.body.setAttribute('lang', 'en');
+    }
     const candidates = doc.body.querySelectorAll<HTMLElement>(
       'h1, h2, h3, h4, h5, h6, p, li, blockquote, a, span, div, td, th'
     );
     candidates.forEach((el) => {
       if (isEditableTextHost(el)) {
         el.setAttribute('contenteditable', 'true');
-        el.setAttribute('spellcheck', 'false');
+        el.setAttribute('spellcheck', this.spellcheck ? 'true' : 'false');
+        if (this.spellcheck) el.setAttribute('lang', 'en');
       }
     });
 
@@ -1885,6 +1948,10 @@ private zoomLevel: number = 1;
         this.events.onContentChange(cleanHtml);
         this.emitLayersUpdate();
         this.syncHUDPosition();
+        if (this.spellcheck) {
+          clearTimeout(this.spellcheckDebounce);
+          this.spellcheckDebounce = setTimeout(() => this.runSpellcheck(), 150);
+        }
       },
       { signal }
     );
@@ -1893,6 +1960,10 @@ private zoomLevel: number = 1;
       'keyup',
       () => {
         this.syncHUDPosition();
+        if (this.spellcheck) {
+          clearTimeout(this.spellcheckDebounce);
+          this.spellcheckDebounce = setTimeout(() => this.runSpellcheck(), 150);
+        }
       },
       { signal }
     );
@@ -1920,6 +1991,10 @@ private zoomLevel: number = 1;
     if (typeof MutationObserver !== 'undefined' && doc.body) {
       this.iframeMutationObserver = new MutationObserver(() => {
         this.syncHUDPosition();
+        if (this.spellcheck) {
+          clearTimeout(this.spellcheckDebounce);
+          this.spellcheckDebounce = setTimeout(() => this.runSpellcheck(), 150);
+        }
       });
       this.iframeMutationObserver.observe(doc.body, {
         childList: true,
@@ -1935,6 +2010,10 @@ private zoomLevel: number = 1;
     if (typeof ResizeObserver !== 'undefined' && doc.body) {
       this.contentResizeObserver = new ResizeObserver(() => {
         this.syncHUDPosition();
+        if (this.spellcheck) {
+          clearTimeout(this.spellcheckDebounce);
+          this.spellcheckDebounce = setTimeout(() => this.runSpellcheck(), 150);
+        }
       });
       this.contentResizeObserver.observe(doc.body);
     }

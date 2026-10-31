@@ -808,6 +808,7 @@ Initializes and mounts the editor.
 | `customSections` | `PrebuiltSection[]` | `[]` | Additional modular sections appended to the catalog. |
 | `theme` | `'light' \| 'dark'` | `'light'` | UI chrome theme. |
 | `sidebarPosition` | `'left' \| 'right'` | `'right'` | Places the Blocks/Sections/Settings sidebar on the left or right of the canvas. |
+| `spellcheck` | `boolean` | `false` | Enables offline English spellchecking with visual error indicators in edit and non-edit modes. |
 | `readOnly` | `boolean` | `false` | Disables editing mode. |
 | `onChange` | `(doc: EmailDocument) => void` | `undefined` | Fired when any content or structure changes. |
 | `onSelectBlock` | `(block: BlockNode \| null) => void` | `undefined` | Fired when an element or block is selected. |
@@ -880,6 +881,8 @@ Initializes and mounts the editor.
 | `undo()` | `void` | Reverts the last change. |
 | `redo()` | `void` | Redoes the previously undone change. |
 | `setViewportMode(mode)` | `void` | Changes viewport mode (`'desktop'` \| `'tablet'` \| `'mobile'`). |
+| `setSpellcheck(enabled)` | `void` | Dynamically enables or disables offline spellchecking. |
+| `isSpellcheckEnabled()` | `boolean` | Returns whether spellchecking is currently enabled. |
 | `getSidebarPosition()` | `'left' \| 'right'` | Returns the current sidebar side. |
 | `setSidebarPosition(position)` | `void` | Moves the sidebar to the left or right of the canvas. |
 | `destroy()` | `void` | Unbinds all listeners and removes the editor from DOM. |

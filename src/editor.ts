@@ -146,6 +146,15 @@ export class ArchEmailEditor {
   public isReadOnly(): boolean {
     return Boolean(this.options.readOnly);
   }
+  public setSpellcheck(enabled: boolean): void {
+    this.options.spellcheck = enabled;
+    this.canvas?.setSpellcheck(enabled);
+  }
+
+  public isSpellcheckEnabled(): boolean {
+    return this.canvas?.isSpellcheckEnabled() ?? Boolean(this.options.spellcheck);
+  }
+
 
   public setTheme(theme: 'light' | 'dark'): void {
     this.options.theme = theme;
@@ -653,6 +662,7 @@ export class ArchEmailEditor {
 
     // 3. Initialize Canvas (takes full width on left)
     this.canvas = new Canvas({
+      spellcheck: this.options.spellcheck ?? false,
       onSelectBlock: (id) => this.selectBlock(id),
       onSelectElement: (info) => this.selectElement(info),
       getHtml: () => this.getHTML(),

@@ -26,5 +26,6 @@ export { ArchEmailEditor, compileToEmailHtml, getDefaultDocument, parseHtmlToDoc
 export { DEFAULT_PREBUILT_SECTIONS, getDefaultSections } from './engine/sections';
 export { RightPanel } from './components/RightPanel';
 export { Inspector } from './components/Inspector';
+export { isSpelledCorrectly, getSpellingSuggestions, highlightSpellingErrors } from './engine/spellcheck';
 export default ArchEmailEditor;
 export * from './types';

@@ -308,6 +308,8 @@ export interface EditorOptions {
   actions?: ToolbarActionsOptions;
   /** AI provider configuration */
   ai?: AiOptions;
+  /** Whether browser spellchecking is enabled in editable text elements (default: false) */
+  spellcheck?: boolean;
   /** Shortcut to show/hide "Import HTML" button (default: true) */
   showImportHtml?: boolean;
   /** Shortcut to show/hide "Export HTML" button (default: true) */

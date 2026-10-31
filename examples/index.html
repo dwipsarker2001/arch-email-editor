@@ -39,6 +39,7 @@
   <script>
     const Editor = window.ArchEmailEditor.create ? window.ArchEmailEditor : window.ArchEmailEditor.ArchEmailEditor;
     const editor = Editor.create('#editor-container', {
+      spellcheck: true,
       onChange: (doc) => {
         // Document updated in real-time
       }

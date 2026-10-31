@@ -45,6 +45,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.3.0",
+    "@types/typo-js": "^1.2.2",
     "jsdom": "^26.0.0",
     "react": "^19.3.1",
     "typescript": "^5.7.0",
@@ -57,6 +58,7 @@
     "@codemirror/state": "^6.7.6",
     "codemirror": "^6.0.2",
     "lucide": "^1.61.0",
-    "omniroute": "^3.8.52"
+    "omniroute": "^3.8.52",
+    "typo-js": "^1.4.0"
   }
 }

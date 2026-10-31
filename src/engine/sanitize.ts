@@ -186,11 +186,13 @@ export function serializeCleanDocument(
   meta?: FrameMeta
 ): string {
   const clone = ifrDoc.documentElement.cloneNode(true) as HTMLElement;
+  clone.removeAttribute("spellcheck");
+  clone.removeAttribute("contenteditable");
 
   // Remove any internal editor style tags, helper nodes, or empty-column drop placeholders
   clone
     .querySelectorAll(
-      '#arch-canvas-editor-style, .arch-floating-toolbar, .arch-empty-col-placeholder, [data-arch-placeholder]'
+      '#arch-canvas-editor-style, #arch-spellcheck-style, .arch-floating-toolbar, .arch-empty-col-placeholder, [data-arch-placeholder]'
     )
     .forEach((el) => el.remove());
 
