@@ -65,11 +65,14 @@ import {
   wrapContextAwareHtmlSnippet
 } from '../engine/adapters';
 import { validateEmailStructure } from '../engine/history';
+import { CanvasCodeEditor } from './CanvasCodeEditor';
 
 export interface CanvasEvents {
   onSelectBlock: (id: string | null) => void;
   onSelectElement: (info: SelectedElementInfo | null) => void;
   onContentChange: (html: string) => void;
+  getHtml: () => string;
+  applyHtml: (html: string) => void;
   onLayersChange?: (layers: LayerNode[], selectedUnit: HTMLElement | null) => void;
   onAddBlock?: (type: BlockType) => void;
   onReorderBlock?: (sourceId: string, targetIndex: number) => void;
@@ -104,6 +107,8 @@ export class Canvas {
   private iframe: HTMLIFrameElement;
   private overlayLayer: HTMLElement;
   private floatingToolbar: HTMLElement | null = null;
+  private codeEditor: CanvasCodeEditor | null = null;
+  private codeEditorHost: HTMLElement | null = null;
   private bottomActions: HTMLElement | null = null;
   private textToolbar: HTMLElement | null = null;
   private dimensionsBadge: HTMLElement | null = null;
@@ -213,6 +218,13 @@ private zoomLevel: number = 1;
         </svg>
       </button>
       <span class="arch-floating-history-divider"></span>
+      <button class="arch-floating-history-btn arch-btn--code" type="button" title="Edit HTML source" aria-label="Edit HTML source">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m16 18 6-6-6-6"/>
+          <path d="m8 6-6 6 6 6"/>
+        </svg>
+      </button>
+      <span class="arch-floating-history-divider"></span>
       <button class="arch-floating-history-btn arch-btn--placeholder" type="button" title="Placeholders ({})" aria-label="Template strings" aria-haspopup="menu" aria-expanded="false">
         <span style="font-family: monospace; font-size: 13px; font-weight: 700; line-height: 1;">{}</span>
       </button>
@@ -272,6 +284,15 @@ private zoomLevel: number = 1;
         const label = collapsed ? 'Open sidebar' : `Close ${this.sidebarPosition} sidebar`;
         sidebarToggle.title = label;
         sidebarToggle.setAttribute('aria-label', label);
+      }
+    });
+
+    this.floatingHistory.querySelector<HTMLButtonElement>('.arch-btn--code')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.codeEditor) {
+        this.exitCodeMode();
+      } else {
+        this.enterCodeMode();
       }
     });
 
@@ -364,23 +385,65 @@ private zoomLevel: number = 1;
 
   public setReadOnly(readOnly: boolean): void {
     this.readOnly = readOnly;
+    this.codeEditor?.setReadOnly(readOnly);
+    this.floatingHistory?.classList.toggle('is-readonly', readOnly);
     if (readOnly) {
       this.clearSelection();
       this.exitTextEditMode();
       this.removeFloatingToolbar();
-      if (this.floatingHistory) this.floatingHistory.style.display = 'none';
+      if (this.floatingHistory) this.floatingHistory.style.display = '';
       const ifrDoc = this.iframe.contentDocument;
       if (ifrDoc) {
         ifrDoc.body.querySelectorAll('[contenteditable]').forEach((el) => {
           el.removeAttribute('contenteditable');
         });
       }
+
     } else {
       if (this.floatingHistory) this.floatingHistory.style.display = '';
       const ifrDoc = this.iframe.contentDocument;
       if (ifrDoc) {
         this.enableDirectEditing(ifrDoc);
       }
+    }
+  }
+
+  private enterCodeMode(): void {
+    this.codeEditorHost = document.createElement('div');
+    this.codeEditorHost.className = 'arch-canvas-code-editor';
+    this.containerElement.insertBefore(this.codeEditorHost, this.overlayLayer);
+    this.codeEditor = new CanvasCodeEditor(this.codeEditorHost, this.events.getHtml(), this.readOnly);
+    this.containerElement.classList.add('is-code-mode');
+
+    const button = this.floatingHistory?.querySelector<HTMLButtonElement>('.arch-btn--code');
+    if (button) {
+      button.title = 'Return to email preview';
+      button.setAttribute('aria-label', 'Return to email preview');
+      button.classList.add('is-active');
+    }
+
+    this.codeEditor.focus();
+  }
+
+  private exitCodeMode(): void {
+    if (!this.codeEditor) return;
+
+    if (!this.readOnly) {
+      this.events.applyHtml(this.codeEditor.getValue());
+    }
+
+    this.codeEditor.destroy();
+    this.codeEditor = null;
+    this.codeEditorHost?.remove();
+    this.codeEditorHost = null;
+    this.containerElement.classList.remove('is-code-mode');
+
+    const button = this.floatingHistory?.querySelector<HTMLButtonElement>('.arch-btn--code');
+    if (button) {
+      button.title = 'Edit HTML source';
+      button.setAttribute('aria-label', 'Edit HTML source');
+      button.classList.remove('is-active');
+      button.focus();
     }
   }
 
@@ -1332,17 +1395,27 @@ private zoomLevel: number = 1;
 
     if (!hasBlocks && !hasRawHtml) {
       this.clearSelection();
-      this.containerElement.innerHTML = `
-        <div class="arch-canvas-empty">
+      let emptyState = this.containerElement.querySelector<HTMLElement>('.arch-canvas-empty');
+      if (!emptyState) {
+        emptyState = document.createElement('div');
+        emptyState.className = 'arch-canvas-empty';
+        emptyState.innerHTML = `
           <p style="font-weight: 600; font-size: 16px; margin: 0 0 6px 0;">This email is empty</p>
           <p style="margin: 0; color: var(--arch-text-secondary); font-size: 13px;">
             Drag or click blocks from the left palette or import a prebuilt HTML newsletter.
           </p>
-        </div>
-      `;
+        `;
+        this.containerElement.insertBefore(emptyState, this.overlayLayer);
+      }
+      this.iframe.style.display = 'none';
+      this.overlayLayer.style.display = 'none';
       this.emitLayersUpdate();
       return;
     }
+
+    this.containerElement.querySelector('.arch-canvas-empty')?.remove();
+    this.iframe.style.display = '';
+    this.overlayLayer.style.display = '';
 
     if (!this.containerElement.contains(this.iframe)) {
       this.containerElement.innerHTML = '';
@@ -3777,6 +3850,8 @@ private zoomLevel: number = 1;
   }
 
   public destroy(): void {
+    this.codeEditor?.destroy();
+    this.codeEditor = null;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.contentResizeObserver?.disconnect();

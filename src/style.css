@@ -1898,6 +1898,29 @@ input:checked + .arch-toggle-slider:before {
   transition: width 0.2s ease;
 }
 
+.arch-canvas-container.is-code-mode .arch-canvas-iframe,
+.arch-canvas-container.is-code-mode .arch-canvas-overlay {
+  display: none;
+}
+
+.arch-canvas-code-editor {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #ffffff;
+  color: #1f2937;
+}
+
+.arch-canvas-code-editor .cm-editor {
+  height: 100%;
+}
+
+.arch-canvas-floating-history.is-readonly > :not(.arch-btn--code) {
+  display: none !important;
+}
+
 .arch-canvas-container.drag-over {
   border: 2px dashed var(--arch-primary);
 }

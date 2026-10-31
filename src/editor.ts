@@ -655,6 +655,8 @@ export class ArchEmailEditor {
     this.canvas = new Canvas({
       onSelectBlock: (id) => this.selectBlock(id),
       onSelectElement: (info) => this.selectElement(info),
+      getHtml: () => this.getHTML(),
+      applyHtml: (html) => this.importHTML(html),
       onContentChange: (cleanHtml) => {
         this.document.rawHtml = cleanHtml;
         this.recordHistory();
@@ -691,10 +693,10 @@ export class ArchEmailEditor {
 
     this.rightPanel = new RightPanel(
       {
-        onAddBlock: (type) => this.addBlock(type),
-        onAddRowLayout: (layout) => this.addRowLayout(layout),
         aiOptions: this.options.ai ?? {},
         createAiEditorToolCallbacks: () => this.createAiEditorToolCallbacks(),
+        onAddBlock: (type) => this.addBlock(type),
+        onAddRowLayout: (layout) => this.addRowLayout(layout),
         onInsertSection: (section) => {
           this.insertHTML(section.html);
         },
